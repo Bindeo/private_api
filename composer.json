@@ -1,0 +1,21 @@
+{
+    "name": "bindeo/private-api",
+    "description": "Bindeo private api",
+    "license": "proprietary",
+    "type": "project",
+    "autoload": {
+        "psr-4": {
+            "Api\\": "src/",
+            "Bindeo\\": "../common/"
+        }
+    },
+    "require": {
+        "php": ">=5.6.0",
+        "ext-pdo": "*",
+        "ext-mcrypt": "*",
+        "slim/slim": "~3.0",
+        "slim/twig-view": "*",
+        "monolog/monolog": "~1.0",
+        "maxmind-db/reader": "~1.0"
+    }
+}
