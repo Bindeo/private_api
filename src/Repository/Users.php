@@ -11,14 +11,12 @@ class Users extends RepositoryLocatableAbstract
 {
     /**
      * Change the account type of the user
-
-*
-*@param \Api\Entity\User $user
-     * @param int        $newType
-     * @param ResultSet  $types [optional]
-
-*
-*@return User
+     *
+     * @param \Api\Entity\User $user
+     * @param int              $newType
+     * @param ResultSet        $types [optional]
+     *
+     * @return User
      * @throws \Exception
      */
     private function _changeType(User $user, $newType, ResultSet $types = null)
@@ -66,19 +64,16 @@ class Users extends RepositoryLocatableAbstract
         }
 
         return $user->setType($newType)
-                      ->setStorageLeft($newType > 1 ? $user->getStorageLeft() + $storageLeft : 0)
-                      ->setStampsLeft($types->getRows()[$newType - 1]->getMaxStampsMonth());
+                    ->setStorageLeft($newType > 1 ? $user->getStorageLeft() + $storageLeft : 0)
+                    ->setStampsLeft($types->getRows()[$newType - 1]->getMaxStampsMonth());
     }
 
     /**
      * Renew a user account
-
-*
-*@param \Api\Entity\User $user
-
-
-*
-*@return User
+     *
+     * @param \Api\Entity\User $user
+     *
+     * @return User
      * @throws \Exception
      */
     private function _renewAccount(User $user)
@@ -142,13 +137,10 @@ class Users extends RepositoryLocatableAbstract
 
     /**
      * Find a user by id
-
-*
-*@param User $user
-
-
-*
-*@return User
+     *
+     * @param User $user
+     *
+     * @return User
      * @throws \Exception
      */
     public function find(User $user)
@@ -157,7 +149,7 @@ class Users extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT ID_USER, EMAIL, TYPE, NAME, SURNAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
+        $sql = 'SELECT ID_USER, EMAIL, PASSWORD, TYPE, NAME, SURNAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
                 FROM USERS WHERE ID_USER = :id';
         $params = [':id' => $user->getIdUser()];
 
@@ -171,13 +163,38 @@ class Users extends RepositoryLocatableAbstract
     }
 
     /**
+     * Find a user by email
+     *
+     * @param User $user
+     *
+     * @return User
+     * @throws \Exception
+     */
+    public function findEmail(User $user)
+    {
+        if (!$user->getEmail()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $sql = 'SELECT ID_USER, EMAIL, PASSWORD, TYPE, NAME, SURNAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
+                FROM USERS WHERE EMAIL = :email';
+        $params = [':email' => trim(mb_strtolower($user->getEmail()))];
+
+        $data = $this->_db->query($sql, $params, 'Api\Entity\User');
+
+        if (!$data or $this->_db->getError()) {
+            throw new \Exception($this->_db->getError(), 400);
+        }
+
+        return $data->getNumRows() ? $data->getRows()[0] : null;
+    }
+
+    /**
      * Create a new user
-
      *
-*@param User $user
-
+     * @param User $user
      *
-*@return array
+     * @return array
      * @throws \Exception
      */
     public function create(User $user)
@@ -262,11 +279,10 @@ class Users extends RepositoryLocatableAbstract
 
     /**
      * Modify an account
-
-*
-*@param User $user
      *
-*@return User
+     * @param User $user
+     *
+     * @return User
      * @throws \Exception
      */
     public function modify(User $user)
@@ -308,14 +324,10 @@ class Users extends RepositoryLocatableAbstract
 
     /**
      * Modify an account password
-
-*
-*@param User $user
-
-
-
-*
-*@return \Api\Entity\ResultSet
+     *
+     * @param User $user
+     *
+     * @return \Api\Entity\ResultSet
      * @throws \Exception
      */
     public function modifyPassword(User $user)
@@ -364,11 +376,10 @@ class Users extends RepositoryLocatableAbstract
 
     /**
      * Modify an account type
-
-*
-*@param User $user
      *
-*@return User
+     * @param User $user
+     *
+     * @return User
      * @throws \Exception
      */
     public function changeType(User $user)
@@ -392,11 +403,10 @@ class Users extends RepositoryLocatableAbstract
 
     /**
      * Modify an account email
-
      *
-*@param User $user
+     * @param User $user
      *
-*@return string
+     * @return string
      * @throws \Exception
      */
     public function modifyEmail(User $user)
@@ -466,8 +476,8 @@ class Users extends RepositoryLocatableAbstract
         /** @var User $user */
         $user = $this->_geolocalize(new User([
             'id_user' => $res['FK_ID_USER'],
-            'email'     => $res['EMAIL'],
-            'ip'        => $ip
+            'email'   => $res['EMAIL'],
+            'ip'      => $ip
         ]));
 
         // Process the token
@@ -526,17 +536,19 @@ class Users extends RepositoryLocatableAbstract
 
     /**
      * Login the user
-
-*
-*@param User $user
      *
-*@return User
+     * @param User   $user
+     * @param string $source
+     *
+     * @return User
      * @throws \Exception
      */
-    public function login(User $user)
+    public function login(User $user, $source)
     {
         if (!$user->getEmail() or !$user->getPassword() or !$user->getIp()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        } elseif(!in_array($source, ['front', 'api'])) {
+            throw new \Exception(Exceptions::UNAUTHORIZED, 403);
         }
 
         // Try to get the user
@@ -558,9 +570,9 @@ class Users extends RepositoryLocatableAbstract
         }
 
         $userAux->setIp($user->getIp())
-             ->setLatitude($user->getLatitude())
-             ->setLongitude($user->getLongitude())
-             ->setIdGeonames($user->getIdGeonames());
+                ->setLatitude($user->getLatitude())
+                ->setLongitude($user->getLongitude())
+                ->setIdGeonames($user->getIdGeonames());
         unset($user);
 
         // Renew the account if necessary
@@ -587,11 +599,12 @@ class Users extends RepositoryLocatableAbstract
 
         $res = $this->_db->action($sql, $params);
 
-        $sql = 'INSERT INTO USERS_LOGINS(FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
-                VALUES (:id, :email, SYSDATE(), :ip, :id_geonames, :latitude, :longitude)';
+        $sql = 'INSERT INTO USERS_LOGINS(FK_ID_USER, EMAIL, CTRL_DATE, SOURCE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
+                VALUES (:id, :email, SYSDATE(), :source, :ip, :id_geonames, :latitude, :longitude)';
         $params = [
             ':id'          => $userAux->getIdUser(),
             ':email'       => $userAux->getEmail(),
+            ':source'      => strtoupper($source),
             ':ip'          => $userAux->getIp(),
             ':latitude'    => $userAux->getLatitude(),
             ':longitude'   => $userAux->getLongitude(),
@@ -615,11 +628,10 @@ class Users extends RepositoryLocatableAbstract
 
     /**
      * Delete an account
-
      *
-*@param User $user
+     * @param User $user
      *
-*@return bool
+     * @return bool
      * @throws \Exception
      */
     public function delete(User $user)

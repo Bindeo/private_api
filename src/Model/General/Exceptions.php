@@ -4,6 +4,9 @@ namespace Api\Model\General;
 
 class Exceptions
 {
+    // Authorizations
+    const UNAUTHORIZED     = 'Unauthorized access'; // 403
+
     // Database
     const MISSING_FIELDS     = 'Missing fields'; // 400
     const INCORRECT_PASSWORD = 'Incorrect password'; // 400

@@ -34,8 +34,16 @@ class Users
         // Populate de user object
         $user = new User($request->getParams());
 
-        // Get the user
-        $user = $this->_usersRepo->find($user);
+        if ($user->getIdUser()) {
+            // Get the user by id
+            $user = $this->_usersRepo->find($user);
+        } elseif ($user->getEmail()) {
+            // Get the user by email
+            $user = $this->_usersRepo->findEmail($user);
+        } else {
+            $user = null;
+        }
+
         $res = ['data' => ['type' => 'users', 'attributes' => $user ? $user->toArray() : []]];
 
         return $response->withJson($res, 200);

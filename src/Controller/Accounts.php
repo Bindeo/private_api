@@ -3,6 +3,7 @@
 namespace Api\Controller;
 
 use Api\Model\General\Exceptions;
+use Api\Model\General\OAuthRegistry;
 use Api\Repository\RepositoryAbstract;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
@@ -33,7 +34,7 @@ class Accounts
     public function login(Request $request, Response $response, $args)
     {
         // Populate the user object and login the user
-        $data = $this->_usersRepo->login(new User($request->getParams()));
+        $data = $this->_usersRepo->login(new User($request->getParams()), OAuthRegistry::getInstance()->getAppName());
         $res = ['data' => ['type' => 'users', 'attributes' => $data->toArray()]];
 
         return $response->withJson($res, 200);
