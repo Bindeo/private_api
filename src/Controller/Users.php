@@ -2,21 +2,21 @@
 
 namespace Api\Controller;
 
-use Api\Entity\Client;
+use Api\Entity\User;
 use Api\Repository\RepositoryAbstract;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 
-class Clients
+class Users
 {
     /**
-     * @var \Api\Repository\Clients
+     * @var \Api\Repository\Users
      */
-    private $_clientsRepo;
+    private $_usersRepo;
 
-    public function __construct(RepositoryAbstract $clients)
+    public function __construct(RepositoryAbstract $users)
     {
-        $this->_clientsRepo = $clients;
+        $this->_usersRepo = $users;
     }
 
     /**
@@ -31,12 +31,12 @@ class Clients
      */
     public function get(Request $request, Response $response, $args)
     {
-        // Populate de client object
-        $client = new Client($request->getParams());
+        // Populate de user object
+        $user = new User($request->getParams());
 
         // Get the user
-        $user = $this->_clientsRepo->find($client);
-        $res = ['data' => ['type' => 'clients', 'attributes' => $user ? $user->toArray() : []]];
+        $user = $this->_usersRepo->find($user);
+        $res = ['data' => ['type' => 'users', 'attributes' => $user ? $user->toArray() : []]];
 
         return $response->withJson($res, 200);
     }

@@ -3,7 +3,7 @@
 namespace Api\Model;
 
 use Api\Entity\BlockChain;
-use Api\Entity\Client;
+use Api\Entity\User;
 use Api\Entity\File;
 use Api\Model\General\Exceptions;
 use Api\Model\General\FilesInterface;
@@ -23,7 +23,7 @@ class StoreData
     private $_dataRepo;
 
     /**
-     * @var \Api\Repository\Clients
+     * @var \Api\Repository\Users
      */
     private $_clientsRepo;
 
@@ -93,7 +93,7 @@ class StoreData
         }
 
         // We need to check if the user has enough free space
-        if (!($client = $this->_clientsRepo->find(new Client(['id_client' => $file->getIdClient()])))) {
+        if (!($client = $this->_clientsRepo->find(new User(['id_client' => $file->getIdClient()])))) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 

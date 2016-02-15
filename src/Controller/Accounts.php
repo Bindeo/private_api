@@ -6,18 +6,18 @@ use Api\Model\General\Exceptions;
 use Api\Repository\RepositoryAbstract;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
-use Api\Entity\Client;
+use Api\Entity\User;
 
 class Accounts
 {
     /**
-     * @var \Api\Repository\Clients
+     * @var \Api\Repository\Users
      */
-    private $_clientsRepo;
+    private $_usersRepo;
 
-    public function __construct(RepositoryAbstract $clients)
+    public function __construct(RepositoryAbstract $users)
     {
-        $this->_clientsRepo = $clients;
+        $this->_usersRepo = $users;
     }
 
     /**
@@ -32,9 +32,9 @@ class Accounts
      */
     public function login(Request $request, Response $response, $args)
     {
-        // Populate the client object and login the client
-        $data = $this->_clientsRepo->login(new Client($request->getParams()));
-        $res = ['data' => ['type' => 'clients', 'attributes' => $data->toArray()]];
+        // Populate the user object and login the user
+        $data = $this->_usersRepo->login(new User($request->getParams()));
+        $res = ['data' => ['type' => 'users', 'attributes' => $data->toArray()]];
 
         return $response->withJson($res, 200);
     }
@@ -50,10 +50,10 @@ class Accounts
      */
     public function create(Request $request, Response $response, $args)
     {
-        // Populate the client object and create a new account
-        $data = $this->_clientsRepo->create(new Client($request->getParams()));
+        // Populate the user object and create a new account
+        $data = $this->_usersRepo->create(new User($request->getParams()));
 
-        $res = ['data' => ['type' => 'clients', 'attributes' => $data]];
+        $res = ['data' => ['type' => 'users', 'attributes' => $data]];
 
         return $response->withJson($res, 201);
     }
@@ -69,10 +69,10 @@ class Accounts
      */
     public function modify(Request $request, Response $response, $args)
     {
-        // Populate the client object and modify the account
-        $user = $this->_clientsRepo->modify(new Client($request->getParams()));
+        // Populate the user object and modify the account
+        $user = $this->_usersRepo->modify(new User($request->getParams()));
 
-        $res = ['data' => ['type' => 'clients', 'attributes' => $user ? $user->toArray() : null]];
+        $res = ['data' => ['type' => 'users', 'attributes' => $user ? $user->toArray() : null]];
 
         return $response->withJson($res, 200);
     }
@@ -88,8 +88,8 @@ class Accounts
      */
     public function modifyPassword(Request $request, Response $response, $args)
     {
-        // Populate the client object and modify the password
-        $this->_clientsRepo->modifyPassword(new Client($request->getParams()));
+        // Populate the user object and modify the password
+        $this->_usersRepo->modifyPassword(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -105,10 +105,10 @@ class Accounts
      */
     public function changeType(Request $request, Response $response, $args)
     {
-        // Populate the client object and change his account type
-        $user = $this->_clientsRepo->changeType(new Client($request->getParams()));
+        // Populate the user object and change his account type
+        $user = $this->_usersRepo->changeType(new User($request->getParams()));
 
-        $res = ['data' => ['type' => 'clients', 'attributes' => $user ? $user->toArray() : null]];
+        $res = ['data' => ['type' => 'users', 'attributes' => $user ? $user->toArray() : null]];
 
         return $response->withJson($res, 200);
     }
@@ -124,8 +124,8 @@ class Accounts
      */
     public function modifyEmail(Request $request, Response $response, $args)
     {
-        // Populate the client object and modify the email
-        $this->_clientsRepo->modifyEmail(new Client($request->getParams()));
+        // Populate the user object and modify the email
+        $this->_usersRepo->modifyEmail(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -147,7 +147,7 @@ class Accounts
         }
 
         // Create a new account
-        $this->_clientsRepo->validateToken($request->getParam('token'), $request->getParam('ip'),
+        $this->_usersRepo->validateToken($request->getParam('token'), $request->getParam('ip'),
             $request->getParam('password'));
 
         return $response->withJson('', 204);
@@ -165,8 +165,8 @@ class Accounts
      */
     public function delete(Request $request, Response $response, $args)
     {
-        // Populate the client object and delete an account
-        $this->_clientsRepo->delete(new Client($request->getParams()));
+        // Populate the user object and delete an account
+        $this->_usersRepo->delete(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }

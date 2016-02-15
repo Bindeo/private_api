@@ -60,8 +60,8 @@ $container['Api\Model\General\Database'] = function ($c) {
 };
 
 // Repositories
-$container['Api\Repository\Clients'] = function ($c) {
-    return new Api\Repository\Clients($c->get('Api\Model\General\Database'), $c->get('MaxMind\Db\Reader'));
+$container['Api\Repository\Users'] = function ($c) {
+    return new Api\Repository\Users($c->get('Api\Model\General\Database'), $c->get('MaxMind\Db\Reader'));
 };
 
 $container['Api\Repository\StoreData'] = function ($c) {
@@ -72,17 +72,17 @@ $container['Api\Repository\StoreData'] = function ($c) {
 $container['Api\Model\StoreData'] = function ($c) {
     $c->get('Api\Lib\BlockChain\BlockChain');
 
-    return new Api\Model\StoreData($c->get('Api\Repository\StoreData'), $c->get('Api\Repository\Clients'),
+    return new Api\Model\StoreData($c->get('Api\Repository\StoreData'), $c->get('Api\Repository\Users'),
         $c->get('Api\Model\General\FilesStorage'), $c->get('logger'));
 };
 
 // Controllers
 $container['Api\Controller\Accounts'] = function ($c) {
-    return new Api\Controller\Accounts($c->get('Api\Repository\Clients'));
+    return new Api\Controller\Accounts($c->get('Api\Repository\Users'));
 };
 
-$container['Api\Controller\Clients'] = function ($c) {
-    return new Api\Controller\Clients($c->get('Api\Repository\Clients'));
+$container['Api\Controller\Users'] = function ($c) {
+    return new Api\Controller\Users($c->get('Api\Repository\Users'));
 };
 
 $container['Api\Controller\StoreData'] = function ($c) {

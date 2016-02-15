@@ -11,6 +11,13 @@ if (PHP_SAPI == 'cli-server') {
 
 // Define application environment
 defined('ENV') || define('ENV', (getenv('ENV') ? getenv('ENV') : 'production'));
+if (ENV == "development") {
+    if (getenv('DEVELOPER')) {
+        define("DEVELOPER", getenv('DEVELOPER'));
+    } else {
+        define("DEVELOPER", current(explode('@', getenv('SERVER_ADMIN'))));
+    }
+}
 
 require __DIR__ . '/../vendor/autoload.php';
 

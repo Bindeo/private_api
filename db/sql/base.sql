@@ -3,28 +3,29 @@
 /*
 DROP TABLE FILES;
 DROP TABLE BLOCKCHAIN;
-DROP TABLE CLIENTS_TYPES;
-DROP TABLE CLIENTS_VALIDATIONS;
-DROP TABLE CLIENTS_LOGINS;
-DROP TABLE CLIENTS_DELETED;
-DROP TABLE CLIENTS;
+DROP TABLE USERS_TYPES;
+DROP TABLE USERS_VALIDATIONS;
+DROP TABLE USERS_LOGINS;
+DROP TABLE USERS_DELETED;
+DROP TABLE USERS;
 DROP TABLE ACCOUNT_TYPES;
 */
 
 # CREATION
 
 # Tables
-source /var/www/html/project/db/tables/ACCOUNT_TYPES.sql;
-source /var/www/html/project/db/tables/CLIENTS.sql;
-source /var/www/html/project/db/tables/CLIENTS_DELETED.sql;
-source /var/www/html/project/db/tables/CLIENTS_LOGINS.sql;
-source /var/www/html/project/db/tables/CLIENTS_VALIDATIONS.sql;
-source /var/www/html/project/db/tables/CLIENTS_TYPES.sql;
-source /var/www/html/project/db/tables/BLOCKCHAIN.sql;
-source /var/www/html/project/db/tables/FILES.sql;
+
+source /var/www/html/project/api/db/tables/ACCOUNT_TYPES.sql;
+source /var/www/html/project/api/db/tables/USERS.sql;
+source /var/www/html/project/api/db/tables/USERS_DELETED.sql;
+source /var/www/html/project/api/db/tables/USERS_LOGINS.sql;
+source /var/www/html/project/api/db/tables/USERS_VALIDATIONS.sql;
+source /var/www/html/project/api/db/tables/USERS_TYPES.sql;
+source /var/www/html/project/api/db/tables/BLOCKCHAIN.sql;
+source /var/www/html/project/api/db/tables/FILES.sql;
 
 # Triggers
-source /var/www/html/project/db/triggers/TGR_BD_CLIENTS.sql;
+source /var/www/html/project/api/db/triggers/TGR_BD_USERS.sql;
 
 
 INSERT INTO ACCOUNT_TYPES(ID_TYPE, TYPE, COST, MAX_STORAGE, MAX_STAMPS_MONTH)

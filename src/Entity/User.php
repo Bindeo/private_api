@@ -2,9 +2,9 @@
 
 namespace Api\Entity;
 
-use Bindeo\DataModel\ClientAbstract;
+use Bindeo\DataModel\UserAbstract;
 
-class Client extends ClientAbstract
+class User extends UserAbstract
 {
     // Optionals and temporary attributes
     protected $_renew;

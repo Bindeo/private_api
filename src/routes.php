@@ -13,9 +13,9 @@ $app->group('/account', function () {
     $this->put('/token', 'Api\Controller\Accounts:validateToken');
 });
 
-// Clients routes
-$app->group('/clients', function () {
-    $this->get('', 'Api\Controller\Clients:get');
+// Users routes
+$app->group('/users', function () {
+    $this->get('', 'Api\Controller\Users:get');
 });
 
 // Data storage routes
