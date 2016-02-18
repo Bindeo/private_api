@@ -76,13 +76,11 @@ class StoreData
 
     /**
      * Save the file in storage and database
-
-*
-*@param \Api\Entity\File              $file
+     *
+     * @param \Api\Entity\File        $file
      * @param \Slim\Http\UploadedFile $origFile Original uploaded file
-
-*
-*@return array
+     *
+     * @return array
      * @throws \Exception
      */
     public function saveFile(File $file, UploadedFileInterface $origFile)
@@ -127,11 +125,10 @@ class StoreData
 
     /**
      * Delete a file if it is not signed yet
-
-*
-*@param \Api\Entity\File $file
      *
-     *@throws \Exception
+     * @param \Api\Entity\File $file
+     *
+     * @throws \Exception
      */
     public function deleteFile(File $file)
     {
@@ -163,9 +160,8 @@ class StoreData
 
     /**
      * Sign a file into the blockchain
-
-*
-*@param \Api\Entity\File $file
+     *
+     * @param \Api\Entity\File $file
      *
      * @return array
      * @throws \Exception
@@ -204,7 +200,7 @@ class StoreData
             throw new \Exception(Exceptions::NO_COINS, 503);
         }
 
-        $res = $blockchain->storeData($file->getHash(true));
+        $res = $blockchain->storeData($file->getHash(true), 'S');
 
         // Check if the transaction was ok
         if (!$res['txid']) {
@@ -220,13 +216,10 @@ class StoreData
 
     /**
      * Get a blockchain transaction by id from our db
-
-*
-*@param \Api\Entity\BlockChain $blockchain
-
-
-*
-*@return array
+     *
+     * @param \Api\Entity\BlockChain $blockchain
+     *
+     * @return array
      */
     public function getTransaction(BlockChain $blockchain)
     {
@@ -242,13 +235,10 @@ class StoreData
 
     /**
      * Get a blockchain transaction hash by id from blockchain
-
-*
-*@param \Api\Entity\BlockChain $blockchain
-
-
-*
-*@return string
+     *
+     * @param \Api\Entity\BlockChain $blockchain
+     *
+     * @return string
      * @throws \Exception
      */
     public function getTransactionHash(BlockChain $blockchain)
@@ -271,8 +261,8 @@ class StoreData
             $this->_logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
             throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
         };
-        // Obtain encoded data from blockchain
-        $res = $net->getEncodedData($blockchain->getTransaction());
+        // Obtain decoded data from blockchain
+        $res = $net->getDecodedData($blockchain->getTransaction());
         if (isset($res['data'])) {
             $res = $res['data'];
         } else {

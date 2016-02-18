@@ -34,9 +34,13 @@ interface BlockChainClientInterface
 
     public function listAccounts();
 
+    public function listAddressGroupings();
+
     public function listTransactions($account = null);
 
-    public function listUnspent();
+    public function listUnspent($account = null);
+
+    public function move($from, $to, $amount);
 
     public function sendRawTransaction($raw);
 
@@ -45,9 +49,9 @@ interface BlockChainClientInterface
     public function signRawTransaction($tx, $output, $key, $sig_hash = null);
 
     // Complex functionality
-    public function storeData($data);
+    public function storeData($data, $type, $accountTo = null, $accountFrom = null, $txid = null);
 
-    public function getUncodedData($txid);
+    public function getDecodedData($txid);
 
     public function getEncodedData($txid);
 }

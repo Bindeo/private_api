@@ -141,27 +141,41 @@ class BlockChain
         return $this->_client->listAccounts();
     }
 
+    public function listAddressGroupings()
+    {
+        return $this->_client->listAddressGroupings();
+    }
+
     public function listTransactions($account = null)
     {
         return $account ? $this->_client->listTransactions($account) : $this->_client->listTransactions();
     }
 
-    public function listUnspent()
+    public function listUnspent($account = null)
     {
-        return $this->_client->listUnspent();
+        return ($account !== null) ? $this->_client->listUnspent($account) : $this->_client->listUnspent();
+    }
+
+    public function move($from, $to, $amount)
+    {
+        return $this->_client->move($from, $to, $amount);
     }
 
     // Complex functionality
     /**
-     * Store data in the blockchain
+     * Store data in the blockchain, we can store a Stamp, a Genesis operation or a Transfer operation
      *
      * @param string $data
+     * @param string $type        Type of seal - S: Stamp, G: Genesis, T: Transfer
+     * @param string $accountTo   [optional]
+     * @param string $accountFrom [optional]
+     * @param string $txid        [optional]
      *
      * @return array
      */
-    public function storeData($data)
+    public function storeData($data, $type, $accountTo = null, $accountFrom = null, $txid = null)
     {
-        return $this->_client->storeData($data);
+        return $this->_client->storeData($data, $type, $accountTo, $accountFrom, $txid);
     }
 
     /**
@@ -171,9 +185,9 @@ class BlockChain
      *
      * @return array
      */
-    public function getUncodedData($txid)
+    public function getDecodedData($txid)
     {
-        return $this->_client->getUncodedData($txid);
+        return $this->_client->getDecodedData($txid);
     }
 
     /**
