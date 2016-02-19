@@ -12,13 +12,10 @@ class StoreData extends RepositoryLocatableAbstract
 {
     /**
      * Find a transaction by id
-
-*
-*@param BlockChain $blockchain
-
-
-*
-*@return \Api\Entity\BlockChain
+     *
+     * @param BlockChain $blockchain
+     *
+     * @return \Api\Entity\BlockChain
      * @throws \Exception
      */
     public function findTransaction(BlockChain $blockchain)
@@ -31,10 +28,10 @@ class StoreData extends RepositoryLocatableAbstract
                 LATITUDE, LONGITUDE FROM BLOCKCHAIN WHERE TRANSACTION = :id';
         $params = [':id' => $blockchain->getTransaction()];
 
-        $data = $this->_db->query($sql, $params, 'Api\Entity\BlockChain');
+        $data = $this->db->query($sql, $params, 'Api\Entity\BlockChain');
 
-        if (!$data or $this->_db->getError()) {
-            throw new \Exception($this->_db->getError(), 400);
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
         }
 
         return $data->getNumRows() ? $data->getRows()[0] : [];
@@ -42,13 +39,10 @@ class StoreData extends RepositoryLocatableAbstract
 
     /**
      * Find a file by id
-
-*
-*@param File $file
-
-
-*
-*@return \Api\Entity\File
+     *
+     * @param File $file
+     *
+     * @return \Api\Entity\File
      * @throws \Exception
      */
     public function findFile(File $file)
@@ -61,10 +55,10 @@ class StoreData extends RepositoryLocatableAbstract
                 LATITUDE, LONGITUDE FROM FILES WHERE ID_FILE = :id';
         $params = [':id' => $file->getIdFile()];
 
-        $data = $this->_db->query($sql, $params, 'Api\Entity\File');
+        $data = $this->db->query($sql, $params, 'Api\Entity\File');
 
-        if (!$data or $this->_db->getError()) {
-            throw new \Exception($this->_db->getError(), 400);
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
         }
 
         return $data->getNumRows() ? $data->getRows()[0] : null;
@@ -72,11 +66,10 @@ class StoreData extends RepositoryLocatableAbstract
 
     /**
      * Create a new file
-
-*
-*@param \Api\Entity\File $file
      *
-*@return array
+     * @param \Api\Entity\File $file
+     *
+     * @return array
      * @throws \Exception
      */
     public function createFile(File $file)
@@ -89,9 +82,9 @@ class StoreData extends RepositoryLocatableAbstract
 
         // Geolocalize the client
         /** @var \Api\Entity\File $file */
-        $file = $this->_geolocalize($file);
+        $file = $this->geolocalize($file);
 
-        $this->_db->beginTransaction();
+        $this->db->beginTransaction();
         // Prepare query and mandatory data
         $sql = 'UPDATE CLIENTS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT - :size ELSE 0 END WHERE ID_CLIENT = :id_client;
                 INSERT INTO FILES(FK_ID_CLIENT, TYPE, NAME, HASH, SIZE, CTRL_DATE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
@@ -110,24 +103,23 @@ class StoreData extends RepositoryLocatableAbstract
         ];
 
         // Execute query
-        if ($this->_db->action($sql, $data)) {
-            $id = $this->_db->lastInsertId();
-            $this->_db->commit();
+        if ($this->db->action($sql, $data)) {
+            $id = $this->db->lastInsertId();
+            $this->db->commit();
 
             return $id;
         } else {
-            $this->_db->rollBack();
-            throw $this->_dbException();
+            $this->db->rollBack();
+            throw $this->dbException();
         }
     }
 
     /**
      * Delete a file
-
-*
-*@param \Api\Entity\File $file
      *
-*@return \Api\Entity\File
+     * @param \Api\Entity\File $file
+     *
+     * @return \Api\Entity\File
      * @throws \Exception
      */
     public function deleteFile(File $file)
@@ -138,7 +130,7 @@ class StoreData extends RepositoryLocatableAbstract
 
         // Fetch the file to delete
         $sql = 'SELECT ID_FILE, NAME, FK_ID_CLIENT, SIZE, TRANSACTION FROM FILES WHERE ID_FILE = :id';
-        $res = $this->_db->query($sql, [':id' => $file->getIdFile()], 'Api\Entity\File');
+        $res = $this->db->query($sql, [':id' => $file->getIdFile()], 'Api\Entity\File');
         if ($res->getNumRows() != 1) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         } else {
@@ -151,21 +143,21 @@ class StoreData extends RepositoryLocatableAbstract
             $sql = "UPDATE FILES SET STATUS = 'D', CTRL_IP_DEL = :ip, CTRL_DATE_DEL = SYSDATE()
                     WHERE ID_FILE = :id";
             $data = [':id' => $file->getIdFile(), ':ip' => $file->getIp()];
-            if ($this->_db->action($sql, $data)) {
+            if ($this->db->action($sql, $data)) {
                 return null;
             } else {
-                throw $this->_dbException();
+                throw $this->dbException();
             }
         } else {
-            $this->_db->beginTransaction();
+            $this->db->beginTransaction();
             $sql = 'UPDATE CLIENTS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_CLIENT = :id_client;
                     DELETE FROM FILES WHERE ID_FILE = :id;';
             $data = [':id' => $file->getIdFile(), ':id_client' => $res->getIdClient(), ':size' => $res->getSize()];
-            if (!$this->_db->action($sql, $data)) {
-                $this->_db->rollBack();
-                throw $this->_dbException();
+            if (!$this->db->action($sql, $data)) {
+                $this->db->rollBack();
+                throw $this->dbException();
             } else {
-                $this->_db->commit();
+                $this->db->commit();
             }
         }
 
@@ -174,14 +166,12 @@ class StoreData extends RepositoryLocatableAbstract
 
     /**
      * Get a paginated list of files from one client
-
-*
-*@param int $idClient
+     *
+     * @param int $idClient
      * @param int $page
      * @param int $numRows [optional]
-
-*
-*@return \Api\Entity\ResultSet
+     *
+     * @return \Api\Entity\ResultSet
      */
     public function fileList($idClient, $page, $numRows = 20)
     {
@@ -190,7 +180,7 @@ class StoreData extends RepositoryLocatableAbstract
                 LATITUDE, LONGITUDE FROM FILES WHERE FK_ID_CLIENT = :id AND STATUS = 'A' ORDER BY ID_FILE ASC";
         $data = [':id' => $idClient];
 
-        return $this->_db->query($sql, $data, 'Api\Entity\File', $page, $numRows);
+        return $this->db->query($sql, $data, 'Api\Entity\File', $page, $numRows);
     }
 
     /**
@@ -210,9 +200,9 @@ class StoreData extends RepositoryLocatableAbstract
 
         // Geolocalize the client
         /** @var \Api\Entity\File $file */
-        $file = $this->_geolocalize($file);
+        $file = $this->geolocalize($file);
 
-        $this->_db->beginTransaction();
+        $this->db->beginTransaction();
         // Insert the transaction
         $sql = "INSERT INTO BLOCKCHAIN(TRANSACTION, NET, FK_ID_CLIENT, HASH, CTRL_DATE, CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE)
                     VALUES (:txid, :net, :id_client, :hash, SYSDATE(), :ip, 'F', :id_element, :id_geonames, :latitude, :longitude)";
@@ -228,21 +218,21 @@ class StoreData extends RepositoryLocatableAbstract
             ':longitude'   => $file->getLongitude() ? $file->getLongitude() : null
         ];
 
-        if ($this->_db->action($sql, $data)) {
+        if ($this->db->action($sql, $data)) {
             // Update the file
             $sql = 'UPDATE FILES SET HASH = :hash, TRANSACTION = :txid WHERE ID_FILE = :id';
             $data = [':id' => $file->getIdFile(), ':hash' => $file->getHash(), ':txid' => $file->getTransaction()];
 
-            if (!$this->_db->action($sql, $data)) {
-                $this->_db->rollBack();
-                throw $this->_dbException();
+            if (!$this->db->action($sql, $data)) {
+                $this->db->rollBack();
+                throw $this->dbException();
             }
         } else {
-            $this->_db->rollBack();
-            throw $this->_dbException();
+            $this->db->rollBack();
+            throw $this->dbException();
         }
 
-        $this->_db->commit();
+        $this->db->commit();
 
         return $file;
     }

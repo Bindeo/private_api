@@ -12,11 +12,11 @@ class Users
     /**
      * @var \Api\Repository\Users
      */
-    private $_usersRepo;
+    private $usersRepo;
 
     public function __construct(RepositoryAbstract $users)
     {
-        $this->_usersRepo = $users;
+        $this->usersRepo = $users;
     }
 
     /**
@@ -36,10 +36,10 @@ class Users
 
         if ($user->getIdUser()) {
             // Get the user by id
-            $user = $this->_usersRepo->find($user);
+            $user = $this->usersRepo->find($user);
         } elseif ($user->getEmail()) {
             // Get the user by email
-            $user = $this->_usersRepo->findEmail($user);
+            $user = $this->usersRepo->findEmail($user);
         } else {
             $user = null;
         }

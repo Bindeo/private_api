@@ -20,22 +20,22 @@ class StoreData
     /**
      * @var \Api\Repository\StoreData
      */
-    private $_dataRepo;
+    private $dataRepo;
 
     /**
      * @var \Api\Repository\Users
      */
-    private $_clientsRepo;
+    private $clientsRepo;
 
     /**
      * @var \Api\Model\General\FilesStorage
      */
-    private $_storage;
+    private $storage;
 
     /**
      * @var \Monolog\Logger
      */
-    private $_logger;
+    private $logger;
 
     public function __construct(
         RepositoryAbstract $dataRepo,
@@ -43,10 +43,10 @@ class StoreData
         FilesInterface $storage,
         LoggerInterface $logger
     ) {
-        $this->_dataRepo = $dataRepo;
-        $this->_clientsRepo = $clientsRepo;
-        $this->_storage = $storage;
-        $this->_logger = $logger;
+        $this->dataRepo = $dataRepo;
+        $this->clientsRepo = $clientsRepo;
+        $this->storage = $storage;
+        $this->logger = $logger;
     }
 
     /**
@@ -59,11 +59,11 @@ class StoreData
     public function getFile(File $file)
     {
         // Get the file
-        $file = $this->_dataRepo->findFile($file);
+        $file = $this->dataRepo->findFile($file);
 
         if ($file) {
             // Get the public path
-            $file->setPath($this->_storage->get($file->getIdClient(), $file->getName()));
+            $file->setPath($this->storage->get($file->getIdClient(), $file->getName()));
 
             // Convert the object into an array
             $file = $file->toArray();
@@ -91,7 +91,7 @@ class StoreData
         }
 
         // We need to check if the user has enough free space
-        if (!($client = $this->_clientsRepo->find(new User(['id_client' => $file->getIdClient()])))) {
+        if (!($client = $this->clientsRepo->find(new User(['id_client' => $file->getIdClient()])))) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
@@ -103,20 +103,20 @@ class StoreData
 
         // Storage the file in our file system
         try {
-            $name = $this->_storage->save($file->getIdClient(), $origFile);
+            $name = $this->storage->save($file->getIdClient(), $origFile);
         } catch (\Exception $e) {
             throw new \Exception('', 500);
         }
 
         // Hash the file
-        $file->setType('F')->setHash($this->_storage->getHash($file->getIdClient(), $name))->setName($name);
+        $file->setType('F')->setHash($this->storage->getHash($file->getIdClient(), $name))->setName($name);
 
         // Save the file registry
         try {
-            $id = $this->_dataRepo->createFile($file);
+            $id = $this->dataRepo->createFile($file);
         } catch (\Exception $e) {
             // Remove the uploaded file
-            $this->_storage->delete($file->getIdClient(), $file->getName());
+            $this->storage->delete($file->getIdClient(), $file->getName());
             throw $e;
         }
 
@@ -133,9 +133,9 @@ class StoreData
     public function deleteFile(File $file)
     {
         // Delete the registry
-        if ($file = $this->_dataRepo->deleteFile($file)) {
+        if ($file = $this->dataRepo->deleteFile($file)) {
             // Delete the file if the registry has been completely deleted
-            $this->_storage->delete($file->getIdClient(), $file->getName());
+            $this->storage->delete($file->getIdClient(), $file->getName());
         }
     }
 
@@ -155,7 +155,7 @@ class StoreData
         }
 
         // Get the list
-        return $this->_dataRepo->fileList($idClient, $page);
+        return $this->dataRepo->fileList($idClient, $page);
     }
 
     /**
@@ -174,7 +174,7 @@ class StoreData
 
         // Get the file
         $ip = $file->getIp();
-        $file = $this->_dataRepo->findFile($file);
+        $file = $this->dataRepo->findFile($file);
         if (!$file) {
             throw new \Exception('', 500);
         }
@@ -186,17 +186,17 @@ class StoreData
         }
 
         // Check if the stored hash is correct
-        $hash = $this->_storage->getHash($file->getIdClient(), $file->getName());
+        $hash = $this->storage->getHash($file->getIdClient(), $file->getName());
         if ($hash != $file->getHash()) {
             // We need to store the new hash after sign the file
-            $this->_logger->addNotice('Hash Incongruence', $file->toArray());
+            $this->logger->addNotice('Hash Incongruence', $file->toArray());
             $file->setHash($hash);
         }
 
         // Create the transaction
         $blockchain = \Api\Lib\BlockChain\BlockChain::getInstance();
         if ($blockchain->getBalance() <= 0) {
-            $this->_logger->addError(Exceptions::NO_COINS);
+            $this->logger->addError(Exceptions::NO_COINS);
             throw new \Exception(Exceptions::NO_COINS, 503);
         }
 
@@ -204,14 +204,14 @@ class StoreData
 
         // Check if the transaction was ok
         if (!$res['txid']) {
-            $this->_logger->addError('Error signing a file', $file->toArray());
+            $this->logger->addError('Error signing a file', $file->toArray());
             throw new \Exception('', 500);
         }
 
         // Save the transaction information
         $file->setTransaction($res['txid']);
 
-        return $this->_dataRepo->signFile($file, $blockchain->getNet())->toArray();
+        return $this->dataRepo->signFile($file, $blockchain->getNet())->toArray();
     }
 
     /**
@@ -224,7 +224,7 @@ class StoreData
     public function getTransaction(BlockChain $blockchain)
     {
         // Get the blockchain transaction
-        $blockchain = $this->_dataRepo->findTransaction($blockchain);
+        $blockchain = $this->dataRepo->findTransaction($blockchain);
 
         if ($blockchain) {
             $blockchain = $blockchain->toArray();
@@ -249,7 +249,7 @@ class StoreData
 
         // If net has not been provided, we assume is a transaction from our system, we take it from db
         if (!$blockchain->getNet()) {
-            $blockchain = $this->_dataRepo->findTransaction($blockchain);
+            $blockchain = $this->dataRepo->findTransaction($blockchain);
             if (!$blockchain) {
                 throw new \Exception(Exceptions::MISSING_FIELDS, 400);
             }
@@ -258,7 +258,7 @@ class StoreData
         // Get the blockchain transaction
         $net = \Api\Lib\BlockChain\BlockChain::getInstance($blockchain->getNet());
         if (!$net) {
-            $this->_logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
+            $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
             throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
         };
         // Obtain decoded data from blockchain
@@ -288,7 +288,7 @@ class StoreData
 
         // If net has not been provided, we assume is a transaction from our system, we take it from db
         if (!$blockchain->getNet()) {
-            $blockchain = $this->_dataRepo->findTransaction($blockchain);
+            $blockchain = $this->dataRepo->findTransaction($blockchain);
             if (!$blockchain) {
                 throw new \Exception(Exceptions::MISSING_FIELDS, 400);
             }
@@ -297,7 +297,7 @@ class StoreData
         // Get the blockchain transaction
         $net = \Api\Lib\BlockChain\BlockChain::getInstance($blockchain->getNet());
         if (!$net) {
-            $this->_logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
+            $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
             throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
         };
         // Obtain encoded data from blockchain
@@ -314,7 +314,7 @@ class StoreData
     public function getBCBalance()
     {
         if (!($blockchain = \Api\Lib\BlockChain\BlockChain::getInstance('bitcoin'))) {
-            $this->_logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
+            $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
             throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
         }
 

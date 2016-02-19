@@ -10,123 +10,124 @@ class BitcoinClient implements BlockChainClientInterface
     const STAMP_FEE       = 0.000013; // 1300 satoshis
     const TRANSACTION_FEE = 0.000023; // 2300 satoshis
     const SATOSHI         = 0.00000001; // 1 satoshi
-    private $_bitcoin;
+
+    private $bitcoin;
 
     public function __construct($host, $port, $user)
     {
-        $this->_bitcoin = new jsonRPCClient('http://bitcoinrpc:' . $user . '@' . $host . ':' . $port);
+        $this->bitcoin = new jsonRPCClient('http://bitcoinrpc:' . $user . '@' . $host . ':' . $port);
     }
 
     public function createRawTransaction($input, $output)
     {
-        return $this->_bitcoin->createrawtransaction($input, $output);
+        return $this->bitcoin->createrawtransaction($input, $output);
     }
 
     public function decodeRawTransaction($raw)
     {
-        return $this->_bitcoin->decoderawtransaction($raw);
+        return $this->bitcoin->decoderawtransaction($raw);
     }
 
     public function getInfo()
     {
-        return $this->_bitcoin->getinfo();
+        return $this->bitcoin->getinfo();
     }
 
     public function getNetworkInfo()
     {
-        return $this->_bitcoin->getnetworkinfo();
+        return $this->bitcoin->getnetworkinfo();
     }
 
     public function getAccount($address)
     {
-        return $this->_bitcoin->getaccount($address);
+        return $this->bitcoin->getaccount($address);
     }
 
     public function getAccountAddress($account)
     {
-        return $this->_bitcoin->getaccountaddress($account);
+        return $this->bitcoin->getaccountaddress($account);
     }
 
     public function getBalance($account = '')
     {
-        return $this->_bitcoin->getbalance($account);
+        return $this->bitcoin->getbalance($account);
     }
 
     public function getBlock($hash)
     {
-        return $this->_bitcoin->getblock($hash);
+        return $this->bitcoin->getblock($hash);
     }
 
     public function getBlockHash($number)
     {
-        return $this->_bitcoin->getblockhash($number);
+        return $this->bitcoin->getblockhash($number);
     }
 
     public function getBlockCount()
     {
-        return $this->_bitcoin->getblockcount();
+        return $this->bitcoin->getblockcount();
     }
 
     public function getRawChangeAddress()
     {
-        return $this->_bitcoin->getrawchangeaddress();
+        return $this->bitcoin->getrawchangeaddress();
     }
 
     public function getRawTransaction($txid, $decoded = 0)
     {
-        return $this->_bitcoin->getrawtransaction($txid, $decoded);
+        return $this->bitcoin->getrawtransaction($txid, $decoded);
     }
 
     public function getTransaction($txid)
     {
-        return $this->_bitcoin->gettransaction($txid);
+        return $this->bitcoin->gettransaction($txid);
     }
 
     public function getWalletInfo()
     {
-        return $this->_bitcoin->getwalletinfo();
+        return $this->bitcoin->getwalletinfo();
     }
 
     public function listAccounts()
     {
-        return $this->_bitcoin->listaccounts(0);
+        return $this->bitcoin->listaccounts(0);
     }
 
     public function listAddressGroupings()
     {
-        return $this->_bitcoin->listaddressgroupings();
+        return $this->bitcoin->listaddressgroupings();
     }
 
     public function listTransactions($account = '*')
     {
-        return $this->_bitcoin->listtransactions($account);
+        return $this->bitcoin->listtransactions($account);
     }
 
     public function listUnspent($account = null)
     {
-        $accounts = $account !== null ? $this->_bitcoin->getaddressesbyaccount($account) : [];
+        $accounts = $account !== null ? $this->bitcoin->getaddressesbyaccount($account) : [];
 
-        return $this->_bitcoin->listunspent(0, 9999999, $accounts);
+        return $this->bitcoin->listunspent(0, 9999999, $accounts);
     }
 
     public function move($from, $to, $amount)
     {
-        return $this->_bitcoin->move($from, $to, $amount);
+        return $this->bitcoin->move($from, $to, $amount);
     }
 
     public function sendRawTransaction($raw)
     {
-        return $this->_bitcoin->sendrawtransaction($raw);
+        return $this->bitcoin->sendrawtransaction($raw);
     }
 
     public function signMessage($address, $message)
     {
-        return $this->_bitcoin->signmessage($address, $message);
+        return $this->bitcoin->signmessage($address, $message);
     }
 
     public function signRawTransaction($tx, $output = null, $key = null, $sig_hash = null)
     {
-        return $this->_bitcoin->signrawtransaction($tx, $output, $key, $sig_hash);
+        return $this->bitcoin->signrawtransaction($tx, $output, $key, $sig_hash);
     }
 
     // Complex functionality
@@ -142,7 +143,7 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return array
      */
-    private function _selectInputs($amount, $account = null, $txid = null)
+    private function selectInputs($amount, $account = null, $txid = null)
     {
         // Select unspent transactions
         $unspentInputs = $this->listUnspent('');
@@ -213,7 +214,7 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return string
      */
-    private function _flipByteOrder($bytes)
+    private function flipByteOrder($bytes)
     {
         return implode('', array_reverse(str_split($bytes, 2)));
     }
@@ -229,7 +230,7 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return string
      */
-    private function _decToBytes($decimal, $bytes, $reverse = false)
+    private function decToBytes($decimal, $bytes, $reverse = false)
     {
         $hex = dechex($decimal);
         if (strlen($hex) % 2 != 0) {
@@ -238,7 +239,7 @@ class BitcoinClient implements BlockChainClientInterface
 
         $hex = str_pad($hex, $bytes * 2, '0', STR_PAD_LEFT);
 
-        return ($reverse == true) ? $this->_flipByteOrder($hex) : $hex;
+        return ($reverse == true) ? $this->flipByteOrder($hex) : $hex;
     }
 
     /**
@@ -255,11 +256,11 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return string|FALSE
      */
-    private function _encodeVint($decimal)
+    private function encodeVint($decimal)
     {
         $hex = dechex($decimal);
         if ($decimal < 253) {
-            $hint = $this->_decToBytes($decimal, 1);
+            $hint = $this->decToBytes($decimal, 1);
             $numBytes = 0;
         } elseif ($decimal < 65535) {
             $hint = 'fd';
@@ -277,7 +278,7 @@ class BitcoinClient implements BlockChainClientInterface
         // If the number needs no extra bytes, just return the 1-byte number.
         // If it needs to indicate a larger integer size (16bit, 32bit, 64bit)
         // then it returns the size hint and the 64bit number.
-        return ($numBytes == 0) ? $hint : $hint . $this->_decToBytes($decimal, $numBytes, true);
+        return ($numBytes == 0) ? $hint : $hint . $this->decToBytes($decimal, $numBytes, true);
     }
 
     /**
@@ -291,7 +292,7 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return string
      */
-    private function _encodeInputs($vin, $inputCount)
+    private function encodeInputs($vin, $inputCount)
     {
         $inputs = '';
         for ($i = 0; $i < $inputCount; $i++) {
@@ -302,21 +303,21 @@ class BitcoinClient implements BlockChainClientInterface
                 // Decimal number of bytes
                 $scriptSize = strlen($vin[$i]['coinbase']) / 2;
                 // Varint
-                $scriptVarint = $this->_encodeVint($scriptSize);
+                $scriptVarint = $this->encodeVint($scriptSize);
                 $scriptSig = $scriptVarint . $vin[$i]['coinbase'];
             } else {
                 // Regular transaction
-                $txHash = $this->_flipByteOrder($vin[$i]['txid']);
-                $vout = $this->_decToBytes($vin[$i]['vout'], 4, true);
+                $txHash = $this->flipByteOrder($vin[$i]['txid']);
+                $vout = $this->decToBytes($vin[$i]['vout'], 4, true);
 
                 // Decimal number of bytes
                 $scriptSize = strlen($vin[$i]['scriptSig']['hex']) / 2;
                 // Create the varint encoding scripts length
-                $scriptVarint = $this->_encodeVint($scriptSize);
+                $scriptVarint = $this->encodeVint($scriptSize);
                 $scriptSig = $scriptVarint . $vin[$i]['scriptSig']['hex'];
             }
             // Add the sequence number.
-            $sequence = $this->_decToBytes($vin[$i]['sequence'], 4, true);
+            $sequence = $this->decToBytes($vin[$i]['sequence'], 4, true);
 
             // Append this encoded input to the byte string.
             $inputs .= $txHash . $vout . $scriptSig . $sequence;
@@ -336,7 +337,7 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return string|FALSE
      */
-    private function _encodeOutputs($voutArr, $outputCount)
+    private function encodeOutputs($voutArr, $outputCount)
     {
         // If $voutArr is empty, check if it's MEANT to be before failing.
         if (count($voutArr) == 0) {
@@ -350,12 +351,12 @@ class BitcoinClient implements BlockChainClientInterface
             if (!is_int($satoshis)) {
                 $satoshis *= 100000000;
             }
-            $amount = $this->_decToBytes($satoshis, 8);
-            $amount = $this->_flipByteOrder($amount);
+            $amount = $this->decToBytes($satoshis, 8);
+            $amount = $this->flipByteOrder($amount);
 
             // Number of bytes
             $scriptSize = strlen($voutArr[$i]['scriptPubKey']['hex']) / 2;
-            $scriptVarint = $this->_encodeVint($scriptSize);
+            $scriptVarint = $this->encodeVint($scriptSize);
             $scriptPubKey = $voutArr[$i]['scriptPubKey']['hex'];
 
             $outputs .= $amount . $scriptVarint . $scriptPubKey;
@@ -374,22 +375,22 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return string
      */
-    private function _encodeTransaction($rawTransactionArray)
+    private function encodeTransaction($rawTransactionArray)
     {
-        $encodedVersion = $this->_decToBytes($rawTransactionArray['version'], 4, true); // TRUE - get little endian
+        $encodedVersion = $this->decToBytes($rawTransactionArray['version'], 4, true); // TRUE - get little endian
 
         // $encodedInputs - set the encoded varint, then work out if any input hex is to be displayed.
         $decimalInputsCount = count($rawTransactionArray['vin']);
-        $encodedInputs = $this->_encodeVint($decimalInputsCount) . (($decimalInputsCount > 0)
-                ? $this->_encodeInputs($rawTransactionArray['vin'], $decimalInputsCount) : '');
+        $encodedInputs = $this->encodeVint($decimalInputsCount) . (($decimalInputsCount > 0)
+                ? $this->encodeInputs($rawTransactionArray['vin'], $decimalInputsCount) : '');
 
         // $encodedOutputs - set varint, then work out if output hex is required.
         $decimalOutputsCount = count($rawTransactionArray['vout']);
-        $encodedOutputs = $this->_encodeVint($decimalOutputsCount) . (($decimalInputsCount > 0)
-                ? $this->_encodeOutputs($rawTransactionArray['vout'], $decimalOutputsCount) : '');
+        $encodedOutputs = $this->encodeVint($decimalOutputsCount) . (($decimalInputsCount > 0)
+                ? $this->encodeOutputs($rawTransactionArray['vout'], $decimalOutputsCount) : '');
 
         // Transaction locktime
-        $encodedLocktime = $this->_decToBytes($rawTransactionArray['locktime'], 4, true);
+        $encodedLocktime = $this->decToBytes($rawTransactionArray['locktime'], 4, true);
 
         return $encodedVersion . $encodedInputs . $encodedOutputs . $encodedLocktime;
     }
@@ -436,9 +437,9 @@ class BitcoinClient implements BlockChainClientInterface
         }
 
         // Get the change address to return coins
-        $changeAddress = $this->_bitcoin->getaddressesbyaccount("")[0];
+        $changeAddress = $this->bitcoin->getaddressesbyaccount("")[0];
 
-        $inputs = $this->_selectInputs($amount, $accountFrom, $txid);
+        $inputs = $this->selectInputs($amount, $accountFrom, $txid);
         if (isset($inputs['error'])) {
             return $inputs;
         }
@@ -470,7 +471,7 @@ class BitcoinClient implements BlockChainClientInterface
         ];
 
         // Encode the transaction into raw format
-        $txn = $this->_encodeTransaction($txn);
+        $txn = $this->encodeTransaction($txn);
 
         // Sign the transaction
         $txn = $this->signRawTransaction($txn);

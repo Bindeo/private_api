@@ -7,11 +7,11 @@ namespace Api\Model\General;
  */
 class OAuthRegistry
 {
-    protected static $_me;
-    protected        $_grantType;
-    protected        $_clientId;
-    protected        $_appName;
-    protected        $_appRole;
+    protected static $me;
+    protected        $grantType;
+    protected        $clientId;
+    protected        $appName;
+    protected        $appRole;
 
     /**
      * Singleton constructor
@@ -24,11 +24,11 @@ class OAuthRegistry
      */
     public static function getInstance()
     {
-        if (self::$_me === null) {
-            self::$_me = new OAuthRegistry();
+        if (self::$me === null) {
+            self::$me = new OAuthRegistry();
         }
 
-        return self::$_me;
+        return self::$me;
     }
 
     // Impedimos que los objetos de esta clase puedan ser clonados o deserializados, para asegurar el singleton
@@ -41,7 +41,7 @@ class OAuthRegistry
      */
     public function getGrantType()
     {
-        return $this->_grantType;
+        return $this->grantType;
     }
 
     /**
@@ -51,7 +51,7 @@ class OAuthRegistry
      */
     public function setGrantType($grantType)
     {
-        $this->_grantType = $grantType;
+        $this->grantType = $grantType;
 
         return $this;
     }
@@ -61,7 +61,7 @@ class OAuthRegistry
      */
     public function getClientId()
     {
-        return $this->_clientId;
+        return $this->clientId;
     }
 
     /**
@@ -71,7 +71,7 @@ class OAuthRegistry
      */
     public function setClientId($clientId)
     {
-        $this->_clientId = $clientId;
+        $this->clientId = $clientId;
 
         return $this;
     }
@@ -81,7 +81,7 @@ class OAuthRegistry
      */
     public function getAppName()
     {
-        return $this->_appName;
+        return $this->appName;
     }
 
     /**
@@ -91,7 +91,7 @@ class OAuthRegistry
      */
     public function setAppName($appName)
     {
-        $this->_appName = $appName;
+        $this->appName = $appName;
 
         return $this;
     }
@@ -101,7 +101,7 @@ class OAuthRegistry
      */
     public function getAppRole()
     {
-        return $this->_appRole;
+        return $this->appRole;
     }
 
     /**
@@ -111,7 +111,7 @@ class OAuthRegistry
      */
     public function setAppRole($appRole)
     {
-        $this->_appRole = $appRole;
+        $this->appRole = $appRole;
 
         return $this;
     }

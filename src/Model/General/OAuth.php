@@ -22,7 +22,7 @@ class OAuth extends \Bindeo\OAuth2\OAuthProviderAbstract
 
         // Check de authorization code
         $authorization = explode(' ', $authorization[0]);
-        $data = $this->_oauthStorage->getOAuth($authorization[0], $authorization[1]);
+        $data = $this->oauthStorage->getOAuth($authorization[0], $authorization[1]);
 
         return $data;
     }

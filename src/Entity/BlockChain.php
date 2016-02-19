@@ -8,17 +8,17 @@ use Bindeo\DataModel\LocatableInterface;
 class BlockChain extends BlockChainAbstract implements LocatableInterface
 {
     // Optionals and temporary attributes
-    protected $_ip;
-    protected $_latitude;
-    protected $_longitude;
-    protected $_idGeonames;
+    protected $ip;
+    protected $latitude;
+    protected $longitude;
+    protected $idGeonames;
 
     /**
      * @return mixed
      */
     public function getIp()
     {
-        return $this->_ip;
+        return $this->ip;
     }
 
     /**
@@ -28,7 +28,7 @@ class BlockChain extends BlockChainAbstract implements LocatableInterface
      */
     public function setIp($ip)
     {
-        $this->_ip = $ip;
+        $this->ip = $ip;
 
         return $this;
     }
@@ -38,7 +38,7 @@ class BlockChain extends BlockChainAbstract implements LocatableInterface
      */
     public function getLatitude()
     {
-        return $this->_latitude;
+        return $this->latitude;
     }
 
     /**
@@ -48,7 +48,7 @@ class BlockChain extends BlockChainAbstract implements LocatableInterface
      */
     public function setLatitude($latitude)
     {
-        $this->_latitude = $latitude;
+        $this->latitude = $latitude;
 
         return $this;
     }
@@ -58,7 +58,7 @@ class BlockChain extends BlockChainAbstract implements LocatableInterface
      */
     public function getLongitude()
     {
-        return $this->_longitude;
+        return $this->longitude;
     }
 
     /**
@@ -68,7 +68,7 @@ class BlockChain extends BlockChainAbstract implements LocatableInterface
      */
     public function setLongitude($longitude)
     {
-        $this->_longitude = $longitude;
+        $this->longitude = $longitude;
 
         return $this;
     }
@@ -78,7 +78,7 @@ class BlockChain extends BlockChainAbstract implements LocatableInterface
      */
     public function getIdGeonames()
     {
-        return $this->_idGeonames;
+        return $this->idGeonames;
     }
 
     /**
@@ -88,7 +88,7 @@ class BlockChain extends BlockChainAbstract implements LocatableInterface
      */
     public function setIdGeonames($idGeonames)
     {
-        $this->_idGeonames = $idGeonames;
+        $this->idGeonames = $idGeonames;
 
         return $this;
     }

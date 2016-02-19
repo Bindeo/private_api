@@ -10,25 +10,25 @@ class FilesStorage implements FilesInterface
      * Internal path
      * @var string
      */
-    private $_basePath;
+    private $basePath;
 
     /**
      * Public path
      * @var string
      */
-    private $_baseUrl;
+    private $baseUrl;
 
     /**
      * Folders name length
      * @var int
      */
-    private $_chunkSize;
+    private $chunkSize;
 
     public function __construct($basePath, $baseUrl)
     {
-        $this->_basePath = $basePath;
-        $this->_baseUrl = $baseUrl;
-        $this->_chunkSize = 2;
+        $this->basePath = $basePath;
+        $this->baseUrl = $baseUrl;
+        $this->chunkSize = 2;
     }
 
     /**
@@ -42,7 +42,7 @@ class FilesStorage implements FilesInterface
     public function save($idClient, UploadedFileInterface $file)
     {
         // Get the subpath based on the id
-        $path = $this->_createPath($idClient);
+        $path = $this->createPath($idClient);
         // Generate a file name with the uploaded extension
         $ext = [];
         $ext = preg_match('/\.[a-zA-Z]+$/', $file->getClientFilename(), $ext) ? strtolower($ext[0]) : '';
@@ -65,7 +65,7 @@ class FilesStorage implements FilesInterface
     public function get($idClient, $name)
     {
         // Get the subpath
-        return $this->_baseUrl . $this->_getSubPath($idClient) . '/' . $name;
+        return $this->baseUrl . $this->getSubPath($idClient) . '/' . $name;
     }
 
     /**
@@ -79,7 +79,7 @@ class FilesStorage implements FilesInterface
     public function getHash($idClient, $name)
     {
         // Get the subpath
-        return hash_file('sha256', $this->_basePath . $this->_getSubPath($idClient) . '/' . $name);
+        return hash_file('sha256', $this->basePath . $this->getSubPath($idClient) . '/' . $name);
     }
 
     /**
@@ -92,7 +92,7 @@ class FilesStorage implements FilesInterface
      */
     public function delete($idClient, $name)
     {
-        $file = $this->_basePath . $this->_getSubPath($idClient) . '/' . $name;
+        $file = $this->basePath . $this->getSubPath($idClient) . '/' . $name;
 
         return unlink($file);
     }
@@ -105,19 +105,19 @@ class FilesStorage implements FilesInterface
      *
      * @return string $subPath
      */
-    private function _getSubPath($id)
+    private function getSubPath($id)
     {
         $path = '';
         // Generate necessary folders
         do {
             // We take the last chunking value digits, if we have less digits we prefix it with 0
-            if (strlen($id) > ($this->_chunkSize - 1)) {
-                $path .= "/" . substr($id, (-1 * $this->_chunkSize));
+            if (strlen($id) > ($this->chunkSize - 1)) {
+                $path .= "/" . substr($id, (-1 * $this->chunkSize));
             } else {
-                $path .= "/" . str_pad($id, $this->_chunkSize, '0', STR_PAD_LEFT);
+                $path .= "/" . str_pad($id, $this->chunkSize, '0', STR_PAD_LEFT);
             }
             // Remove last id digits
-            $id = substr($id, 0, (-1 * $this->_chunkSize));
+            $id = substr($id, 0, (-1 * $this->chunkSize));
         } while ($id != "");
 
         return $path;
@@ -131,14 +131,14 @@ class FilesStorage implements FilesInterface
      * @return string
      * @throws \Exception
      */
-    private function _createPath($id)
+    private function createPath($id)
     {
-        if (!is_dir($this->_basePath)) {
+        if (!is_dir($this->basePath)) {
             throw new \Exception('', 500);
         }
 
         // Generate the path
-        $path = $this->_basePath . $this->_getSubPath($id);
+        $path = $this->basePath . $this->getSubPath($id);
 
         // If the path doesn't exist we create it
         if (!is_dir($path) and !mkdir($path, 0777, true)) {

@@ -6,14 +6,14 @@ use Api\Entity\ResultSet;
 
 class MySQL implements DatabaseInterface
 {
-    private static $_me;
+    private static $me;
 
     /**
      * @var \PDO
      */
-    private $_conn;
+    private $conn;
 
-    private $_error;
+    private $error;
 
     /**
      * Singleton constructor
@@ -26,11 +26,11 @@ class MySQL implements DatabaseInterface
      */
     public static function getInstance()
     {
-        if (self::$_me === null) {
-            self::$_me = new MySQL();
+        if (self::$me === null) {
+            self::$me = new MySQL();
         }
 
-        return self::$_me;
+        return self::$me;
     }
 
     // Objects of this class cannot be deserialize because singleton pattern
@@ -44,7 +44,7 @@ class MySQL implements DatabaseInterface
      */
     public function isConnected()
     {
-        return $this->_conn !== null;
+        return $this->conn !== null;
     }
 
     /**
@@ -57,7 +57,7 @@ class MySQL implements DatabaseInterface
      */
     public function connect($host, $user, $pass, $scheme)
     {
-        $this->_conn = new \PDO('mysql:host=' . $host . ';dbname=' . $scheme, $user, $pass,
+        $this->conn = new \PDO('mysql:host=' . $host . ';dbname=' . $scheme, $user, $pass,
             array(\PDO::ATTR_PERSISTENT => true));
     }
 
@@ -70,7 +70,7 @@ class MySQL implements DatabaseInterface
         if (!$this->isConnected()) {
             return null;
         }
-        $this->_conn->beginTransaction();
+        $this->conn->beginTransaction();
 
         return $this;
     }
@@ -84,7 +84,7 @@ class MySQL implements DatabaseInterface
         if (!$this->isConnected()) {
             return null;
         }
-        $this->_conn->commit();
+        $this->conn->commit();
 
         return $this;
     }
@@ -98,7 +98,7 @@ class MySQL implements DatabaseInterface
         if (!$this->isConnected()) {
             return null;
         }
-        $this->_conn->rollBack();
+        $this->conn->rollBack();
 
         return $this;
     }
@@ -109,7 +109,7 @@ class MySQL implements DatabaseInterface
      */
     public function lastInsertId()
     {
-        return $this->_conn->lastInsertId();
+        return $this->conn->lastInsertId();
     }
 
     /**
@@ -118,7 +118,7 @@ class MySQL implements DatabaseInterface
      */
     public function getError()
     {
-        return $this->_error;
+        return $this->error;
     }
 
     /**
@@ -132,7 +132,7 @@ class MySQL implements DatabaseInterface
     public function action($query, $params = null)
     {
         // Prepare and execute query
-        $stmt = $this->_conn->prepare($query);
+        $stmt = $this->conn->prepare($query);
 
         // If we have params, we bind them
         if ($params and is_array($params)) {
@@ -144,7 +144,7 @@ class MySQL implements DatabaseInterface
         $res = $stmt->execute();
 
         if (!$res) {
-            $this->_error = [$stmt->errorCode(), $stmt->errorInfo()];
+            $this->error = [$stmt->errorCode(), $stmt->errorInfo()];
         }
 
         return $stmt->rowCount();
@@ -174,11 +174,11 @@ class MySQL implements DatabaseInterface
 
             // Count total of rows and pages
             $queryCount = 'SELECT COUNT(*), CEIL(COUNT(*) / :p_rows) FROM (' . $query . ') Q';
-            $stmt = $this->_conn->prepare($queryCount);
+            $stmt = $this->conn->prepare($queryCount);
             $res = $stmt->execute($params);
 
             if (!$res) {
-                $this->_error = [$stmt->errorCode(), $stmt->errorInfo()];
+                $this->error = [$stmt->errorCode(), $stmt->errorInfo()];
 
                 return false;
             }
@@ -193,7 +193,7 @@ class MySQL implements DatabaseInterface
         }
 
         // Prepare and execute query
-        $stmt = $this->_conn->prepare($query);
+        $stmt = $this->conn->prepare($query);
 
         // If we have params, we bind them
         if ($params and is_array($params)) {
@@ -211,7 +211,7 @@ class MySQL implements DatabaseInterface
 
             $result = new ResultSet($totalRows ? $totalRows : $stmt->rowCount(), $totalPages, $rows);
         } else {
-            $this->_error = [$stmt->errorCode(), $stmt->errorInfo()];
+            $this->error = [$stmt->errorCode(), $stmt->errorInfo()];
             $result = false;
         }
 

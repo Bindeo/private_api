@@ -13,11 +13,11 @@ class StoreData
     /**
      * @var \Api\Model\StoreData
      */
-    private $_model;
+    private $model;
 
     public function __construct(\Api\Model\StoreData $model)
     {
-        $this->_model = $model;
+        $this->model = $model;
     }
 
     /**
@@ -33,7 +33,7 @@ class StoreData
     public function getFile(Request $request, Response $response, $args)
     {
         // Get the file
-        $res = $this->_model->getFile(new File($request->getParams()));
+        $res = $this->model->getFile(new File($request->getParams()));
         $res = ['data' => ['type' => 'files', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -51,7 +51,7 @@ class StoreData
     public function createFile(Request $request, Response $response, $args)
     {
         $files = $request->getUploadedFiles();
-        $res = $this->_model->saveFile(new File($request->getParams()), reset($files));
+        $res = $this->model->saveFile(new File($request->getParams()), reset($files));
         $res = ['data' => ['type' => 'files', 'attributes' => $res]];
 
         return $response->withJson($res, 201);
@@ -69,7 +69,7 @@ class StoreData
     public function deleteFile(Request $request, Response $response, $args)
     {
         // Delete an account
-        $this->_model->deleteFile(new File($request->getParams()));
+        $this->model->deleteFile(new File($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -87,7 +87,7 @@ class StoreData
     public function fileList(Request $request, Response $response, $args)
     {
         // Get the list
-        $res = $this->_model->fileList($request->getParam('id_client'), $request->getParam('page'));
+        $res = $this->model->fileList($request->getParam('id_client'), $request->getParam('page'));
         $res = [
             'data'         => $res->toArray('files'),
             'total_pages'  => $res->getNumPages(),
@@ -110,7 +110,7 @@ class StoreData
     public function signFile(Request $request, Response $response, $args)
     {
         // Sign the file
-        $res = $this->_model->signFile(new File($request->getParams()));
+        $res = $this->model->signFile(new File($request->getParams()));
 
         $res = ['data' => ['type' => 'files', 'attributes' => $res]];
 
@@ -130,7 +130,7 @@ class StoreData
     public function getBalance(Request $request, Response $response, $args)
     {
         if ($request->getParam('net') == 'bitcoin') {
-            $res = $this->_model->getBCBalance();
+            $res = $this->model->getBCBalance();
         } else {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -151,7 +151,7 @@ class StoreData
     public function getTransaction(Request $request, Response $response, $args)
     {
         // Get the transaction
-        $res = $this->_model->getTransaction(new BlockChain($request->getParams()));
+        $res = $this->model->getTransaction(new BlockChain($request->getParams()));
         $res = ['data' => ['type' => 'blockchain', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -171,10 +171,10 @@ class StoreData
     {
         if ($request->getParam('mode') == 'hash') {
             $type = 'hash';
-            $res = $this->_model->getTransactionHash(new BlockChain($request->getParams()));
+            $res = $this->model->getTransactionHash(new BlockChain($request->getParams()));
         } elseif ($request->getParam('mode') == 'extended') {
             $type = 'transaction';
-            $res = $this->_model->getTransactionExtended(new BlockChain($request->getParams()));
+            $res = $this->model->getTransactionExtended(new BlockChain($request->getParams()));
         } else {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -203,7 +203,7 @@ class StoreData
         }
 
         // Get the result
-        $res = $this->_model->testFile($file->file, $request->getParam('net'), $request->getParam('transaction'));
+        $res = $this->model->testFile($file->file, $request->getParam('net'), $request->getParam('transaction'));
         $res = ['data' => ['type' => 'hash_test', 'attributes' => $res]];
 
         return $response->withJson($res, 200);

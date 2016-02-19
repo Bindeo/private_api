@@ -19,7 +19,7 @@ class Users extends RepositoryLocatableAbstract
      * @return User
      * @throws \Exception
      */
-    private function _changeType(User $user, $newType, ResultSet $types = null)
+    private function changeType(User $user, $newType, ResultSet $types = null)
     {
         if (!$user->getIdUser() or !in_array($user->getType(), [1, 2, 3]) or !in_array($newType,
                 [1, 2, 3]) or !$user->getIp()
@@ -30,12 +30,12 @@ class Users extends RepositoryLocatableAbstract
         if (!$types) {
             // Get the account types
             $sql = 'SELECT TYPE, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES ORDER BY TYPE ASC';
-            $types = $this->_db->query($sql, null, 'Api\Entity\AccountType');
+            $types = $this->db->query($sql, null, 'Api\Entity\AccountType');
         }
 
         // Geolocalize the user
         /** @var User $user */
-        $user = $this->_geolocalize($user);
+        $user = $this->geolocalize($user);
 
         // The user hasn't paid yet, we change him to free user
         $sql = 'UPDATE USERS_TYPES SET DATE_END = SYSDATE() WHERE FK_ID_USER = :id AND DATE_END IS NULL;
@@ -59,8 +59,8 @@ class Users extends RepositoryLocatableAbstract
             ':id_geonames' => $user->getIdGeonames()
         ];
 
-        if (!$this->_db->action($sql, $data)) {
-            throw $this->_dbException();
+        if (!$this->db->action($sql, $data)) {
+            throw $this->dbException();
         }
 
         return $user->setType($newType)
@@ -76,7 +76,7 @@ class Users extends RepositoryLocatableAbstract
      * @return User
      * @throws \Exception
      */
-    private function _renewAccount(User $user)
+    private function renewAccount(User $user)
     {
         if (!$user->getIdUser() or !in_array($user->getType(), [1, 2, 3]) or !$user->getIp()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
@@ -84,7 +84,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Get the account types
         $sql = 'SELECT TYPE, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES ORDER BY TYPE ASC';
-        $resultSet = $this->_db->query($sql, null, 'Api\Entity\AccountType');
+        $resultSet = $this->db->query($sql, null, 'Api\Entity\AccountType');
         $types = $resultSet->getRows();
 
         // Renew the user depending the type
@@ -96,11 +96,11 @@ class Users extends RepositoryLocatableAbstract
                 ':stamps' => $types[1]->getMaxStampsMonth(),
                 ':id'     => $user->getIdUser()
             ];
-            if ($this->_db->action($sql, $data)) {
+            if ($this->db->action($sql, $data)) {
                 // Reset the stamps
                 $user->setStampsLeft($types[1]->getMaxStampsMonth());
             } else {
-                throw $this->_dbException();
+                throw $this->dbException();
             }
         } elseif ($user->getType() > 2) {
             // Pro user, check if the user has paid and update the reset date
@@ -108,7 +108,7 @@ class Users extends RepositoryLocatableAbstract
                     WHERE FK_ID_USER = :id AND DATE_END IS NULL AND FK_ID_TYPE = :type AND NEXT_PAYMENT > SYSDATE()';
             $data = [':id' => $user->getIdUser(), ':type' => $user->getType()];
 
-            if ($this->_db->action($sql, $data)) {
+            if ($this->db->action($sql, $data)) {
                 // The user has already paid, reset his stamps
                 $sql = 'UPDATE USERS C SET STAMPS_LEFT = :stamps,
                         LAST_RESET = (SELECT LAST_RESET FROM USERS_TYPES WHERE FK_ID_USER = C.ID_USER
@@ -120,15 +120,15 @@ class Users extends RepositoryLocatableAbstract
                     ':id'     => $user->getIdUser()
                 ];
 
-                if ($this->_db->action($sql, $data)) {
+                if ($this->db->action($sql, $data)) {
                     // Reset his stamps
                     $user->setStampsLeft($types[$user->getType() - 1]->getMaxStampsMonth());
                 } else {
-                    throw $this->_dbException();
+                    throw $this->dbException();
                 }
             } else {
                 // The user hasn't paid yet, we change him to free user
-                $user = $this->_changeType($user, 2, $resultSet);
+                $user = $this->changeType($user, 2, $resultSet);
             }
         }
 
@@ -153,10 +153,10 @@ class Users extends RepositoryLocatableAbstract
                 FROM USERS WHERE ID_USER = :id';
         $params = [':id' => $user->getIdUser()];
 
-        $data = $this->_db->query($sql, $params, 'Api\Entity\User');
+        $data = $this->db->query($sql, $params, 'Api\Entity\User');
 
-        if (!$data or $this->_db->getError()) {
-            throw new \Exception($this->_db->getError(), 400);
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
         }
 
         return $data->getNumRows() ? $data->getRows()[0] : null;
@@ -180,10 +180,10 @@ class Users extends RepositoryLocatableAbstract
                 FROM USERS WHERE EMAIL = :email';
         $params = [':email' => trim(mb_strtolower($user->getEmail()))];
 
-        $data = $this->_db->query($sql, $params, 'Api\Entity\User');
+        $data = $this->db->query($sql, $params, 'Api\Entity\User');
 
-        if (!$data or $this->_db->getError()) {
-            throw new \Exception($this->_db->getError(), 400);
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
         }
 
         return $data->getNumRows() ? $data->getRows()[0] : null;
@@ -209,18 +209,18 @@ class Users extends RepositoryLocatableAbstract
 
         // Obtain the account type data
         $sql = 'SELECT ID_TYPE, TYPE, COST, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES WHERE ID_TYPE = :id';
-        $data = $this->_db->query($sql, [':id' => $user->getType()], 'Api\Entity\AccountType');
+        $data = $this->db->query($sql, [':id' => $user->getType()], 'Api\Entity\AccountType');
 
-        if (!$data or $this->_db->getError() or $data->getNumRows() != 1) {
-            throw new \Exception($this->_db->getError(), 400);
+        if (!$data or $this->db->getError() or $data->getNumRows() != 1) {
+            throw new \Exception($this->db->getError(), 400);
         }
 
         // Geolocalize the user
 
         /** @var User $user */
-        $user = $this->_geolocalize($user);
+        $user = $this->geolocalize($user);
 
-        $this->_db->beginTransaction();
+        $this->db->beginTransaction();
         // Prepare query and mandatory data
         $sql = 'INSERT INTO USERS(EMAIL, PASSWORD, TYPE, NAME, SURNAME, CTRL_IP_SIGNUP, CTRL_DATE_SIGNUP, LANG,
                   LAST_ID_GEONAMES, LAST_LATITUDE, LAST_LONGITUDE, STORAGE_LEFT, LAST_RESET, STAMPS_LEFT)
@@ -242,12 +242,12 @@ class Users extends RepositoryLocatableAbstract
         ];
 
         // Execute query
-        if (!$this->_db->action($sql, $data)) {
-            $this->_db->rollBack();
-            throw $this->_dbException();
+        if (!$this->db->action($sql, $data)) {
+            $this->db->rollBack();
+            throw $this->dbException();
         }
 
-        $id = (int)$this->_db->lastInsertId();
+        $id = (int)$this->db->lastInsertId();
 
         // Generate validation code
         $token = md5($id . $user->getEmail() . time());
@@ -266,13 +266,13 @@ class Users extends RepositoryLocatableAbstract
             ':ip'       => $user->getIp()
         ];
 
-        if (!$this->_db->action($sql, $data)) {
-            $this->_db->rollBack();
-            throw $this->_dbException();
+        if (!$this->db->action($sql, $data)) {
+            $this->db->rollBack();
+            throw $this->dbException();
         }
 
         // Commit transaction
-        $this->_db->commit();
+        $this->db->commit();
 
         return ['id' => $id, 'token' => $token];
     }
@@ -296,7 +296,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Geolocalize the user
         /** @var User $user */
-        $user = $this->_geolocalize($user);
+        $user = $this->geolocalize($user);
 
         // Prepare query and data
         $sql = 'UPDATE USERS SET NAME = :name, SURNAME = :surname, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(),
@@ -315,10 +315,10 @@ class Users extends RepositoryLocatableAbstract
         ];
 
         // Execute query
-        if ($this->_db->action($sql, $data)) {
+        if ($this->db->action($sql, $data)) {
             return $this->find($user);
         } else {
-            throw $this->_dbException();
+            throw $this->dbException();
         }
     }
 
@@ -341,7 +341,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Check if the password is correct
         $sql = 'SELECT PASSWORD FROM USERS WHERE ID_USER = :id';
-        $res = $this->_db->query($sql, ['id' => $user->getIdUser()]);
+        $res = $this->db->query($sql, ['id' => $user->getIdUser()]);
         if (!$res or $res->getNumRows() != 1 or !password_verify($user->getOldPassword(),
                 $res->getRows()[0]['PASSWORD'])
         ) {
@@ -350,7 +350,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Geolocalize the user
         /** @var \Api\Entity\User $user */
-        $user = $this->_geolocalize($user);
+        $user = $this->geolocalize($user);
 
         // Prepare query and data
         $sql = 'UPDATE USERS SET PASSWORD = :password, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(),
@@ -367,10 +367,10 @@ class Users extends RepositoryLocatableAbstract
         ];
 
         // Execute query
-        if ($this->_db->action($sql, $data)) {
+        if ($this->db->action($sql, $data)) {
             return true;
         } else {
-            throw $this->_dbException();
+            throw $this->dbException();
         }
     }
 
@@ -382,7 +382,7 @@ class Users extends RepositoryLocatableAbstract
      * @return User
      * @throws \Exception
      */
-    public function changeType(User $user)
+    public function modifyType(User $user)
     {
         $user->clean();
 
@@ -398,7 +398,7 @@ class Users extends RepositoryLocatableAbstract
         $user->setIp($user->getIp());
 
         // Change the user type
-        return $this->_changeType($user, $user->getType());
+        return $this->changeType($user, $user->getType());
     }
 
     /**
@@ -420,7 +420,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Check if the password is correct
         $sql = 'SELECT PASSWORD, EMAIL FROM USERS WHERE ID_USER = :id';
-        $res = $this->_db->query($sql, ['id' => $user->getIdUser()]);
+        $res = $this->db->query($sql, ['id' => $user->getIdUser()]);
         if (!$res or $res->getNumRows() != 1 or !password_verify($user->getPassword(),
                 $res->getRows()[0]['PASSWORD'])
         ) {
@@ -443,10 +443,10 @@ class Users extends RepositoryLocatableAbstract
             ':old_email' => $res->getRows()[0]['PASSWORD']
         ];
 
-        if ($this->_db->action($sql, $data)) {
+        if ($this->db->action($sql, $data)) {
             return $token;
         } else {
-            throw $this->_dbException();
+            throw $this->dbException();
         }
     }
 
@@ -465,7 +465,7 @@ class Users extends RepositoryLocatableAbstract
         // Retrieve the token information if is still valid
         $sql = "SELECT TOKEN, TYPE, FK_ID_USER, EMAIL FROM USERS_VALIDATIONS
                 WHERE TOKEN = :token AND CONFIRMED = 0 AND (TYPE = 'V' OR CTRL_DATE < SYSDATE() + INTERVAL 1 DAY)";
-        $res = $this->_db->query($sql, ['token' => trim($token)]);
+        $res = $this->db->query($sql, ['token' => trim($token)]);
         if (!$res or $res->getNumRows() == 0) {
             throw new \Exception(Exceptions::EXPIRED_TOKEN, 400);
         }
@@ -474,7 +474,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Geolocalize the user
         /** @var User $user */
-        $user = $this->_geolocalize(new User([
+        $user = $this->geolocalize(new User([
             'id_user' => $res['FK_ID_USER'],
             'email'   => $res['EMAIL'],
             'ip'      => $ip
@@ -482,7 +482,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Process the token
         $sql = 'UPDATE USERS_VALIDATIONS SET CONFIRMED = 1 WHERE TOKEN = :token';
-        $this->_db->action($sql, ['token' => $token]);
+        $this->db->action($sql, ['token' => $token]);
 
         if ($res['TYPE'] == 'V') {
             // Initial account validation
@@ -527,10 +527,10 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Execute query
-        if ($this->_db->action($sql, $params)) {
+        if ($this->db->action($sql, $params)) {
             return $user;
         } else {
-            throw $this->_dbException();
+            throw $this->dbException();
         }
     }
 
@@ -547,7 +547,7 @@ class Users extends RepositoryLocatableAbstract
     {
         if (!$user->getEmail() or !$user->getPassword() or !$user->getIp()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        } elseif(!in_array($source, ['front', 'api'])) {
+        } elseif (!in_array($source, ['front', 'api'])) {
             throw new \Exception(Exceptions::UNAUTHORIZED, 403);
         }
 
@@ -557,7 +557,7 @@ class Users extends RepositoryLocatableAbstract
                 FROM USERS WHERE EMAIL = :email';
         $user->clean();
         $params = [':email' => mb_strtolower($user->getEmail())];
-        $data = $this->_db->query($sql, $params, 'Api\Entity\User');
+        $data = $this->db->query($sql, $params, 'Api\Entity\User');
 
         // If we don't have the user, maybe the pass is not correct
         /** @var \Api\Entity\User $userAux */
@@ -565,8 +565,8 @@ class Users extends RepositoryLocatableAbstract
                 $userAux->getPassword())
         ) {
             throw new \Exception(Exceptions::INCORRECT_PASSWORD, 400);
-        } elseif (!$data and $this->_db->getError()) {
-            throw new \Exception($this->_db->getError(), 400);
+        } elseif (!$data and $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
         }
 
         $userAux->setIp($user->getIp())
@@ -577,15 +577,15 @@ class Users extends RepositoryLocatableAbstract
 
         // Renew the account if necessary
         if ($userAux->getRenew()) {
-            $userAux = $this->_renewAccount($userAux);
+            $userAux = $this->renewAccount($userAux);
         }
         $userAux->setPassword(null)->setRenew(null);
 
         // Geolocalize the user
-        $userAux = $this->_geolocalize($userAux);
+        $userAux = $this->geolocalize($userAux);
 
         // Login is successful, record tracking data
-        $this->_db->beginTransaction();
+        $this->db->beginTransaction();
         $sql = 'UPDATE USERS SET CTRL_IP_LOGIN = :ip, CTRL_DATE_LOGIN = SYSDATE(), LAST_ID_GEONAMES = :id_geonames,
                                    LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
                 WHERE ID_USER = :id';
@@ -597,7 +597,7 @@ class Users extends RepositoryLocatableAbstract
             ':id_geonames' => $userAux->getIdGeonames()
         ];
 
-        $res = $this->_db->action($sql, $params);
+        $res = $this->db->action($sql, $params);
 
         $sql = 'INSERT INTO USERS_LOGINS(FK_ID_USER, EMAIL, CTRL_DATE, SOURCE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
                 VALUES (:id, :email, SYSDATE(), :source, :ip, :id_geonames, :latitude, :longitude)';
@@ -612,14 +612,14 @@ class Users extends RepositoryLocatableAbstract
         ];
 
         if ($res) {
-            $res = $this->_db->action($sql, $params);
+            $res = $this->db->action($sql, $params);
         }
 
         // If everything has gone ok, we commit the transaction else we do rollback
         if ($res) {
-            $this->_db->commit();
+            $this->db->commit();
         } else {
-            $this->_db->rollBack();
+            $this->db->rollBack();
             throw new \Exception('Login failed', 500);
         }
 
@@ -642,9 +642,9 @@ class Users extends RepositoryLocatableAbstract
 
         // Geolocalize the user
         /** @var User $user */
-        $user = $this->_geolocalize($user);
+        $user = $this->geolocalize($user);
 
-        $this->_db->beginTransaction();
+        $this->db->beginTransaction();
         $sql = 'UPDATE USERS SET CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(), LAST_ID_GEONAMES = :id_geonames,
                                    LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
                 WHERE ID_USER = :id';
@@ -656,20 +656,20 @@ class Users extends RepositoryLocatableAbstract
             ':longitude'   => $user->getLongitude(),
             ':id_geonames' => $user->getIdGeonames()
         ];
-        $res = $this->_db->action($sql, $params);
+        $res = $this->db->action($sql, $params);
 
         $sql = 'DELETE FROM USERS WHERE ID_USER = :id';
 
         // Execute query
         if ($res) {
-            $res = $this->_db->action($sql, [':id' => $user->getIdUser()]);
+            $res = $this->db->action($sql, [':id' => $user->getIdUser()]);
         }
 
         // If everything has gone ok, we commit the transaction else we do rollback
         if ($res) {
-            $this->_db->commit();
+            $this->db->commit();
         } else {
-            $this->_db->rollBack();
+            $this->db->rollBack();
             throw new \Exception('', 500);
         }
     }

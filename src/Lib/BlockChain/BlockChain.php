@@ -9,13 +9,13 @@ defined('ENV') || define('ENV', 'development');
  */
 class BlockChain
 {
-    static private $_conf;
-    static private $_instance;
-    private        $_net;
+    static private $conf;
+    static private $instance;
+    private        $net;
     /**
      * @var BlockChainClientInterface
      */
-    private $_client;
+    private $client;
 
     /**
      * Private singleton BlockChain constructor.
@@ -26,8 +26,8 @@ class BlockChain
      */
     private function __construct(BlockChainClientInterface $client, $type)
     {
-        $this->_client = $client;
-        $this->_net = $type;
+        $this->client = $client;
+        $this->net = $type;
     }
 
     /**
@@ -37,7 +37,7 @@ class BlockChain
      */
     public static function setConf(array $conf)
     {
-        self::$_conf = $conf;
+        self::$conf = $conf;
     }
 
     /**
@@ -49,16 +49,16 @@ class BlockChain
      */
     public static function getInstance($client = 'bitcoin')
     {
-        if (!isset(self::$_instance[$client])) {
-            if ($client == 'bitcoin' and isset(self::$_conf[$client])) {
-                self::$_instance[$client] = new BlockChain(new BitcoinClient(self::$_conf[$client]['host'],
-                    self::$_conf[$client]['port'], self::$_conf[$client]['user']), $client);
+        if (!isset(self::$instance[$client])) {
+            if ($client == 'bitcoin' and isset(self::$conf[$client])) {
+                self::$instance[$client] = new BlockChain(new BitcoinClient(self::$conf[$client]['host'],
+                    self::$conf[$client]['port'], self::$conf[$client]['user']), $client);
             } else {
                 return null;
             }
         }
 
-        return self::$_instance[$client];
+        return self::$instance[$client];
     }
 
     /**
@@ -67,98 +67,98 @@ class BlockChain
      */
     public function getNet()
     {
-        return $this->_net;
+        return $this->net;
     }
 
     // METHODS
     public function decodeRawTransaction($raw)
     {
-        return $this->_client->decodeRawTransaction($raw);
+        return $this->client->decodeRawTransaction($raw);
     }
 
     public function getInfo()
     {
-        return $this->_client->getInfo();
+        return $this->client->getInfo();
     }
 
     public function getNetworkInfo()
     {
-        return $this->_client->getNetworkInfo();
+        return $this->client->getNetworkInfo();
     }
 
     public function getAccount($address)
     {
-        return $this->_client->getAccount($address);
+        return $this->client->getAccount($address);
     }
 
     public function getAccountAddress($account)
     {
-        return $this->_client->getAccountAddress($account);
+        return $this->client->getAccountAddress($account);
     }
 
     public function getBalance($account = null)
     {
-        return $account ? $this->_client->getBalance($account) : $this->_client->getBalance();
+        return $account ? $this->client->getBalance($account) : $this->client->getBalance();
     }
 
     public function getBlock($hash)
     {
-        return $this->_client->getBlock($hash);
+        return $this->client->getBlock($hash);
     }
 
     public function getBlockHash($number)
     {
-        return $this->_client->getBlockHash($number);
+        return $this->client->getBlockHash($number);
     }
 
     public function getBlockCount()
     {
-        return $this->_client->getBlockCount();
+        return $this->client->getBlockCount();
     }
 
     public function getRawChangeAddress()
     {
-        return $this->_client->getRawChangeAddress();
+        return $this->client->getRawChangeAddress();
     }
 
     public function getRawTransaction($txid, $decoded = 0)
     {
-        return $this->_client->getRawTransaction($txid, $decoded);
+        return $this->client->getRawTransaction($txid, $decoded);
     }
 
     public function getTransaction($txid)
     {
-        return $this->_client->getTransaction($txid);
+        return $this->client->getTransaction($txid);
     }
 
     public function getWalletInfo()
     {
-        return $this->_client->getWalletInfo();
+        return $this->client->getWalletInfo();
     }
 
     public function listAccounts()
     {
-        return $this->_client->listAccounts();
+        return $this->client->listAccounts();
     }
 
     public function listAddressGroupings()
     {
-        return $this->_client->listAddressGroupings();
+        return $this->client->listAddressGroupings();
     }
 
     public function listTransactions($account = null)
     {
-        return $account ? $this->_client->listTransactions($account) : $this->_client->listTransactions();
+        return $account ? $this->client->listTransactions($account) : $this->client->listTransactions();
     }
 
     public function listUnspent($account = null)
     {
-        return ($account !== null) ? $this->_client->listUnspent($account) : $this->_client->listUnspent();
+        return ($account !== null) ? $this->client->listUnspent($account) : $this->client->listUnspent();
     }
 
     public function move($from, $to, $amount)
     {
-        return $this->_client->move($from, $to, $amount);
+        return $this->client->move($from, $to, $amount);
     }
 
     // Complex functionality
@@ -175,7 +175,7 @@ class BlockChain
      */
     public function storeData($data, $type, $accountTo = null, $accountFrom = null, $txid = null)
     {
-        return $this->_client->storeData($data, $type, $accountTo, $accountFrom, $txid);
+        return $this->client->storeData($data, $type, $accountTo, $accountFrom, $txid);
     }
 
     /**
@@ -187,7 +187,7 @@ class BlockChain
      */
     public function getDecodedData($txid)
     {
-        return $this->_client->getDecodedData($txid);
+        return $this->client->getDecodedData($txid);
     }
 
     /**
@@ -199,6 +199,6 @@ class BlockChain
      */
     public function getEncodedData($txid)
     {
-        return $this->_client->getEncodedData($txid);
+        return $this->client->getEncodedData($txid);
     }
 }

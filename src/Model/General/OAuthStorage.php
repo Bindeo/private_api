@@ -7,11 +7,11 @@ use Bindeo\OAuth2\OAuthProviderAbstract;
 
 class OAuthStorage implements OAuthStorageInterface
 {
-    private $_conf;
+    private $conf;
 
     public function __construct($settings)
     {
-        $this->_conf = $settings;
+        $this->conf = $settings;
     }
 
     /**
@@ -26,12 +26,12 @@ class OAuthStorage implements OAuthStorageInterface
     public function getOAuth($type, $oauthToken = null, $clientId = null, $clientSecret = null)
     {
         // Validate the OAuth token
-        if ($type != "Bearer" or !$oauthToken or !isset($this->_conf[$oauthToken])) {
+        if ($type != "Bearer" or !$oauthToken or !isset($this->conf[$oauthToken])) {
             throw new \Exception(OAuthProviderAbstract::INVALID_AUTH_DATA, 401);
         }
 
         // Take the app role and initialize the system
-        return $this->_conf[$oauthToken];
+        return $this->conf[$oauthToken];
     }
 
     /**

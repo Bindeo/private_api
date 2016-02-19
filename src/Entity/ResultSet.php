@@ -4,15 +4,15 @@ namespace Api\Entity;
 
 class ResultSet
 {
-    private $_numRows;
-    private $_numPages;
-    private $_rows;
+    private $numRows;
+    private $numPages;
+    private $rows;
 
     public function __construct($numRows, $numPages, array $rows)
     {
-        $this->_numRows = (int)$numRows;
-        $this->_numPages = (int)$numPages;
-        $this->_rows = $rows;
+        $this->numRows = (int)$numRows;
+        $this->numPages = (int)$numPages;
+        $this->rows = $rows;
     }
 
     /**
@@ -20,7 +20,7 @@ class ResultSet
      */
     public function getRows()
     {
-        return $this->_rows;
+        return $this->rows;
     }
 
     /**
@@ -28,7 +28,7 @@ class ResultSet
      */
     public function getNumPages()
     {
-        return $this->_numPages;
+        return $this->numPages;
     }
 
     /**
@@ -36,7 +36,7 @@ class ResultSet
      */
     public function getNumRows()
     {
-        return $this->_numRows;
+        return $this->numRows;
     }
 
     /**
@@ -49,8 +49,8 @@ class ResultSet
     public function toArray($type)
     {
         $array = [];
-        if ($this->_numRows > 0) {
-            foreach ($this->_rows as $row) {
+        if ($this->numRows > 0) {
+            foreach ($this->rows as $row) {
                 $array[] = ['type' => $type, 'attributes' => $row->toArray()];
             }
         }

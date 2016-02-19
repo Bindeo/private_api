@@ -9,11 +9,11 @@ use Api\Model\General\OAuthRegistry;
 
 class OAuth
 {
-    private $_oauth;
+    private $oauth;
 
     public function __construct(OAuthProviderAbstract $oauth)
     {
-        $this->_oauth = $oauth;
+        $this->oauth = $oauth;
     }
 
     /**
@@ -27,7 +27,7 @@ class OAuth
      */
     public function run(Request $request, Response $response, callable $next)
     {
-        $data = $this->_oauth->verify($request);
+        $data = $this->oauth->verify($request);
 
         OAuthRegistry::getInstance()
                      ->setGrantType($data['grantType'])

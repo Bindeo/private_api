@@ -7,14 +7,14 @@ use Api\Model\General\Exceptions;
 
 abstract class RepositoryAbstract
 {
-    protected $_codes;
-    protected $_db;
+    protected $codes;
+    protected $db;
 
     public function __construct(DatabaseInterface $db)
     {
-        $this->_db = $db;
+        $this->db = $db;
 
-        $this->_codes = [23000 => [409, Exceptions::DUPLICATED_KEY]];
+        $this->codes = [23000 => [409, Exceptions::DUPLICATED_KEY]];
     }
 
     /**
@@ -22,13 +22,13 @@ abstract class RepositoryAbstract
      *
      * @return \Exception
      */
-    protected function _dbException()
+    protected function dbException()
     {
-        if (isset($this->_codes[$this->_db->getError()[0]])) {
-            return new \Exception($this->_codes[$this->_db->getError()[0]][1],
-                $this->_codes[$this->_db->getError()[0]][0]);
+        if (isset($this->codes[$this->db->getError()[0]])) {
+            return new \Exception($this->codes[$this->db->getError()[0]][1],
+                $this->codes[$this->db->getError()[0]][0]);
         } else {
-            return new \Exception(json_encode($this->_db->getError()), 400);
+            return new \Exception(json_encode($this->db->getError()), 400);
         }
     }
 }

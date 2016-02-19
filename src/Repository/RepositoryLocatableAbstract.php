@@ -11,11 +11,11 @@ abstract class RepositoryLocatableAbstract extends RepositoryAbstract
     /**
      * @var Reader
      */
-    protected $_maxmind;
+    protected $maxmind;
 
     public function __construct(DatabaseInterface $db, Reader $maxmind)
     {
-        $this->_maxmind = $maxmind;
+        $this->maxmind = $maxmind;
         parent::__construct($db);
     }
 
@@ -26,10 +26,10 @@ abstract class RepositoryLocatableAbstract extends RepositoryAbstract
      *
      * @return LocatableInterface
      */
-    protected function _geolocalize(LocatableInterface $model)
+    protected function geolocalize(LocatableInterface $model)
     {
         // Geolocalize the ip
-        $geoip = $this->_maxmind->get($model->getIp());
+        $geoip = $this->maxmind->get($model->getIp());
 
         if (!$model->getLatitude()) {
             $model->setLatitude($geoip['location']['latitude']);

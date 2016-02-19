@@ -14,11 +14,11 @@ class Accounts
     /**
      * @var \Api\Repository\Users
      */
-    private $_usersRepo;
+    private $usersRepo;
 
     public function __construct(RepositoryAbstract $users)
     {
-        $this->_usersRepo = $users;
+        $this->usersRepo = $users;
     }
 
     /**
@@ -34,7 +34,7 @@ class Accounts
     public function login(Request $request, Response $response, $args)
     {
         // Populate the user object and login the user
-        $data = $this->_usersRepo->login(new User($request->getParams()), OAuthRegistry::getInstance()->getAppName());
+        $data = $this->usersRepo->login(new User($request->getParams()), OAuthRegistry::getInstance()->getAppName());
         $res = ['data' => ['type' => 'users', 'attributes' => $data->toArray()]];
 
         return $response->withJson($res, 200);
@@ -52,7 +52,7 @@ class Accounts
     public function create(Request $request, Response $response, $args)
     {
         // Populate the user object and create a new account
-        $data = $this->_usersRepo->create(new User($request->getParams()));
+        $data = $this->usersRepo->create(new User($request->getParams()));
 
         $res = ['data' => ['type' => 'users', 'attributes' => $data]];
 
@@ -71,7 +71,7 @@ class Accounts
     public function modify(Request $request, Response $response, $args)
     {
         // Populate the user object and modify the account
-        $user = $this->_usersRepo->modify(new User($request->getParams()));
+        $user = $this->usersRepo->modify(new User($request->getParams()));
 
         $res = ['data' => ['type' => 'users', 'attributes' => $user ? $user->toArray() : null]];
 
@@ -90,7 +90,7 @@ class Accounts
     public function modifyPassword(Request $request, Response $response, $args)
     {
         // Populate the user object and modify the password
-        $this->_usersRepo->modifyPassword(new User($request->getParams()));
+        $this->usersRepo->modifyPassword(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -107,7 +107,7 @@ class Accounts
     public function changeType(Request $request, Response $response, $args)
     {
         // Populate the user object and change his account type
-        $user = $this->_usersRepo->changeType(new User($request->getParams()));
+        $user = $this->usersRepo->modifyType(new User($request->getParams()));
 
         $res = ['data' => ['type' => 'users', 'attributes' => $user ? $user->toArray() : null]];
 
@@ -126,7 +126,7 @@ class Accounts
     public function modifyEmail(Request $request, Response $response, $args)
     {
         // Populate the user object and modify the email
-        $this->_usersRepo->modifyEmail(new User($request->getParams()));
+        $this->usersRepo->modifyEmail(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -148,7 +148,7 @@ class Accounts
         }
 
         // Create a new account
-        $this->_usersRepo->validateToken($request->getParam('token'), $request->getParam('ip'),
+        $this->usersRepo->validateToken($request->getParam('token'), $request->getParam('ip'),
             $request->getParam('password'));
 
         return $response->withJson('', 204);
@@ -167,7 +167,7 @@ class Accounts
     public function delete(Request $request, Response $response, $args)
     {
         // Populate the user object and delete an account
-        $this->_usersRepo->delete(new User($request->getParams()));
+        $this->usersRepo->delete(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }

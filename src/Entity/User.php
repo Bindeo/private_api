@@ -7,14 +7,14 @@ use Bindeo\DataModel\UserAbstract;
 class User extends UserAbstract
 {
     // Optionals and temporary attributes
-    protected $_renew;
+    protected $renew;
 
     /**
      * @return mixed
      */
     public function getRenew()
     {
-        return $this->_renew;
+        return $this->renew;
     }
 
     /**
@@ -24,7 +24,7 @@ class User extends UserAbstract
      */
     public function setRenew($renew)
     {
-        $this->_renew = $renew;
+        $this->renew = $renew;
 
         return $this;
     }
