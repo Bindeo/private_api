@@ -13,9 +13,10 @@
         "php": ">=5.6.0",
         "ext-pdo": "*",
         "ext-mcrypt": "*",
-        "slim/slim": "~3.0",
+        "slim/slim": "^3.0",
         "slim/twig-view": "*",
-        "monolog/monolog": "~1.0",
-        "maxmind-db/reader": "~1.0"
+        "monolog/monolog": "^1.0",
+        "maxmind-db/reader": "^1.0",
+        "mailgun/mailgun-php": "^1.8"
     }
 }

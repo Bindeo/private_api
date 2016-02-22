@@ -5,11 +5,11 @@
 $app->group('/account', function () {
     $this->get('', 'Api\Controller\Accounts:login');
     $this->post('', 'Api\Controller\Accounts:create');
-    $this->patch('', 'Api\Controller\Accounts:modify');
+    $this->put('', 'Api\Controller\Accounts:modify');
     $this->delete('', 'Api\Controller\Accounts:delete');
-    $this->patch('/password', 'Api\Controller\Accounts:modifyPassword');
-    $this->patch('/email', 'Api\Controller\Accounts:modifyEmail');
-    $this->patch('/type', 'Api\Controller\Accounts:changeType');
+    $this->put('/password', 'Api\Controller\Accounts:modifyPassword');
+    $this->put('/email', 'Api\Controller\Accounts:modifyEmail');
+    $this->put('/type', 'Api\Controller\Accounts:changeType');
     $this->put('/token', 'Api\Controller\Accounts:validateToken');
 });
 

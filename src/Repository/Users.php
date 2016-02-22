@@ -274,7 +274,7 @@ class Users extends RepositoryLocatableAbstract
         // Commit transaction
         $this->db->commit();
 
-        return ['id' => $id, 'token' => $token];
+        return ['idUser' => $id, 'token' => $token];
     }
 
     /**
