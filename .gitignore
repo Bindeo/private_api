@@ -1,3 +1,9 @@
 /vendor/
-/logs/*
+/var/*
+!/var/cache
+/var/cache/*
+!var/cache/.gitkeep
+!/var/logs
+/var/logs/*
+!var/logs/.gitkeep
 !/logs/README.md

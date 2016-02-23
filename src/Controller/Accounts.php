@@ -3,8 +3,6 @@
 namespace Api\Controller;
 
 use Api\Model\General\Exceptions;
-use Api\Model\General\OAuthRegistry;
-use Api\Repository\RepositoryAbstract;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 use Api\Entity\User;
@@ -12,13 +10,13 @@ use Api\Entity\User;
 class Accounts
 {
     /**
-     * @var \Api\Repository\Users
+     * @var \Api\Model\Accounts
      */
-    private $usersRepo;
+    private $model;
 
-    public function __construct(RepositoryAbstract $users)
+    public function __construct(\Api\Model\Accounts $model)
     {
-        $this->usersRepo = $users;
+        $this->model = $model;
     }
 
     /**
@@ -34,8 +32,8 @@ class Accounts
     public function login(Request $request, Response $response, $args)
     {
         // Populate the user object and login the user
-        $data = $this->usersRepo->login(new User($request->getParams()), OAuthRegistry::getInstance()->getAppName());
-        $res = ['data' => ['type' => 'users', 'attributes' => $data->toArray()]];
+        $data = $this->model->login(new User($request->getParams()));
+        $res = ['data' => ['type' => 'users', 'attributes' => $data]];
 
         return $response->withJson($res, 200);
     }
@@ -52,7 +50,7 @@ class Accounts
     public function create(Request $request, Response $response, $args)
     {
         // Populate the user object and create a new account
-        $data = $this->usersRepo->create(new User($request->getParams()));
+        $data = $this->model->create(new User($request->getParams()));
 
         $res = ['data' => ['type' => 'users', 'attributes' => $data]];
 
@@ -71,9 +69,9 @@ class Accounts
     public function modify(Request $request, Response $response, $args)
     {
         // Populate the user object and modify the account
-        $user = $this->usersRepo->modify(new User($request->getParams()));
+        $user = $this->model->modify(new User($request->getParams()));
 
-        $res = ['data' => ['type' => 'users', 'attributes' => $user ? $user->toArray() : null]];
+        $res = ['data' => ['type' => 'users', 'attributes' => $user]];
 
         return $response->withJson($res, 200);
     }
@@ -90,7 +88,7 @@ class Accounts
     public function modifyPassword(Request $request, Response $response, $args)
     {
         // Populate the user object and modify the password
-        $this->usersRepo->modifyPassword(new User($request->getParams()));
+        $this->model->modifyPassword(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -107,9 +105,9 @@ class Accounts
     public function changeType(Request $request, Response $response, $args)
     {
         // Populate the user object and change his account type
-        $user = $this->usersRepo->modifyType(new User($request->getParams()));
+        $user = $this->model->modifyType(new User($request->getParams()));
 
-        $res = ['data' => ['type' => 'users', 'attributes' => $user ? $user->toArray() : null]];
+        $res = ['data' => ['type' => 'users', 'attributes' => $user]];
 
         return $response->withJson($res, 200);
     }
@@ -126,7 +124,7 @@ class Accounts
     public function modifyEmail(Request $request, Response $response, $args)
     {
         // Populate the user object and modify the email
-        $this->usersRepo->modifyEmail(new User($request->getParams()));
+        $this->model->modifyEmail(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -148,7 +146,7 @@ class Accounts
         }
 
         // Create a new account
-        $this->usersRepo->validateToken($request->getParam('token'), $request->getParam('ip'),
+        $this->model->validateToken($request->getParam('token'), $request->getParam('ip'),
             $request->getParam('password'));
 
         return $response->withJson('', 204);
@@ -167,7 +165,7 @@ class Accounts
     public function delete(Request $request, Response $response, $args)
     {
         // Populate the user object and delete an account
-        $this->usersRepo->delete(new User($request->getParams()));
+        $this->model->delete(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }

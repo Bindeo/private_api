@@ -1,0 +1,8 @@
+{% extends 'base.html.twig' %}
+{% block body %}
+    <div>
+        <p>{{ translate.translate('registry_subject', user.name) }}</p>
+        <p>{{ translate.translate('registry_followlink') }}:</p>
+        <p><a href="http://ivelasco.www.bindeo.com/user/validate?t={{ token }}">http://ivelasco.www.bindeo.com/user/validate?t={{ token }}</a></p>
+    </div>
+{% endblock %}

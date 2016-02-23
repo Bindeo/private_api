@@ -25,7 +25,7 @@ class StoreData
     /**
      * @var \Api\Repository\Users
      */
-    private $clientsRepo;
+    private $usersRepo;
 
     /**
      * @var \Api\Model\General\FilesStorage
@@ -39,12 +39,12 @@ class StoreData
 
     public function __construct(
         RepositoryAbstract $dataRepo,
-        RepositoryAbstract $clientsRepo,
+        RepositoryAbstract $usersRepo,
         FilesInterface $storage,
         LoggerInterface $logger
     ) {
         $this->dataRepo = $dataRepo;
-        $this->clientsRepo = $clientsRepo;
+        $this->usersRepo = $usersRepo;
         $this->storage = $storage;
         $this->logger = $logger;
     }
@@ -91,7 +91,7 @@ class StoreData
         }
 
         // We need to check if the user has enough free space
-        if (!($client = $this->clientsRepo->find(new User(['id_client' => $file->getIdClient()])))) {
+        if (!($client = $this->usersRepo->find(new User(['id_client' => $file->getIdClient()])))) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 

@@ -206,7 +206,8 @@ class MySQL implements DatabaseInterface
 
         if ($res) {
             // Fetch query rows
-            $rows = ($class and is_subclass_of($class, 'Bindeo\DataModel\DataModelAbstract')) ? $stmt->fetchAll(\PDO::FETCH_CLASS | \PDO::FETCH_PROPS_LATE, $class)
+            $rows = ($class and is_subclass_of($class, 'Bindeo\DataModel\DataModelAbstract'))
+                ? $stmt->fetchAll(\PDO::FETCH_CLASS | \PDO::FETCH_PROPS_LATE, $class)
                 : $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             $result = new ResultSet($totalRows ? $totalRows : $stmt->rowCount(), $totalPages, $rows);

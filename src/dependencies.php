@@ -13,6 +13,18 @@ $container['logger'] = function ($c) {
     return $logger;
 };
 
+// Templates
+$container['view'] = function ($c) {
+    $view = new Slim\Views\Twig($c->get('settings')['twig']['path'], [
+        'cache'       => $c->get('settings')['twig']['cache'],
+        'auto_reload' => (ENV == 'development')
+    ]);
+
+    //$view->addExtension(new \Slim\Views\TwigExtension($c->get('router'), $c->get('request')->getUri()));
+
+    return $view;
+};
+
 // OAuth2
 $container['Api\Model\General\OAuthStorage'] = function ($c) {
     return new \Api\Model\General\OAuthStorage($c->get('settings')['oauth']);
@@ -59,6 +71,13 @@ $container['Api\Model\General\Database'] = function ($c) {
     return $database;
 };
 
+// Emails
+$container['Api\Model\Email\Email'] = function ($c) {
+    $conf = $c->get('settings')['email'];
+
+    return \Api\Model\Email\EmailManager::factory($conf['current'], $conf[$conf['current']][ENV]);
+};
+
 // Repositories
 $container['Api\Repository\Users'] = function ($c) {
     return new Api\Repository\Users($c->get('Api\Model\General\Database'), $c->get('MaxMind\Db\Reader'));
@@ -69,6 +88,11 @@ $container['Api\Repository\StoreData'] = function ($c) {
 };
 
 // Models
+$container['Api\Model\Accounts'] = function ($c) {
+    return new Api\Model\Accounts($c->get('Api\Repository\Users'), $c->get('logger'), $c->get('Api\Model\Email\Email'),
+        $c->get('view'));
+};
+
 $container['Api\Model\StoreData'] = function ($c) {
     $c->get('Api\Lib\BlockChain\BlockChain');
 
@@ -78,7 +102,7 @@ $container['Api\Model\StoreData'] = function ($c) {
 
 // Controllers
 $container['Api\Controller\Accounts'] = function ($c) {
-    return new Api\Controller\Accounts($c->get('Api\Repository\Users'));
+    return new Api\Controller\Accounts($c->get('Api\Model\Accounts'));
 };
 
 $container['Api\Controller\Users'] = function ($c) {

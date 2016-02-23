@@ -6,7 +6,13 @@ return [
         // Monolog settings
         'logger'              => [
             'name' => 'slim-app',
-            'path' => __DIR__ . '/../logs/app.log',
+            'path' => __DIR__ . '/../var/logs/app.log',
+        ],
+
+        // Templates settings
+        'twig'                => [
+            'path'  => __DIR__ . '/Templates',
+            'cache' => __DIR__ . '/../var/cache',
         ],
 
         // Storage for private OAuth apps
@@ -34,6 +40,23 @@ return [
                 'user'   => 'API',
                 'pass'   => 'dd9b15947a493f7ce7067a41f8a3edd1',
                 'scheme' => 'API'
+            ]
+        ],
+
+        // Email configurations
+        'email'               => [
+            'current' => 'mailgun',
+            'mailgun' => [
+                'development' => [
+                    'domain' => 'sandbox31d6f38203e342f9af992a85c6dad951.mailgun.org',
+                    'key'    => 'key-7068eebbe6808e44b7816aa7b88ba21a',
+                    'from'   => 'mail@bindeo.com'
+                ],
+                'production'  => [
+                    'domain' => 'mg.bindeo.com',
+                    'key'    => 'key-7068eebbe6808e44b7816aa7b88ba21a',
+                    'from'   => 'mail@bindeo.com'
+                ]
             ]
         ],
 

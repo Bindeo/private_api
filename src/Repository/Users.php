@@ -455,7 +455,7 @@ class Users extends RepositoryLocatableAbstract
      *
      * @param string $token
      * @param string $ip
-     * @param string $password
+     * @param string $password [optional]
      *
      * @return string
      * @throws \Exception
