@@ -34,7 +34,7 @@ class MailGunClient implements EmailInterface
     {
         // Build the message
         $message = new MessageBuilder();
-        $message->setFromAddress($from ? $from : $this->baseFrom);
+        $message->setFromAddress($from ? $from : $this->baseFrom, ['first' => 'Bindeo']);
         $message->addToRecipient($to);
         $message->setSubject($subject);
         $message->setHtmlBody($content);
