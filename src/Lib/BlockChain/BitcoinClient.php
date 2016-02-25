@@ -6,7 +6,7 @@ use Api\Lib\JsonRPC\jsonRPCClient;
 
 class BitcoinClient implements BlockChainClientInterface
 {
-    const MAX_DATA_LENGTH = 40;
+    const MAX_DATA_LENGTH = 128; // 80 bytes in hex characters
     const STAMP_FEE       = 0.000013; // 1300 satoshis
     const TRANSACTION_FEE = 0.000023; // 2300 satoshis
     const SATOSHI         = 0.00000001; // 1 satoshi
@@ -50,7 +50,7 @@ class BitcoinClient implements BlockChainClientInterface
 
     public function getBalance($account = '')
     {
-        return $this->bitcoin->getbalance($account);
+        return $this->bitcoin->getbalance($account, 0);
     }
 
     public function getBlock($hash)
@@ -447,7 +447,7 @@ class BitcoinClient implements BlockChainClientInterface
         // Build the transaction
         $amount = $inputs['total'] - $amount;
 
-        $outputs = [];
+        $outputs = ['data' => $data];
         if ($amount > 0) {
             $outputs = [$changeAddress => $amount];
 
@@ -457,7 +457,11 @@ class BitcoinClient implements BlockChainClientInterface
                 $outputs[$userAccount] = self::SATOSHI;
             }
         };
+
+        // Create a raw transaction with all the information
         $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
+        /*
+        // Old method to include OP_RETURN data
         $txn = $this->decodeRawTransaction($txn);
 
         // Add OP_RETURN data
@@ -472,6 +476,7 @@ class BitcoinClient implements BlockChainClientInterface
 
         // Encode the transaction into raw format
         $txn = $this->encodeTransaction($txn);
+        */
 
         // Sign the transaction
         $txn = $this->signRawTransaction($txn);
@@ -506,12 +511,12 @@ class BitcoinClient implements BlockChainClientInterface
         if (!isset($tx['vout'][1]['scriptPubKey']['hex'])) {
             return ['error' => "Transaction doesn't exist"];
         } else {
-            return ['data' => bin2hex(substr(hex2bin($tx['vout'][1]['scriptPubKey']['hex']), 2))];
+            return ['data' => substr($tx['vout'][1]['scriptPubKey']['hex'], 4)];
         }
     }
 
     /**
-     * Get coded stored data from a transaction id
+     * Get encoded stored data from a transaction id
      *
      * @param $txid
      *

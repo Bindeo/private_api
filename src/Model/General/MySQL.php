@@ -145,6 +145,8 @@ class MySQL implements DatabaseInterface
 
         if (!$res) {
             $this->error = [$stmt->errorCode(), $stmt->errorInfo()];
+        } else {
+            $this->error = null;
         }
 
         return $stmt->rowCount();
@@ -211,6 +213,7 @@ class MySQL implements DatabaseInterface
                 : $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             $result = new ResultSet($totalRows ? $totalRows : $stmt->rowCount(), $totalPages, $rows);
+            $this->error = null;
         } else {
             $this->error = [$stmt->errorCode(), $stmt->errorInfo()];
             $result = false;

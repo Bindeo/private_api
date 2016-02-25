@@ -208,4 +208,21 @@ class StoreData
 
         return $response->withJson($res, 200);
     }
+
+    /**
+     * Development blockchain tests
+     *
+     * @param Request  $request
+     * @param Response $response
+     * @param          $args
+     */
+    public function tests(Request $request, Response $response, $args)
+    {
+        $blockchain = \Api\Lib\BlockChain\BlockChain::getInstance();
+
+        $res = $blockchain->listAccounts();
+        echo '<pre>';
+        print_r($res);
+        exit;
+    }
 }

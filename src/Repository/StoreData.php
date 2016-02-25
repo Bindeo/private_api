@@ -24,7 +24,7 @@ class StoreData extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT TRANSACTION, NET, FK_ID_CLIENT, HASH, CTRL_DATE, CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES,
+        $sql = 'SELECT TRANSACTION, NET, FK_ID_USER, HASH, CTRL_DATE, CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES,
                 LATITUDE, LONGITUDE FROM BLOCKCHAIN WHERE TRANSACTION = :id';
         $params = [':id' => $blockchain->getTransaction()];
 
@@ -51,7 +51,7 @@ class StoreData extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT ID_FILE, FK_ID_CLIENT, TYPE, NAME, HASH, SIZE, CTRL_DATE, TRANSACTION, STATUS, ID_GEONAMES,
+        $sql = 'SELECT ID_FILE, FK_ID_USER, TYPE, NAME, HASH, SIZE, CTRL_DATE, TRANSACTION, STATUS, ID_GEONAMES,
                 LATITUDE, LONGITUDE FROM FILES WHERE ID_FILE = :id';
         $params = [':id' => $file->getIdFile()];
 
@@ -76,22 +76,22 @@ class StoreData extends RepositoryLocatableAbstract
     {
         $file->clean();
         // Check the received data
-        if (!$file->getIdClient() or !$file->getType() or !$file->getName() or !$file->getIp() or !$file->getHash()) {
+        if (!$file->getIdUser() or !$file->getType() or !$file->getName() or !$file->getIp() or !$file->getHash()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // Geolocalize the client
+        // Geolocalize the user
         /** @var \Api\Entity\File $file */
         $file = $this->geolocalize($file);
 
         $this->db->beginTransaction();
         // Prepare query and mandatory data
-        $sql = 'UPDATE CLIENTS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT - :size ELSE 0 END WHERE ID_CLIENT = :id_client;
-                INSERT INTO FILES(FK_ID_CLIENT, TYPE, NAME, HASH, SIZE, CTRL_DATE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
-                VALUES (:id_client, :type, :name, :hash, :size, SYSDATE(), :ip, :id_geonames, :latitude, :longitude);';
+        $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT - :size ELSE 0 END WHERE ID_USER = :id_user;
+                INSERT INTO FILES(FK_ID_USER, TYPE, NAME, HASH, SIZE, CTRL_DATE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
+                VALUES (:id_user, :type, :name, :hash, :size, SYSDATE(), :ip, :id_geonames, :latitude, :longitude);';
 
         $data = [
-            ':id_client'   => $file->getIdClient(),
+            ':id_user'     => $file->getIdUser(),
             ':type'        => $file->getType(),
             ':name'        => $file->getName(),
             ':hash'        => $file->getHash(),
@@ -103,7 +103,8 @@ class StoreData extends RepositoryLocatableAbstract
         ];
 
         // Execute query
-        if ($this->db->action($sql, $data)) {
+        $this->db->action($sql, $data);
+        if (!$this->db->getError()) {
             $id = $this->db->lastInsertId();
             $this->db->commit();
 
@@ -129,7 +130,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Fetch the file to delete
-        $sql = 'SELECT ID_FILE, NAME, FK_ID_CLIENT, SIZE, TRANSACTION FROM FILES WHERE ID_FILE = :id';
+        $sql = 'SELECT ID_FILE, NAME, FK_ID_USER, SIZE, TRANSACTION FROM FILES WHERE ID_FILE = :id';
         $res = $this->db->query($sql, [':id' => $file->getIdFile()], 'Api\Entity\File');
         if ($res->getNumRows() != 1) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
@@ -150,9 +151,9 @@ class StoreData extends RepositoryLocatableAbstract
             }
         } else {
             $this->db->beginTransaction();
-            $sql = 'UPDATE CLIENTS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_CLIENT = :id_client;
+            $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_USER = :id_user;
                     DELETE FROM FILES WHERE ID_FILE = :id;';
-            $data = [':id' => $file->getIdFile(), ':id_client' => $res->getIdClient(), ':size' => $res->getSize()];
+            $data = [':id' => $file->getIdFile(), ':id_user' => $res->getIdUser(), ':size' => $res->getSize()];
             if (!$this->db->action($sql, $data)) {
                 $this->db->rollBack();
                 throw $this->dbException();
@@ -165,20 +166,20 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
-     * Get a paginated list of files from one client
+     * Get a paginated list of files from one user
      *
-     * @param int $idClient
+     * @param int $idUser
      * @param int $page
      * @param int $numRows [optional]
      *
      * @return \Api\Entity\ResultSet
      */
-    public function fileList($idClient, $page, $numRows = 20)
+    public function fileList($idUser, $page, $numRows = 20)
     {
         // Get the paginated list
-        $sql = "SELECT ID_FILE, FK_ID_CLIENT, TYPE, NAME, HASH, CTRL_DATE, TRANSACTION, STATUS, ID_GEONAMES,
-                LATITUDE, LONGITUDE FROM FILES WHERE FK_ID_CLIENT = :id AND STATUS = 'A' ORDER BY ID_FILE ASC";
-        $data = [':id' => $idClient];
+        $sql = "SELECT ID_FILE, FK_ID_USER, TYPE, NAME, HASH, CTRL_DATE, TRANSACTION, STATUS, ID_GEONAMES,
+                LATITUDE, LONGITUDE FROM FILES WHERE FK_ID_USER = :id AND STATUS = 'A' ORDER BY ID_FILE ASC";
+        $data = [':id' => $idUser];
 
         return $this->db->query($sql, $data, 'Api\Entity\File', $page, $numRows);
     }
@@ -194,22 +195,22 @@ class StoreData extends RepositoryLocatableAbstract
      */
     public function signFile(File $file, $net)
     {
-        if (!$file->getIdFile() or !$file->getIdClient() or !$file->getIp() or !$file->getTransaction() or !$file->getHash()) {
+        if (!$file->getIdFile() or !$file->getIdUser() or !$file->getIp() or !$file->getTransaction() or !$file->getHash()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // Geolocalize the client
+        // Geolocalize the user
         /** @var \Api\Entity\File $file */
         $file = $this->geolocalize($file);
 
         $this->db->beginTransaction();
         // Insert the transaction
-        $sql = "INSERT INTO BLOCKCHAIN(TRANSACTION, NET, FK_ID_CLIENT, HASH, CTRL_DATE, CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE)
-                    VALUES (:txid, :net, :id_client, :hash, SYSDATE(), :ip, 'F', :id_element, :id_geonames, :latitude, :longitude)";
+        $sql = "INSERT INTO BLOCKCHAIN(TRANSACTION, NET, FK_ID_USER, HASH, CTRL_DATE, CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE)
+                    VALUES (:txid, :net, :id_user, :hash, SYSDATE(), :ip, 'F', :id_element, :id_geonames, :latitude, :longitude)";
         $data = [
             ':txid'        => $file->getTransaction(),
             ':net'         => $net,
-            ':id_client'   => $file->getIdClient(),
+            ':id_user'     => $file->getIdUser(),
             ':hash'        => $file->getHash(),
             ':ip'          => $file->getIp(),
             ':id_element'  => $file->getIdFile(),

@@ -63,7 +63,7 @@ class StoreData
 
         if ($file) {
             // Get the public path
-            $file->setPath($this->storage->get($file->getIdClient(), $file->getName()));
+            $file->setPath($this->storage->get($file->getIdUser(), $file->getName()));
 
             // Convert the object into an array
             $file = $file->toArray();
@@ -86,37 +86,37 @@ class StoreData
     public function saveFile(File $file, UploadedFileInterface $origFile)
     {
         // We try to create file first
-        if (!$file->getIdClient() or !$origFile or $origFile->getError()) {
+        if (!$file->getIdUser() or !$origFile or $origFile->getError()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // We need to check if the user has enough free space
-        if (!($client = $this->usersRepo->find(new User(['id_client' => $file->getIdClient()])))) {
+        if (!($user = $this->usersRepo->find(new User(['idUser' => $file->getIdUser()])))) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
         // Transform bytes to kilobytes
         $file->setSize(ceil($origFile->getSize() / 1024));
-        if ($client->getType() > 1 and $file->getSize() > $client->getStorageLeft()) {
+        if ($user->getType() > 1 and $file->getSize() > $user->getStorageLeft()) {
             throw new \Exception(Exceptions::FULL_SPACE, 403);
         }
 
         // Storage the file in our file system
         try {
-            $name = $this->storage->save($file->getIdClient(), $origFile);
+            $name = $this->storage->save($file->getIdUser(), $origFile);
         } catch (\Exception $e) {
             throw new \Exception('', 500);
         }
 
         // Hash the file
-        $file->setType('F')->setHash($this->storage->getHash($file->getIdClient(), $name))->setName($name);
+        $file->setType('F')->setHash($this->storage->getHash($file->getIdUser(), $name))->setName($name);
 
         // Save the file registry
         try {
             $id = $this->dataRepo->createFile($file);
         } catch (\Exception $e) {
             // Remove the uploaded file
-            $this->storage->delete($file->getIdClient(), $file->getName());
+            $this->storage->delete($file->getIdUser(), $file->getName());
             throw $e;
         }
 
@@ -135,7 +135,7 @@ class StoreData
         // Delete the registry
         if ($file = $this->dataRepo->deleteFile($file)) {
             // Delete the file if the registry has been completely deleted
-            $this->storage->delete($file->getIdClient(), $file->getName());
+            $this->storage->delete($file->getIdUser(), $file->getName());
         }
     }
 
@@ -168,7 +168,7 @@ class StoreData
      */
     public function signFile(File $file)
     {
-        if (!$file->getIdFile() or !$file->getIdClient() or !$file->getIp()) {
+        if (!$file->getIdFile() or !$file->getIdUser() or !$file->getIp()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -186,7 +186,7 @@ class StoreData
         }
 
         // Check if the stored hash is correct
-        $hash = $this->storage->getHash($file->getIdClient(), $file->getName());
+        $hash = $this->storage->getHash($file->getIdUser(), $file->getName());
         if ($hash != $file->getHash()) {
             // We need to store the new hash after sign the file
             $this->logger->addNotice('Hash Incongruence', $file->toArray());
@@ -200,7 +200,7 @@ class StoreData
             throw new \Exception(Exceptions::NO_COINS, 503);
         }
 
-        $res = $blockchain->storeData($file->getHash(true), 'S');
+        $res = $blockchain->storeData($file->getHash(), 'S');
 
         // Check if the transaction was ok
         if (!$res['txid']) {
