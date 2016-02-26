@@ -29,7 +29,7 @@ class Users extends RepositoryLocatableAbstract
 
         if (!$types) {
             // Get the account types
-            $sql = 'SELECT TYPE, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES ORDER BY TYPE ASC';
+            $sql = 'SELECT ID_TYPE, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES ORDER BY ID_TYPE ASC';
             $types = $this->db->query($sql, null, 'Api\Entity\AccountType');
         }
 
@@ -83,7 +83,7 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Get the account types
-        $sql = 'SELECT TYPE, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES ORDER BY TYPE ASC';
+        $sql = 'SELECT ID_TYPE, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES ORDER BY ID_TYPE ASC';
         $resultSet = $this->db->query($sql, null, 'Api\Entity\AccountType');
         $types = $resultSet->getRows();
 
@@ -149,7 +149,7 @@ class Users extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT ID_USER, EMAIL, PASSWORD, TYPE, NAME, SURNAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
+        $sql = 'SELECT ID_USER, EMAIL, PASSWORD, TYPE, NAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
                 FROM USERS WHERE ID_USER = :id';
         $params = [':id' => $user->getIdUser()];
 
@@ -176,7 +176,7 @@ class Users extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT ID_USER, EMAIL, PASSWORD, TYPE, NAME, SURNAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
+        $sql = 'SELECT ID_USER, EMAIL, PASSWORD, TYPE, NAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
                 FROM USERS WHERE EMAIL = :email';
         $params = [':email' => trim(mb_strtolower($user->getEmail()))];
 
@@ -208,7 +208,7 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Obtain the account type data
-        $sql = 'SELECT ID_TYPE, TYPE, COST, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES WHERE ID_TYPE = :id';
+        $sql = 'SELECT ID_TYPE, COST, MAX_STORAGE, MAX_STAMPS_MONTH FROM ACCOUNT_TYPES WHERE ID_TYPE = :id';
         $data = $this->db->query($sql, [':id' => $user->getType()], 'Api\Entity\AccountType');
 
         if (!$data or $this->db->getError() or $data->getNumRows() != 1) {
@@ -216,22 +216,20 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Geolocalize the user
-
         /** @var User $user */
         $user = $this->geolocalize($user);
 
         $this->db->beginTransaction();
         // Prepare query and mandatory data
-        $sql = 'INSERT INTO USERS(EMAIL, PASSWORD, TYPE, NAME, SURNAME, CTRL_IP_SIGNUP, CTRL_DATE_SIGNUP, LANG,
+        $sql = 'INSERT INTO USERS(EMAIL, PASSWORD, TYPE, NAME, CTRL_IP_SIGNUP, CTRL_DATE_SIGNUP, LANG,
                   LAST_ID_GEONAMES, LAST_LATITUDE, LAST_LONGITUDE, STORAGE_LEFT, LAST_RESET, STAMPS_LEFT)
-                VALUES (:email, :password, :type, :name, :surname, :ip, SYSDATE(), :lang, :id_geonames, :latitude,
+                VALUES (:email, :password, :type, :name, :ip, SYSDATE(), :lang, :id_geonames, :latitude,
                   :longitude, :storage, SYSDATE(), :stamps)';
         $data = [
             ':email'       => mb_strtolower($user->getEmail()),
             ':password'    => password_hash($user->getPassword(), PASSWORD_DEFAULT),
             ':type'        => $user->getType(),
             ':name'        => $user->getName(),
-            ':surname'     => $user->getSurname() ? $user->getSurname() : null,
             ':ip'          => $user->getIp(),
             ':lang'        => $user->getLang(),
             ':id_geonames' => $user->getIdGeonames() ? $user->getIdGeonames() : null,
@@ -252,18 +250,21 @@ class Users extends RepositoryLocatableAbstract
         // Generate validation code
         $token = md5($id . $user->getEmail() . time());
 
-        // Insert the validation token and the active user type
-        $sql = 'INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP)
+        // Insert the validation token, the active user type and the first identity
+        $sql = "INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP)
                 VALUES (:token, :type_val, :id, :email, SYSDATE(), :ip);
                 INSERT INTO USERS_TYPES(FK_ID_USER, FK_ID_TYPE, DATE_START, NEXT_PAYMENT, LAST_RESET)
-                VALUES (:id, :type, SYSDATE(), CASE WHEN :type > 2 THEN SYSDATE() + INTERVAL 1 MONTH ELSE NULL END, CASE WHEN :type > 2 THEN SYSDATE() ELSE NULL END);';
+                VALUES (:id, :type, SYSDATE(), CASE WHEN :type > 2 THEN SYSDATE() + INTERVAL 1 MONTH ELSE NULL END, CASE WHEN :type > 2 THEN SYSDATE() ELSE NULL END);
+                INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, CTRL_IP, CTRL_DATE)
+                VALUES (:id, 1, 'E', :name, :email, :ip, SYSDATE());";
         $data = [
             ':token'    => $token,
             ':type_val' => 'V',
             ':id'       => $id,
             ':type'     => $user->getType(),
             ':email'    => mb_strtolower($user->getEmail()),
-            ':ip'       => $user->getIp()
+            ':ip'       => $user->getIp(),
+            ':name'     => $user->getName()
         ];
 
         if (!$this->db->action($sql, $data)) {
@@ -299,14 +300,13 @@ class Users extends RepositoryLocatableAbstract
         $user = $this->geolocalize($user);
 
         // Prepare query and data
-        $sql = 'UPDATE USERS SET NAME = :name, SURNAME = :surname, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(),
+        $sql = 'UPDATE USERS SET NAME = :name, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(),
                 LANG = :lang, LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
                 WHERE ID_USER = :id';
 
         $data = [
             ':id'          => $user->getIdUser(),
             ':name'        => $user->getName(),
-            ':surname'     => $user->getSurname() ? $user->getSurname() : null,
             ':ip'          => $user->getIp(),
             ':lang'        => $user->getLang(),
             ':id_geonames' => $user->getIdGeonames() ? $user->getIdGeonames() : null,
@@ -552,7 +552,7 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Try to get the user
-        $sql = 'SELECT ID_USER, PASSWORD, EMAIL, TYPE, NAME, SURNAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT,
+        $sql = 'SELECT ID_USER, PASSWORD, EMAIL, TYPE, NAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT,
                 CASE WHEN TYPE > 1 AND LAST_RESET <= SYSDATE() - INTERVAL 1 MONTH THEN 1 ELSE 0 END RENEW
                 FROM USERS WHERE EMAIL = :email';
         $user->clean();

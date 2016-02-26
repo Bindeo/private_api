@@ -17,7 +17,7 @@
                 {{ translate.translate('registry_subject', user.name) }}
             </p>
 
-            <p>{{ translate.translate('general_hi_user', '<strong>'~user.fullname~'</strong>')|raw }},</p>
+            <p>{{ translate.translate('general_hi_user', '<strong>'~user.name~'</strong>')|raw }},</p>
             <p>{{ translate.translate('registry_explanation') }}
                 (<a href="mailto:{{ user.email }}" style="text-decoration: none; color: #333;">{{ user.email }}</a>):
 

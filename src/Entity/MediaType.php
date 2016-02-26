@@ -2,8 +2,8 @@
 
 namespace Api\Entity;
 
-use Bindeo\DataModel\AccountTypeAbstract;
+use Bindeo\DataModel\MediaTypeAbstract;
 
-class MediaType extends AccountTypeAbstract
+class MediaType extends MediaTypeAbstract
 {
 }

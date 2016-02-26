@@ -2,8 +2,8 @@
 
 namespace Api\Entity;
 
-use Bindeo\DataModel\AccountTypeAbstract;
+use Bindeo\DataModel\FileTypeAbstract;
 
-class FileType extends AccountTypeAbstract
+class FileType extends FileTypeAbstract
 {
 }

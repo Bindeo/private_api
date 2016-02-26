@@ -2,7 +2,6 @@
 
 namespace Api\Controller;
 
-use Api\Entity\User;
 use Api\Repository\RepositoryAbstract;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
@@ -33,7 +32,7 @@ class General
     {
         $data = $this->generalRepo->accountTypes($request->getParam('locale'));
 
-        $res = ['data' => $data->toArray('account_type')];
+        $res = ['data' => $data->toArray('account_type'), 'total_pages' => 1];
 
         return $response->withJson($res, 200);
     }
@@ -52,7 +51,7 @@ class General
     {
         $data = $this->generalRepo->fileTypes($request->getParam('locale'));
 
-        $res = ['data' => $data->toArray('file_type')];
+        $res = ['data' => $data->toArray('file_type'), 'total_pages' => 1];
 
         return $response->withJson($res, 200);
     }
@@ -71,7 +70,7 @@ class General
     {
         $data = $this->generalRepo->mediaTypes($request->getParam('locale'));
 
-        $res = ['data' => $data->toArray('media_type')];
+        $res = ['data' => $data->toArray('media_type'), 'total_pages' => 1];
 
         return $response->withJson($res, 200);
     }

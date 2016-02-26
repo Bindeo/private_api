@@ -582,16 +582,16 @@
         },
         {
             "name": "slim/slim",
-            "version": "3.1.0",
+            "version": "3.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/slimphp/Slim.git",
-                "reference": "03b44a4b41896ba42c78bbd5fa172cd79e650496"
+                "reference": "835425f5945a25509eeab885e80617948e68371d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/slimphp/Slim/zipball/03b44a4b41896ba42c78bbd5fa172cd79e650496",
-                "reference": "03b44a4b41896ba42c78bbd5fa172cd79e650496",
+                "url": "https://api.github.com/repos/slimphp/Slim/zipball/835425f5945a25509eeab885e80617948e68371d",
+                "reference": "835425f5945a25509eeab885e80617948e68371d",
                 "shasum": ""
             },
             "require": {
@@ -645,7 +645,7 @@
                 "micro",
                 "router"
             ],
-            "time": "2016-01-08 15:37:50"
+            "time": "2016-02-25 08:15:17"
         },
         {
             "name": "slim/twig-view",
