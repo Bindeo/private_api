@@ -79,6 +79,10 @@ $container['Api\Model\Email\Email'] = function ($c) {
 };
 
 // Repositories
+$container['Api\Repository\General'] = function ($c) {
+    return new Api\Repository\General($c->get('Api\Model\General\Database'));
+};
+
 $container['Api\Repository\Users'] = function ($c) {
     return new Api\Repository\Users($c->get('Api\Model\General\Database'), $c->get('MaxMind\Db\Reader'));
 };
@@ -101,6 +105,10 @@ $container['Api\Model\StoreData'] = function ($c) {
 };
 
 // Controllers
+$container['Api\Controller\General'] = function ($c) {
+    return new Api\Controller\General($c->get('Api\Repository\General'));
+};
+
 $container['Api\Controller\Accounts'] = function ($c) {
     return new Api\Controller\Accounts($c->get('Api\Model\Accounts'));
 };

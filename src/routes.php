@@ -1,6 +1,13 @@
 <?php
 // Routes
 
+// General data routes
+$app->group('/general', function () {
+    $this->get('/account-types', 'Api\Controller\General:accountTypes');
+    $this->get('/file-types', 'Api\Controller\General:fileTypes');
+    $this->get('/media-types', 'Api\Controller\General:mediaTypes');
+});
+
 // Accounts routes
 $app->group('/account', function () {
     $this->get('', 'Api\Controller\Accounts:login');

@@ -109,7 +109,7 @@ class StoreData
         }
 
         // Hash the file
-        $file->setType('F')->setHash($this->storage->getHash($file->getIdUser(), $name))->setName($name);
+        $file->setIdType('F')->setHash($this->storage->getHash($file->getIdUser(), $name))->setName($name);
 
         // Save the file registry
         try {
@@ -124,7 +124,7 @@ class StoreData
     }
 
     /**
-     * Delete a file if it is not signed yet
+     * Delete a file o send it to trash
      *
      * @param \Api\Entity\File $file
      *
@@ -133,9 +133,11 @@ class StoreData
     public function deleteFile(File $file)
     {
         // Delete the registry
-        if ($file = $this->dataRepo->deleteFile($file)) {
-            // Delete the file if the registry has been completely deleted
-            $this->storage->delete($file->getIdUser(), $file->getName());
+        if ($oldFile = $this->dataRepo->deleteFile($file)) {
+            // Delete the file if it has been completely deleted
+            if ($file->getStatus() == 'D') {
+                $this->storage->delete($oldFile->getIdUser(), $oldFile->getName());
+            }
         }
     }
 
