@@ -169,4 +169,23 @@ class Accounts
 
         return $response->withJson('', 204);
     }
+
+    /**
+     * Get active identities of the user
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     * @throws \Exception
+     */
+    public function getIdentities(Request $request, Response $response, $args)
+    {
+        $data = $this->model->getIdentities(new User($request->getParams()));
+
+        $res = ['data' => $data->toArray('user_identity'), 'total_pages' => 1];
+
+        return $response->withJson($res, 200);
+    }
 }

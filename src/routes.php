@@ -18,6 +18,7 @@ $app->group('/account', function () {
     $this->put('/email', 'Api\Controller\Accounts:modifyEmail');
     $this->put('/type', 'Api\Controller\Accounts:changeType');
     $this->put('/token', 'Api\Controller\Accounts:validateToken');
+    $this->get('/identities', 'Api\Controller\Accounts:getIdentities');
 });
 
 // Users routes

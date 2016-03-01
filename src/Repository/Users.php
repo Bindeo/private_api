@@ -486,11 +486,14 @@ class Users extends RepositoryLocatableAbstract
 
         if ($res['TYPE'] == 'V') {
             // Initial account validation
-            $sql = 'UPDATE USERS SET CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
+            $sql = "UPDATE USERS SET CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
                     LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
-                    WHERE ID_USER = :id';
+                    WHERE ID_USER = :id;
+                    UPDATE USERS_IDENTITIES SET CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
+                    WHERE FK_ID_USER = :id AND TYPE = 'E' AND STATUS = 'A' AND VALUE = :email;";
             $params = [
                 ':id'          => $user->getIdUser(),
+                ':email'       => $user->getEmail(),
                 ':ip'          => $user->getIp(),
                 ':latitude'    => $user->getLatitude(),
                 ':longitude'   => $user->getLongitude(),
@@ -672,5 +675,31 @@ class Users extends RepositoryLocatableAbstract
             $this->db->rollBack();
             throw new \Exception('', 500);
         }
+    }
+
+    /**
+     * Get active identities of the user
+     *
+     * @param User $user
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function getIdentities(User $user)
+    {
+        if (!$user->getIdUser()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+        $sql = "SELECT ID_IDENTITY, FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, STATUS
+                FROM USERS_IDENTITIES WHERE FK_ID_USER = :id AND STATUS = 'A' ORDER BY MAIN DESC, ID_IDENTITY ASC";
+        $params = [':id' => $user->getIdUser()];
+
+        $data = $this->db->query($sql, $params, 'Api\Entity\UserIdentity');
+
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
+        }
+
+        return $data;
     }
 }

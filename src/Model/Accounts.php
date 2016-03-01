@@ -2,6 +2,7 @@
 
 namespace Api\Model;
 
+use Api\Entity\ResultSet;
 use Api\Entity\User;
 use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
@@ -177,5 +178,18 @@ class Accounts
     public function delete(User $user)
     {
         $this->usersRepo->delete($user);
+    }
+
+    /**
+     * Get active identities of the user
+     *
+     * @param User $user
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function getIdentities(User $user)
+    {
+        return $this->usersRepo->getIdentities($user);
     }
 }
