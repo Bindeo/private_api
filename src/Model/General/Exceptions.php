@@ -21,5 +21,6 @@ class Exceptions
 
     // Storage
     const FULL_SPACE      = 'Storage space full'; // 403
-    const DUPLICATED_FILE = 'Storage space full'; // 409
+    const DUPLICATED_FILE = 'File already uploaded by the user'; // 409
+    const CANNOT_MOVE     = 'Cannot move file'; // 503
 }

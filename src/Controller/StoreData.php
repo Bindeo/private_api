@@ -50,8 +50,7 @@ class StoreData
      */
     public function createFile(Request $request, Response $response, $args)
     {
-        $files = $request->getUploadedFiles();
-        $res = $this->model->saveFile(new File($request->getParams()), reset($files));
+        $res = $this->model->saveFile(new File($request->getParams()));
         $res = ['data' => ['type' => 'files', 'attributes' => $res]];
 
         return $response->withJson($res, 201);

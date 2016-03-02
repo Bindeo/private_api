@@ -2,21 +2,21 @@
 
 namespace Api\Model\General;
 
-use Psr\Http\Message\UploadedFileInterface;
+use Bindeo\DataModel\FileAbstract;
+use Psr\Log\LoggerInterface;
 
 interface FilesInterface
 {
-    public function __construct($basePath, $baseUrl);
+    public function __construct(LoggerInterface $logger, $basePath, $baseUrl);
 
     /**
      * Save the file
      *
-     * @param int                   $idClient
-     * @param UploadedFileInterface $file
+     * @param FileAbstract $file
      *
      * @return string file name
      */
-    public function save($idClient, UploadedFileInterface $file);
+    public function save(FileAbstract $file);
 
     /**
      * Get the file

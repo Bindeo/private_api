@@ -52,7 +52,7 @@ $container['Api\Lib\BlockChain\BlockChain'] = function ($c) {
 $container['Api\Model\General\FilesStorage'] = function ($c) {
     $settings = $c->get('settings')['files'][ENV];
 
-    return new \Api\Model\General\FilesStorage($settings['basePath'], $settings['baseUrl']);
+    return new \Api\Model\General\FilesStorage($c->get('logger'), $settings['basePath'], $settings['baseUrl']);
 };
 
 // Database

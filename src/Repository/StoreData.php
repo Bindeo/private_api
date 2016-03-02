@@ -52,8 +52,9 @@ class StoreData extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, HASH, SIZE, CTRL_DATE, TAG, DESCRIPTION,
-                  TRANSACTION, CONFIRMED, STATUS, ID_GEONAMES, LATITUDE, LONGITUDE FROM FILES WHERE ID_FILE = :id';
+        $sql = 'SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
+                  CTRL_DATE, TAG, DESCRIPTION, TRANSACTION, CONFIRMED, STATUS, ID_GEONAMES, LATITUDE, LONGITUDE
+                FROM FILES WHERE ID_FILE = :id';
         $params = [':id' => $file->getIdFile()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\File');
@@ -77,7 +78,7 @@ class StoreData extends RepositoryLocatableAbstract
     {
         $file->clean();
         // Check the received data
-        if (!$file->getIdUser() or !$file->getIdType() or !$file->getIdMedia() or !$file->getName() or !$file->getIp() or !$file->getHash()) {
+        if (!$file->getIdUser() or !$file->getIdType() or !$file->getIdMedia() or !$file->getName() or !$file->getFileName() or !$file->getFileOrigName() or !$file->getIp() or !$file->getHash()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -85,12 +86,12 @@ class StoreData extends RepositoryLocatableAbstract
         $sql = "SELECT A.NUM FORBIDDEN, B.NUM WARNING FROM
                 (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND FK_ID_USER = :id_user) A,
                 (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND FK_ID_USER != :id_user) B";
-        $res = $this->db->query($sql, ['id_user' => $file->getIdUser()]);
+        $res = $this->db->query($sql, ['id_user' => $file->getIdUser(), ':hash' => $file->getHash()]);
 
         if ($res->getRows()[0]['FORBIDDEN'] > 0) {
             throw new \Exception(Exceptions::DUPLICATED_FILE, 409);
         } elseif ($res->getRows()[0]['WARNING'] > 0) {
-            // TODO Insert into the logger
+            // TODO Insert into the db logger
         }
 
         // Geolocalize the user
@@ -100,15 +101,18 @@ class StoreData extends RepositoryLocatableAbstract
         $this->db->beginTransaction();
         // Prepare query and mandatory data
         $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT - :size ELSE 0 END WHERE ID_USER = :id_user;
-                INSERT INTO FILES(FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, HASH, SIZE, CTRL_DATE, CTRL_IP,
-                  TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE)
-                VALUES (:id_user, :id_type, :id_media, :name, :hash, :size, SYSDATE(), :ip, :tag, :description, :id_geonames, :latitude, :longitude);';
+                INSERT INTO FILES(FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
+                  CTRL_DATE, CTRL_IP, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE)
+                VALUES (:id_user, :id_type, :id_media, :name, :file_name, :file_orig, :hash, :size, SYSDATE(), :ip, :tag,
+                  :description, :id_geonames, :latitude, :longitude);';
 
         $data = [
             ':id_user'     => $file->getIdUser(),
             ':id_type'     => $file->getIdType(),
             ':id_media'    => $file->getIdMedia(),
             ':name'        => $file->getName(),
+            ':file_name'   => $file->getFileName(),
+            ':file_orig'   => $file->getFileOrigName(),
             ':hash'        => $file->getHash(),
             ':size'        => $file->getSize(),
             ':ip'          => $file->getIp(),
@@ -147,7 +151,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Fetch the file to delete
-        $sql = 'SELECT ID_FILE, NAME, FK_ID_USER, SIZE, STATUS FROM FILES WHERE ID_FILE = :id';
+        $sql = 'SELECT ID_FILE, FILE_NAME, FK_ID_USER, SIZE, STATUS FROM FILES WHERE ID_FILE = :id';
         $res = $this->db->query($sql, [':id' => $file->getIdFile()], 'Api\Entity\File');
         if ($res->getNumRows() != 1) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
@@ -236,8 +240,8 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get the paginated list
-        $sql = "SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, HASH, SIZE, CTRL_DATE, TRANSACTION, CONFIRMED,
-                  STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE FROM FILES
+        $sql = "SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE, CTRL_DATE,
+                  TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE FROM FILES
                 WHERE FK_ID_USER = :id_user" . $where . " AND STATUS = :status ORDER BY " . $order;
 
         return $this->db->query($sql, $data, 'Api\Entity\File', $filter->getPage(), $filter->getNumRows());
@@ -295,5 +299,37 @@ class StoreData extends RepositoryLocatableAbstract
         $this->db->commit();
 
         return $file;
+    }
+
+    /**
+     * Calculate file media type by its extension
+     *
+     * @param File $file
+     *
+     * @return int
+     * @throws \Exception
+     */
+    public function calculateMediaType(File $file)
+    {
+        if (!$file->getFileOrigName()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Extract the extension
+        $matches = [];
+        if (!preg_match('/.+\.([a-z0-9]+)$/i', $file->getFileOrigName(), $matches) or !isset($matches[1])) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Query for the media type
+        $sql = 'SELECT T.ID_TYPE FROM MEDIA_TYPES T, MEDIA_EXTENSIONS E
+                WHERE T.ID_TYPE = E.FK_ID_TYPE AND E.EXT = :ext';
+        $res = $this->db->query($sql, [':ext' => strtolower($matches[1])]);
+
+        if ($res->getNumRows() != 1) {
+            return General::MEDIA_TYPE_OTHERS;
+        } else {
+            return $res->getRows()[0]['ID_TYPE'];
+        }
     }
 }

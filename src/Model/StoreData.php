@@ -78,15 +78,14 @@ class StoreData
      * Save the file in storage and database
      *
      * @param \Api\Entity\File        $file
-     * @param \Slim\Http\UploadedFile $origFile Original uploaded file
      *
      * @return array
      * @throws \Exception
      */
-    public function saveFile(File $file, UploadedFileInterface $origFile)
+    public function saveFile(File $file)
     {
         // We try to create file first
-        if (!$file->getIdUser() or !$origFile or $origFile->getError()) {
+        if (!$file->getIdUser() or !$file->getPath() or !file_exists($file->getPath()) or !$file->getFileOrigName()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -96,27 +95,30 @@ class StoreData
         }
 
         // Transform bytes to kilobytes
-        $file->setSize(ceil($origFile->getSize() / 1024));
+        $file->setSize(ceil(filesize($file->getPath()) / 1024));
         if ($user->getType() > 1 and $file->getSize() > $user->getStorageLeft()) {
             throw new \Exception(Exceptions::FULL_SPACE, 403);
         }
 
         // Storage the file in our file system
         try {
-            $name = $this->storage->save($file->getIdUser(), $origFile);
+            $name = $this->storage->save($file);
         } catch (\Exception $e) {
             throw new \Exception('', 500);
         }
 
         // Hash the file
-        $file->setIdType('F')->setHash($this->storage->getHash($file->getIdUser(), $name))->setName($name);
+        $file->setHash($this->storage->getHash($file->getIdUser(), $name));
+
+        // Calculate the media type
+        $file->setIdMedia($this->dataRepo->calculateMediaType($file));
 
         // Save the file registry
         try {
             $id = $this->dataRepo->createFile($file);
         } catch (\Exception $e) {
             // Remove the uploaded file
-            $this->storage->delete($file->getIdUser(), $file->getName());
+            $this->storage->delete($file->getIdUser(), $file->getFileName());
             throw $e;
         }
 
@@ -136,7 +138,7 @@ class StoreData
         if ($oldFile = $this->dataRepo->deleteFile($file)) {
             // Delete the file if it has been completely deleted
             if ($file->getStatus() == 'D') {
-                $this->storage->delete($oldFile->getIdUser(), $oldFile->getName());
+                $this->storage->delete($oldFile->getIdUser(), $oldFile->getFileName());
             }
         }
     }

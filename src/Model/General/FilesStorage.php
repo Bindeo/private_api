@@ -2,10 +2,16 @@
 
 namespace Api\Model\General;
 
-use Psr\Http\Message\UploadedFileInterface;
+use Bindeo\DataModel\FileAbstract;
+use Psr\Log\LoggerInterface;
 
 class FilesStorage implements FilesInterface
 {
+    /**
+     * @var \Monolog\Logger
+     */
+    private $logger;
+
     /**
      * Internal path
      * @var string
@@ -24,8 +30,9 @@ class FilesStorage implements FilesInterface
      */
     private $chunkSize;
 
-    public function __construct($basePath, $baseUrl)
+    public function __construct(LoggerInterface $logger, $basePath, $baseUrl)
     {
+        $this->logger = $logger;
         $this->basePath = $basePath;
         $this->baseUrl = $baseUrl;
         $this->chunkSize = 2;
@@ -34,22 +41,27 @@ class FilesStorage implements FilesInterface
     /**
      * Save the file
      *
-     * @param int                   $idClient
-     * @param UploadedFileInterface $file
+     * @param FileAbstract $file
      *
      * @return string
+     * @throws \Exception
      */
-    public function save($idClient, UploadedFileInterface $file)
+    public function save(FileAbstract $file)
     {
         // Get the subpath based on the id
-        $path = $this->createPath($idClient);
+        $path = $this->createPath($file->getIdUser());
         // Generate a file name with the uploaded extension
         $ext = [];
-        $ext = preg_match('/\.[a-zA-Z]+$/', $file->getClientFilename(), $ext) ? strtolower($ext[0]) : '';
-        $name = md5($idClient . $file->getClientFilename() . time()) . $ext;
+        $ext = preg_match('/\.[a-zA-Z]+$/', $file->getFileOrigName(), $ext) ? strtolower($ext[0]) : '';
+        $name = md5($file->getIdUser() . $file->getFileOrigName() . time()) . $ext;
 
         // Move to the final folder
-        $file->moveTo($path . '/' . $name);
+        if (!rename($file->getPath(), $path . '/' . $name)) {
+            $this->logger->addError('Error moving uploaded file', [$file->getPath(), $path . '/' . $name]);
+            throw new \RuntimeException(Exceptions::CANNOT_MOVE, 503);
+        }
+
+        $file->setFileName($name);
 
         return $name;
     }

@@ -7,6 +7,8 @@ use Api\Model\General\Exceptions;
 
 class General extends RepositoryAbstract
 {
+    const MEDIA_TYPE_OTHERS = 8;
+
     /**
      * Get the account types list by language
      *
