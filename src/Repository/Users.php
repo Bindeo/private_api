@@ -345,7 +345,7 @@ class Users extends RepositoryLocatableAbstract
         if (!$res or $res->getNumRows() != 1 or !password_verify($user->getOldPassword(),
                 $res->getRows()[0]['PASSWORD'])
         ) {
-            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 400);
+            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 401);
         }
 
         // Geolocalize the user
@@ -424,7 +424,7 @@ class Users extends RepositoryLocatableAbstract
         if (!$res or $res->getNumRows() != 1 or !password_verify($user->getPassword(),
                 $res->getRows()[0]['PASSWORD'])
         ) {
-            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 400);
+            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 401);
         }
 
         // Generate validation code
@@ -567,7 +567,7 @@ class Users extends RepositoryLocatableAbstract
         if ($data->getNumRows() == 0 or !($userAux = $data->getRows()[0]) or !password_verify($user->getPassword(),
                 $userAux->getPassword())
         ) {
-            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 400);
+            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 401);
         } elseif (!$data and $this->db->getError()) {
             throw new \Exception($this->db->getError(), 400);
         }
