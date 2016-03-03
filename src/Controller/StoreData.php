@@ -111,7 +111,7 @@ class StoreData
         // Sign the file
         $res = $this->model->signFile(new File($request->getParams()));
 
-        $res = ['data' => ['type' => 'files', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'blockchain', 'attributes' => $res]];
 
         return $response->withJson($res, 202);
     }

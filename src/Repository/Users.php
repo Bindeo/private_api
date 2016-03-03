@@ -734,17 +734,23 @@ class Users extends RepositoryLocatableAbstract
      * Get active identities of the user
      *
      * @param User $user
+     * @param bool $main [optional] Only main identity
      *
      * @return ResultSet
      * @throws \Exception
      */
-    public function getIdentities(User $user)
+    public function getIdentities(User $user, $main = false)
     {
         if (!$user->getIdUser()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
         $sql = "SELECT ID_IDENTITY, FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, STATUS
-                FROM USERS_IDENTITIES WHERE FK_ID_USER = :id AND STATUS = 'A' ORDER BY MAIN DESC, ID_IDENTITY ASC";
+                FROM USERS_IDENTITIES WHERE FK_ID_USER = :id AND STATUS = 'A'";
+        if ($main) {
+            $sql .= ' AND MAIN = 1';
+        }
+        $sql .= " ORDER BY MAIN DESC, ID_IDENTITY ASC";
+
         $params = [':id' => $user->getIdUser()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\UserIdentity');

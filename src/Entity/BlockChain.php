@@ -92,4 +92,15 @@ class BlockChain extends BlockChainAbstract implements LocatableInterface
 
         return $this;
     }
+
+    // ADITIONAL METHODS
+    /**
+     * @return Signature
+     */
+    public function getSignature()
+    {
+        if ($this->jsonData) {
+            return new Signature(json_decode($this->jsonData, true));
+        } else return null;
+    }
 }

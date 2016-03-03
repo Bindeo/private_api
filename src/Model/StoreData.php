@@ -3,12 +3,13 @@
 namespace Api\Model;
 
 use Api\Entity\BlockChain;
+use Api\Entity\Signature;
 use Api\Entity\User;
 use Api\Entity\File;
 use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
-use \Psr\Http\Message\UploadedFileInterface;
+use Bindeo\DataModel\SignableInterface;
 use \Psr\Log\LoggerInterface;
 
 /**
@@ -77,7 +78,7 @@ class StoreData
     /**
      * Save the file in storage and database
      *
-     * @param \Api\Entity\File        $file
+     * @param File $file
      *
      * @return array
      * @throws \Exception
@@ -128,7 +129,7 @@ class StoreData
     /**
      * Delete a file o send it to trash
      *
-     * @param \Api\Entity\File $file
+     * @param File $file
      *
      * @throws \Exception
      */
@@ -165,14 +166,14 @@ class StoreData
     /**
      * Sign a file into the blockchain
      *
-     * @param \Api\Entity\File $file
+     * @param File $file
      *
      * @return array
      * @throws \Exception
      */
     public function signFile(File $file)
     {
-        if (!$file->getIdFile() or !$file->getIdUser() or !$file->getIp()) {
+        if (!$file->getIdFile() or !$file->getIp()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -190,7 +191,7 @@ class StoreData
         }
 
         // Check if the stored hash is correct
-        $hash = $this->storage->getHash($file->getIdUser(), $file->getName());
+        $hash = $this->storage->getHash($file->getIdUser(), $file->getFileName());
         if ($hash != $file->getHash()) {
             // We need to store the new hash after sign the file
             $this->logger->addNotice('Hash Incongruence', $file->toArray());
@@ -204,7 +205,27 @@ class StoreData
             throw new \Exception(Exceptions::NO_COINS, 503);
         }
 
-        $res = $blockchain->storeData($file->getHash(), 'S');
+        // Generate signature
+        $signature = $this->signatureFactory($file);
+
+        if (!$signature->isValid()) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        // Setup blockchain object
+        $blockchainObj = new BlockChain([
+            'ip'         => $file->getIp(),
+            'net'        => $blockchain->getNet(),
+            'idUser'     => $file->getIdUser(),
+            'idIdentity' => $signature->getAuxIdentity(),
+            'hash'       => $signature->getAssetHash(),
+            'jsonData'   => $signature->generate(true),
+            'type'       => $signature->getAssetType(),
+            'idElement'  => $file->getIdFile()
+        ]);
+
+        // Sign
+        $res = $blockchain->storeData($signature->generateHash(), 'S');
 
         // Check if the transaction was ok
         if (!$res['txid']) {
@@ -213,15 +234,44 @@ class StoreData
         }
 
         // Save the transaction information
+        $blockchainObj->setTransaction($res['txid']);
         $file->setTransaction($res['txid']);
 
-        return $this->dataRepo->signFile($file, $blockchain->getNet())->toArray();
+        return $this->dataRepo->signAsset($blockchainObj)->toArray();
+    }
+
+    /**
+     * Generate the assert signature
+     *
+     * @param SignableInterface $assert
+     *
+     * @return Signature
+     * @throws \Exception
+     */
+    private function signatureFactory(SignableInterface $assert)
+    {
+        // Get owner data
+        $identity = $this->usersRepo->getIdentities(new User(['idUser' => $assert->getIdUser()]), true);
+        if ($identity->getNumRows() == 0) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        $signature = new Signature();
+        $signature->setAssetHash($assert->getHash())
+                  ->setAssetSize($assert->getSize())
+                  ->setAssetName($assert->getName())
+                  ->setAssetType($assert->getType())
+                  ->setOwnerId($identity->getRows()[0]->getValue())
+                  ->setOwnerName($identity->getRows()[0]->getName())
+                  ->setAuxIdentity($identity->getRows()[0]->getIdIdentity());
+
+        return $signature;
     }
 
     /**
      * Get a blockchain transaction by id from our db
      *
-     * @param \Api\Entity\BlockChain $blockchain
+     * @param BlockChain $blockchain
      *
      * @return array
      */
@@ -240,7 +290,7 @@ class StoreData
     /**
      * Get a blockchain transaction hash by id from blockchain
      *
-     * @param \Api\Entity\BlockChain $blockchain
+     * @param BlockChain $blockchain
      *
      * @return string
      * @throws \Exception
