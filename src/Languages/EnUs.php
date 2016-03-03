@@ -14,7 +14,9 @@ class EnUs extends TranslateAbstract
             'general_hi_user'           => 'Hi %s',
             'registry_subject'          => 'Welcome %s to Bindeo',
             'registry_explanation'      => 'Help us secure your Bindeo\'s account by verifiying your email address',
-            'registry_verify_button'    => 'Verify email address'
+            'registry_verify_button'    => 'Verify email address',
+            'verification_subject'      => 'Verify your email address %s',
+            'verification_explanation'  => 'Confirm your email address %s by clicking on the following button'
         ];
     }
 }

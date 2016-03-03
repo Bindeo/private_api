@@ -5,7 +5,7 @@ namespace Api\Repository;
 use Api\Entity\File;
 use Api\Entity\ResultSet;
 use Bindeo\Filter\FilesFilter;
-use Api\Model\General\Exceptions;
+use Bindeo\DataModel\Exceptions;
 use \MaxMind\Db\Reader;
 use Api\Entity\BlockChain;
 

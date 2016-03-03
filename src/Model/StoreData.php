@@ -5,7 +5,7 @@ namespace Api\Model;
 use Api\Entity\BlockChain;
 use Api\Entity\User;
 use Api\Entity\File;
-use Api\Model\General\Exceptions;
+use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
 use \Psr\Http\Message\UploadedFileInterface;

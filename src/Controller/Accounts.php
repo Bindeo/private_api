@@ -2,7 +2,7 @@
 
 namespace Api\Controller;
 
-use Api\Model\General\Exceptions;
+use Bindeo\DataModel\Exceptions;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 use Api\Entity\User;
@@ -146,8 +146,28 @@ class Accounts
         }
 
         // Create a new account
-        $this->model->validateToken($request->getParam('token'), $request->getParam('ip'),
+        $user = $this->model->validateToken($request->getParam('token'), $request->getParam('ip'),
             $request->getParam('password'));
+
+        $res = ['data' => ['type' => 'users', 'attributes' => $user]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
+     * Resend the initial validation token
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     * @throws \Exception
+     */
+    public function resendToken(Request $request, Response $response, $args)
+    {
+        // Resend the token
+        $this->model->resendToken(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }

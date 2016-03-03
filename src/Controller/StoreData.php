@@ -4,7 +4,7 @@ namespace Api\Controller;
 
 use Api\Entity\BlockChain;
 use Api\Entity\File;
-use Api\Model\General\Exceptions;
+use Bindeo\DataModel\Exceptions;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 

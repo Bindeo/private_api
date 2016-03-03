@@ -3,7 +3,7 @@
 namespace Api\Repository;
 
 use Api\Entity\ResultSet;
-use Api\Model\General\Exceptions;
+use Bindeo\DataModel\Exceptions;
 
 class General extends RepositoryAbstract
 {

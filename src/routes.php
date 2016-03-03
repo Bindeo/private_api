@@ -17,6 +17,7 @@ $app->group('/account', function () {
     $this->put('/password', 'Api\Controller\Accounts:modifyPassword');
     $this->put('/email', 'Api\Controller\Accounts:modifyEmail');
     $this->put('/type', 'Api\Controller\Accounts:changeType');
+    $this->get('/token', 'Api\Controller\Accounts:resendToken');
     $this->put('/token', 'Api\Controller\Accounts:validateToken');
     $this->get('/identities', 'Api\Controller\Accounts:getIdentities');
 });

@@ -18,5 +18,10 @@
         "monolog/monolog": "^1.0",
         "maxmind-db/reader": "^1.0",
         "mailgun/mailgun-php": "^1.8"
+    },
+    "scripts": {
+        "post-update-cmd": [
+            "Api\\Model\\General\\ScriptsComposer::clearCache"
+        ]
     }
 }

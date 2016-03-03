@@ -14,7 +14,9 @@ class EsEs extends TranslateAbstract
             'general_hi_user'           => 'Hola %s',
             'registry_subject'          => 'Bienvenido %s a Bindeo',
             'registry_explanation'      => 'Ayúdanos a asegurar tu cuenta Bindeo verificando tu dirección de e-mail',
-            'registry_verify_button'    => 'Verifica la dirección de e-mail'
+            'registry_verify_button'    => 'Verifica la dirección de e-mail',
+            'verification_subject'      => 'Verifica tu dirección de email %s',
+            'verification_explanation'  => 'Confirma tu dirección de email %s pulsando en el botón siguiente'
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Api\Model\General;
 
+use Bindeo\DataModel\Exceptions;
 use Bindeo\DataModel\FileAbstract;
 use Psr\Log\LoggerInterface;
 

@@ -4,7 +4,7 @@ namespace Api\Repository;
 
 use Api\Entity\ResultSet;
 use Api\Entity\User;
-use Api\Model\General\Exceptions;
+use Bindeo\DataModel\Exceptions;
 use \MaxMind\Db\Reader;
 
 class Users extends RepositoryLocatableAbstract
@@ -291,7 +291,7 @@ class Users extends RepositoryLocatableAbstract
         $user->clean();
 
         // Check the type of the update
-        if (!$user->getIdUser() or !is_numeric($user->getType()) or !$user->getName() or !$user->getIp() or !$user->getLang()) {
+        if (!$user->getIdUser() or !$user->getName() or !$user->getIp() or !$user->getLang()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -345,7 +345,7 @@ class Users extends RepositoryLocatableAbstract
         if (!$res or $res->getNumRows() != 1 or !password_verify($user->getOldPassword(),
                 $res->getRows()[0]['PASSWORD'])
         ) {
-            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 401);
+            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
         }
 
         // Geolocalize the user
@@ -420,31 +420,84 @@ class Users extends RepositoryLocatableAbstract
 
         // Check if the password is correct
         $sql = 'SELECT PASSWORD, EMAIL FROM USERS WHERE ID_USER = :id';
-        $res = $this->db->query($sql, ['id' => $user->getIdUser()]);
+        $res = $this->db->query($sql, [':id' => $user->getIdUser()]);
         if (!$res or $res->getNumRows() != 1 or !password_verify($user->getPassword(),
                 $res->getRows()[0]['PASSWORD'])
         ) {
-            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 401);
+            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
         }
 
-        // Generate validation code
-        $token = md5($user->getIdUser() . $user->getEmail() . time());
+        // Check if the new email is already used
+        $sql = 'SELECT EMAIL FROM USERS WHERE ID_USER != :id AND EMAIL = :email';
+        $res = $this->db->query($sql, [':id' => $user->getIdUser(), ':email' => $user->getEmail()]);
+        if ($res->getNumRows() > 0) {
+            throw new \Exception(Exceptions::DUPLICATED_KEY, 409);
+        }
 
-        // Insert the validation token
-        $sql = 'INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP, OLD_EMAIL)
+        // Check if we already have a non expired or confirmed token with the same change
+        $sql = 'SELECT TOKEN FROM USERS_VALIDATIONS
+                WHERE FK_ID_USER = :id AND EMAIL = :email AND TYPE = :type AND CONFIRMED = 0 AND
+                  CTRL_DATE < SYSDATE() + INTERVAL 1 DAY';
+        $data = [
+            ':id'    => $user->getIdUser(),
+            ':email' => mb_strtolower($user->getEmail()),
+            ':type'  => 'E'
+        ];
+        $res = $this->db->query($sql, $data);
+
+        if ($res->getNumRows() == 0) {
+            // Generate validation code
+            $token = md5($user->getIdUser() . $user->getEmail() . time());
+
+            // Insert the validation token
+            $sql = 'INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP, OLD_EMAIL)
                     VALUES (:token, :type, :id, :email, SYSDATE(), :ip, :old_email);';
 
-        $data = [
-            ':token'     => $token,
-            ':type'      => 'E',
-            ':id'        => $user->getIdUser(),
-            ':email'     => mb_strtolower($user->getEmail()),
-            ':ip'        => $user->getIp(),
-            ':old_email' => $res->getRows()[0]['PASSWORD']
-        ];
+            $data = [
+                ':token'     => $token,
+                ':type'      => 'E',
+                ':id'        => $user->getIdUser(),
+                ':email'     => mb_strtolower($user->getEmail()),
+                ':ip'        => $user->getIp(),
+                ':old_email' => $res->getRows()[0]['EMAIL']
+            ];
 
-        if ($this->db->action($sql, $data)) {
-            return $token;
+            if ($this->db->action($sql, $data)) {
+                return $token;
+            } else {
+                throw $this->dbException();
+            }
+        } else {
+            return $res->getRows()[0]['TOKEN'];
+        }
+    }
+
+    /**
+     * Get the user validation token
+     *
+     * @param User $user
+     *
+     * @return string
+     * @throws \Exception
+     */
+    public function getValidationToken(User $user)
+    {
+        // Check data
+        if (!$user->getIdUser() or !$user->getEmail()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Check if we already have a non expired or confirmed token with the same change
+        $sql = "SELECT TOKEN FROM USERS_VALIDATIONS
+                WHERE FK_ID_USER = :id AND EMAIL = :email AND TYPE = 'V' AND CONFIRMED = 0";
+        $data = [
+            ':id'    => $user->getIdUser(),
+            ':email' => mb_strtolower($user->getEmail())
+        ];
+        $res = $this->db->query($sql, $data);
+
+        if ($res->getNumRows() > 0) {
+            return $res->getRows()[0]['TOKEN'];
         } else {
             throw $this->dbException();
         }
@@ -457,7 +510,7 @@ class Users extends RepositoryLocatableAbstract
      * @param string $ip
      * @param string $password [optional]
      *
-     * @return string
+     * @return User
      * @throws \Exception
      */
     public function validateToken($token, $ip, $password = null)
@@ -467,7 +520,7 @@ class Users extends RepositoryLocatableAbstract
                 WHERE TOKEN = :token AND CONFIRMED = 0 AND (TYPE = 'V' OR CTRL_DATE < SYSDATE() + INTERVAL 1 DAY)";
         $res = $this->db->query($sql, ['token' => trim($token)]);
         if (!$res or $res->getNumRows() == 0) {
-            throw new \Exception(Exceptions::EXPIRED_TOKEN, 400);
+            throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
         }
 
         $res = $res->getRows()[0];
@@ -526,7 +579,7 @@ class Users extends RepositoryLocatableAbstract
                 ':id_geonames' => $user->getIdGeonames()
             ];
         } else {
-            throw new \Exception(Exceptions::EXPIRED_TOKEN, 400);
+            throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
         }
 
         // Execute query
@@ -551,7 +604,7 @@ class Users extends RepositoryLocatableAbstract
         if (!$user->getEmail() or !$user->getPassword() or !$user->getIp()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         } elseif (!in_array($source, ['front', 'api'])) {
-            throw new \Exception(Exceptions::UNAUTHORIZED, 403);
+            throw new \Exception(Exceptions::UNAUTHORIZED, 401);
         }
 
         // Try to get the user
@@ -567,7 +620,7 @@ class Users extends RepositoryLocatableAbstract
         if ($data->getNumRows() == 0 or !($userAux = $data->getRows()[0]) or !password_verify($user->getPassword(),
                 $userAux->getPassword())
         ) {
-            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 401);
+            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
         } elseif (!$data and $this->db->getError()) {
             throw new \Exception($this->db->getError(), 400);
         }
