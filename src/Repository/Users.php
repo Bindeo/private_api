@@ -420,9 +420,9 @@ class Users extends RepositoryLocatableAbstract
 
         // Check if the password is correct
         $sql = 'SELECT PASSWORD, EMAIL FROM USERS WHERE ID_USER = :id';
-        $res = $this->db->query($sql, [':id' => $user->getIdUser()]);
-        if (!$res or $res->getNumRows() != 1 or !password_verify($user->getPassword(),
-                $res->getRows()[0]['PASSWORD'])
+        $oldUser = $this->db->query($sql, [':id' => $user->getIdUser()]);
+        if (!$oldUser or $oldUser->getNumRows() != 1 or !password_verify($user->getPassword(),
+                $oldUser->getRows()[0]['PASSWORD'])
         ) {
             throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
         }
@@ -459,7 +459,7 @@ class Users extends RepositoryLocatableAbstract
                 ':id'        => $user->getIdUser(),
                 ':email'     => mb_strtolower($user->getEmail()),
                 ':ip'        => $user->getIp(),
-                ':old_email' => $res->getRows()[0]['EMAIL']
+                ':old_email' => $oldUser->getRows()[0]['EMAIL']
             ];
 
             if ($this->db->action($sql, $data)) {
@@ -516,9 +516,11 @@ class Users extends RepositoryLocatableAbstract
     public function validateToken($token, $ip, $password = null)
     {
         // Retrieve the token information if is still valid
-        $sql = "SELECT TOKEN, TYPE, FK_ID_USER, EMAIL FROM USERS_VALIDATIONS
-                WHERE TOKEN = :token AND CONFIRMED = 0 AND (TYPE = 'V' OR CTRL_DATE < SYSDATE() + INTERVAL 1 DAY)";
-        $res = $this->db->query($sql, ['token' => trim($token)]);
+        $sql = "SELECT V.TOKEN, V.TYPE, V.FK_ID_USER, V.EMAIL, V.OLD_EMAIL, U.CONFIRMED, U.NAME
+                FROM USERS_VALIDATIONS V, USERS U
+                WHERE U.ID_USER = V.FK_ID_USER AND V.TOKEN = :token AND V.CONFIRMED = 0 AND
+                  (V.TYPE = 'V' OR V.CTRL_DATE < SYSDATE() + INTERVAL 1 DAY)";
+        $res = $this->db->query($sql, [':token' => trim($token)]);
         if (!$res or $res->getNumRows() == 0) {
             throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
         }
@@ -543,7 +545,7 @@ class Users extends RepositoryLocatableAbstract
                     LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
                     WHERE ID_USER = :id;
                     UPDATE USERS_IDENTITIES SET CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
-                    WHERE FK_ID_USER = :id AND TYPE = 'E' AND STATUS = 'A' AND VALUE = :email;";
+                    WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :email;";
             $params = [
                 ':id'          => $user->getIdUser(),
                 ':email'       => $user->getEmail(),
@@ -553,6 +555,30 @@ class Users extends RepositoryLocatableAbstract
                 ':id_geonames' => $user->getIdGeonames()
             ];
         } elseif ($res['TYPE'] == 'E') {
+            // If the user is not confirmed, we will change the identity email, otherwise we create a new identity and deprecate the old one
+            $params = [
+                ':id'        => $user->getIdUser(),
+                ':old_email' => $res['OLD_EMAIL'],
+                ':email'     => $user->getEmail(),
+                ':ip'        => $user->getIp()
+            ];
+
+            if ($res['CONFIRMED'] == 1) {
+                // Get the main status of replaced field
+                $sql = "SELECT COUNT(*) MAIN FROM USERS_IDENTITIES WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :old_email AND STATUS = 'A' AND MAIN = 1";
+                $params[':main'] = $this->db->query($sql,
+                    [':id' => $user->getIdUser(), ':old_email' => $res['OLD_EMAIL']])->getRows()[0]['MAIN'];
+
+                $sql = "UPDATE USERS_IDENTITIES SET STATUS = 'D', MAIN = 0, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
+                        WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :old_email;
+                        INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, CTRL_IP, CTRL_DATE)
+                        VALUES (:id, :main, 'E', :name, :email, 1, :ip, SYSDATE());";
+            } else {
+                $sql = "UPDATE USERS_IDENTITIES SET VALUE = :email, CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
+                        WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :old_email";
+            }
+            $this->db->action($sql, $params);
+
             // Confirm the email change
             $sql = 'UPDATE USERS SET CONFIRMED = 1, EMAIL = :email, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
                     LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
