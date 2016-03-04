@@ -13,12 +13,13 @@ class Signature
 
     // Aux
     private $auxIdentity;
+    private $translate = ['F' => 'File', 'E' => 'Email', 'File' => 'F', 'Email' => 'E'];
 
     public function __construct(array $data = null)
     {
         if ($data) {
-            if (isset($data['asset']['type'])) {
-                $this->assetType = $data['asset']['type'];
+            if (isset($data['asset']['type']) and isset($this->translate[$data['asset']['type']])) {
+                $this->assetType = $this->translate[$data['asset']['type']];
             }
             if (isset($data['asset']['hash'])) {
                 $this->assetHash = $data['asset']['hash'];
@@ -201,7 +202,7 @@ class Signature
         if ($this->isValid()) {
             $sign = [
                 'asset' => [
-                    'type' => $this->assetType,
+                    'type' => $this->translate[$this->assetType],
                     'hash' => $this->assetHash,
                     'size' => $this->assetSize,
                     'name' => $this->assetName
