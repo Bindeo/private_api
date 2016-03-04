@@ -259,7 +259,7 @@ class StoreData
         $signature = new Signature();
         $signature->setAssetHash($assert->getHash())
                   ->setAssetSize($assert->getSize())
-                  ->setAssetName($assert->getName())
+                  ->setAssetName($assert->getFileOrigName())
                   ->setAssetType($assert->getType())
                   ->setOwnerId($identity->getRows()[0]->getValue())
                   ->setOwnerName($identity->getRows()[0]->getName())
@@ -396,5 +396,47 @@ class StoreData
         $hashBC = $this->getTransactionHash(new BlockChain(['transaction' => $txid, 'net' => $net]));
 
         return ['match' => $hashFile == $hashBC, 'hash_file' => $hashFile, 'hash_blockchain' => $hashBC];
+    }
+
+    /**
+     * Test an asset against the blockchain
+     *
+     * @param SignableInterface $asset
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function testAsset(SignableInterface $asset)
+    {
+        if ($asset->getType() == 'F') {
+            $file = $this->dataRepo->findFile($asset);
+        } else {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        if (!$file or !$file->getTransaction()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        if (!($blockchain = $this->dataRepo->findTransaction(new BlockChain(['transaction' => $file->getTransaction()])))) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Generate fresh signature
+        $signature = new Signature(json_decode($blockchain->getJsonData(), true));
+
+        if (!$signature->isValid()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $hashBC = $this->getTransactionHash($blockchain);
+        $hashSign = $signature->generateHash();
+
+        return [
+            'match'           => $hashSign == $hashBC,
+            'hash_signature'  => $hashSign,
+            'hash_blockchain' => $hashBC,
+            'sign_info'       => $signature->generate()
+        ];
     }
 }

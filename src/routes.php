@@ -37,7 +37,7 @@ $app->group('/data', function () {
     $this->get('/blockchain', 'Api\Controller\StoreData:getTransaction');
     $this->get('/blockchain/coins', 'Api\Controller\StoreData:getBalance');
     $this->get('/blockchain/info', 'Api\Controller\StoreData:getTransactionInfo');
-    $this->post('/blockchain/test', 'Api\Controller\StoreData:testFile');
+    $this->get('/blockchain/test', 'Api\Controller\StoreData:testAsset');
 });
 
 //$app->get('/tests', 'Api\Controller\StoreData:tests');

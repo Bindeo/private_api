@@ -7,8 +7,8 @@ use Api\Lib\JsonRPC\jsonRPCClient;
 class BitcoinClient implements BlockChainClientInterface
 {
     const MAX_DATA_LENGTH = 128; // 80 bytes in hex characters
-    const STAMP_FEE       = 0.000013; // 1300 satoshis
-    const TRANSACTION_FEE = 0.000023; // 2300 satoshis
+    const STAMP_FEE       = (ENV == 'development') ? 0.000013 * 10 : 0.000013; // 1300 satoshis
+    const TRANSACTION_FEE = (ENV == 'development') ? 0.000023 * 10 : 0.000023; // 2300 satoshis
     const SATOSHI         = 0.00000001; // 1 satoshi
 
     private $bitcoin;
@@ -448,8 +448,9 @@ class BitcoinClient implements BlockChainClientInterface
         $amount = $inputs['total'] - $amount;
 
         $outputs = ['data' => $data];
+        //$outputs = [];
         if ($amount > 0) {
-            $outputs = [$changeAddress => $amount];
+            $outputs[$changeAddress] = $amount;
 
             // Set the account target to send him the colored coin
             if ($accountTo) {
@@ -460,7 +461,7 @@ class BitcoinClient implements BlockChainClientInterface
 
         // Create a raw transaction with all the information
         $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
-        /*
+/*
         // Old method to include OP_RETURN data
         $txn = $this->decodeRawTransaction($txn);
 
@@ -476,7 +477,7 @@ class BitcoinClient implements BlockChainClientInterface
 
         // Encode the transaction into raw format
         $txn = $this->encodeTransaction($txn);
-        */
+*/
 
         // Sign the transaction
         $txn = $this->signRawTransaction($txn);
@@ -508,10 +509,10 @@ class BitcoinClient implements BlockChainClientInterface
     public function getDecodedData($txid)
     {
         $tx = $this->getRawTransaction($txid, 1);
-        if (!isset($tx['vout'][1]['scriptPubKey']['hex'])) {
+        if (!isset($tx['vout'][0]['scriptPubKey']['hex'])) {
             return ['error' => "Transaction doesn't exist"];
         } else {
-            return ['data' => substr($tx['vout'][1]['scriptPubKey']['hex'], 4)];
+            return ['data' => substr($tx['vout'][0]['scriptPubKey']['hex'], 4)];
         }
     }
 
@@ -525,10 +526,10 @@ class BitcoinClient implements BlockChainClientInterface
     public function getEncodedData($txid)
     {
         $tx = $this->getRawTransaction($txid, 1);
-        if (!isset($tx['vout'][1]['scriptPubKey']['hex'])) {
+        if (!isset($tx['vout'][0]['scriptPubKey']['hex'])) {
             return ['error' => "Transaction doesn't exist"];
         } else {
-            return ['data' => substr(hex2bin($tx['vout'][1]['scriptPubKey']['hex']), 1)];
+            return ['data' => substr(hex2bin($tx['vout'][0]['scriptPubKey']['hex']), 1)];
         }
     }
 }

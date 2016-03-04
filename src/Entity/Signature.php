@@ -26,8 +26,8 @@ class Signature
             if (isset($data['asset']['size'])) {
                 $this->assetSize = $data['asset']['size'];
             }
-            if (isset($data['asset']['size'])) {
-                $this->assetSize = $data['asset']['size'];
+            if (isset($data['asset']['name'])) {
+                $this->assetName = $data['asset']['name'];
             }
             if (isset($data['owner']['name'])) {
                 $this->ownerName = $data['owner']['name'];
@@ -220,12 +220,15 @@ class Signature
 
     /**
      * Generate signature hash
+     *
+     * @param bool $raw [optional]
+     *
      * @return string
      */
-    public function generateHash()
+    public function generateHash($raw = false)
     {
         if ($json = $this->generate(true)) {
-            return hash('sha256', $json);
+            return hash('sha256', $json, $raw);
         } else {
             return null;
         }

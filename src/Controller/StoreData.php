@@ -3,6 +3,7 @@
 namespace Api\Controller;
 
 use Api\Entity\BlockChain;
+use Api\Entity\Email;
 use Api\Entity\File;
 use Bindeo\DataModel\Exceptions;
 use \Psr\Http\Message\ServerRequestInterface as Request;
@@ -209,6 +210,30 @@ class StoreData
     }
 
     /**
+     * Test an asset against the blockchain
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     * @throws \Exception
+     */
+    public function testAsset(Request $request, Response $response, $args)
+    {
+        // Get the result
+        if ($request->getParam('type') == 'F') {
+            $asset = new File($request->getParams());
+        } else {
+            $asset = new Email($request->getParams());
+        }
+        $res = $this->model->testAsset($asset);
+        $res = ['data' => ['type' => 'hash_test', 'attributes' => $res]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
      * Development blockchain tests
      *
      * @param Request  $request
@@ -219,9 +244,11 @@ class StoreData
     {
         $blockchain = \Api\Lib\BlockChain\BlockChain::getInstance();
 
-        $res = $blockchain->listAccounts();
+        $res = $blockchain->getRawTransaction('59f91fd845430e8b8b13e7325e23f8c3b866cae1db78b3a427f94a1c1a0fed0b', 1);
+        $res1 = $blockchain->getRawTransaction('7c2cb65d25e67a1b2e9221db756c01434476ebf8e5d9d0b63140a77ea38abbc5', 1);
         echo '<pre>';
         print_r($res);
+        print_r($res1);
         exit;
     }
 }

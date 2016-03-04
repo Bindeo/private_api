@@ -4,6 +4,7 @@ namespace Api\Repository;
 
 use Api\Entity\File;
 use Api\Entity\ResultSet;
+use Bindeo\DataModel\SignableInterface;
 use Bindeo\Filter\FilesFilter;
 use Bindeo\DataModel\Exceptions;
 use \MaxMind\Db\Reader;
@@ -25,8 +26,8 @@ class StoreData extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT TRANSACTION, NET, CONFIRMED, FK_ID_USER, HASH, CTRL_DATE, CTRL_IP, TYPE, FK_ID_ELEMENT,
-                  ID_GEONAMES, LATITUDE, LONGITUDE FROM BLOCKCHAIN WHERE TRANSACTION = :id';
+        $sql = 'SELECT TRANSACTION, NET, CONFIRMED, FK_ID_USER, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE, CTRL_IP,
+                  TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE FROM BLOCKCHAIN WHERE TRANSACTION = :id';
         $params = [':id' => $blockchain->getTransaction()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\BlockChain');
@@ -35,27 +36,27 @@ class StoreData extends RepositoryLocatableAbstract
             throw new \Exception($this->db->getError(), 400);
         }
 
-        return $data->getNumRows() ? $data->getRows()[0] : [];
+        return $data->getNumRows() ? $data->getRows()[0] : null;
     }
 
     /**
      * Find a file by id
      *
-     * @param File $file
+     * @param SignableInterface $file
      *
      * @return \Api\Entity\File
      * @throws \Exception
      */
-    public function findFile(File $file)
+    public function findFile(SignableInterface $file)
     {
-        if (!$file->getIdFile()) {
+        if (!($file instanceof File) or !$file->getIdElement()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         $sql = 'SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
                   CTRL_DATE, TAG, DESCRIPTION, TRANSACTION, CONFIRMED, STATUS, ID_GEONAMES, LATITUDE, LONGITUDE
                 FROM FILES WHERE ID_FILE = :id';
-        $params = [':id' => $file->getIdFile()];
+        $params = [':id' => $file->getIdElement()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\File');
 
