@@ -224,7 +224,11 @@ class StoreData extends RepositoryLocatableAbstract
         // Name
         if ($filter->getName()) {
             $data[':name'] = $filter->getName();
-            $where .= ' AND MATCH(NAME, TAG, DESCRIPTION) AGAINST(:name  IN NATURAL LANGUAGE MODE)';
+            if ($filter->getStatus() != 'D') {
+                $where .= ' AND MATCH(NAME, TAG, DESCRIPTION) AGAINST(:name  IN NATURAL LANGUAGE MODE)';
+            } else {
+                $where .= ' AND MATCH(NAME) AGAINST(:name  IN NATURAL LANGUAGE MODE)';
+            }
         }
 
         // Orders
@@ -250,9 +254,11 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get the paginated list
+        $from = $filter->getStatus() != 'D' ? 'FILES' : 'FILES_DELETED';
+
         $sql = "SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE, CTRL_DATE,
-                  TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE FROM FILES
-                WHERE FK_ID_USER = :id_user" . $where . " AND STATUS = :status ORDER BY " . $order;
+                  TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE
+                FROM ".$from." WHERE FK_ID_USER = :id_user" . $where . " AND STATUS = :status ORDER BY " . $order;
 
         return $this->db->query($sql, $data, 'Api\Entity\File', $filter->getPage(), $filter->getNumRows());
     }
