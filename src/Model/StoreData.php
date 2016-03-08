@@ -10,6 +10,7 @@ use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
 use Bindeo\DataModel\SignableInterface;
+use Bindeo\Filter\FilesFilter;
 use \Psr\Log\LoggerInterface;
 
 /**
@@ -147,20 +148,15 @@ class StoreData
     /**
      * Get a paginated list of files from one client
      *
-     * @param int $idClient
-     * @param int $page
+     * @param FilesFilter $filter
      *
      * @return \Api\Entity\ResultSet
      * @throws \Exception
      */
-    public function fileList($idClient, $page)
+    public function fileList(FilesFilter $filter)
     {
-        if (!is_numeric($idClient) or !is_numeric($page)) {
-            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        }
-
         // Get the list
-        return $this->dataRepo->fileList($idClient, $page);
+        return $this->dataRepo->fileList($filter);
     }
 
     /**

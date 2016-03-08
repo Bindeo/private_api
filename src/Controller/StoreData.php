@@ -6,6 +6,7 @@ use Api\Entity\BlockChain;
 use Api\Entity\Email;
 use Api\Entity\File;
 use Bindeo\DataModel\Exceptions;
+use Bindeo\Filter\FilesFilter;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 
@@ -87,7 +88,7 @@ class StoreData
     public function fileList(Request $request, Response $response, $args)
     {
         // Get the list
-        $res = $this->model->fileList($request->getParam('id_client'), $request->getParam('page'));
+        $res = $this->model->fileList(new FilesFilter($request->getParams()));
         $res = [
             'data'         => $res->toArray('files'),
             'total_pages'  => $res->getNumPages(),

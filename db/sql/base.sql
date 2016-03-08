@@ -2,7 +2,9 @@
 
 /*
 DROP TABLE EMAILS_TO;
+DROP TABLE EMAILS_DELETED;
 DROP TABLE EMAILS;
+DROP TABLE FILES_DELETED;
 DROP TABLE FILES;
 DROP TABLE BLOCKCHAIN;
 DROP TABLE USERS_TYPES;
@@ -35,11 +37,15 @@ source /var/www/html/project/api/db/tables/USERS_TYPES.sql;
 source /var/www/html/project/api/db/tables/USERS_IDENTITIES.sql;
 source /var/www/html/project/api/db/tables/BLOCKCHAIN.sql;
 source /var/www/html/project/api/db/tables/FILES.sql;
+source /var/www/html/project/api/db/tables/FILES_DELETED.sql;
 source /var/www/html/project/api/db/tables/EMAILS.sql;
+source /var/www/html/project/api/db/tables/EMAILS_DELETED.sql;
 source /var/www/html/project/api/db/tables/EMAILS_TO.sql;
 
 # Triggers
 source /var/www/html/project/api/db/triggers/TGR_BD_USERS.sql;
+source /var/www/html/project/api/db/triggers/TGR_BD_FILES.sql;
+source /var/www/html/project/api/db/triggers/TGR_BD_EMAILS.sql;
 
 # Translates
 source /var/www/html/project/api/db/sql/translations.sql;

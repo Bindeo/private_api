@@ -27,7 +27,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         $sql = 'SELECT TRANSACTION, NET, CONFIRMED, FK_ID_USER, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE, CTRL_IP,
-                  TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE FROM BLOCKCHAIN WHERE TRANSACTION = :id';
+                  TYPE, FK_ID_ELEMENT, STATUS_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE FROM BLOCKCHAIN WHERE TRANSACTION = :id';
         $params = [':id' => $blockchain->getTransaction()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\BlockChain');
@@ -171,9 +171,10 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // If the file has been permanently deleted, we free the space
-        if ($file->getStatus() == 'D' and $res->getStatus() != 'D') {
-            $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_USER = :id_user;';
-            $data = [':id_user' => $res->getIdUser(), ':size' => $res->getSize()];
+        if ($file->getStatus() == 'D') {
+            $sql = 'DELETE FROM FILES WHERE ID_FILE = :id;
+                    UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_USER = :id_user;';
+            $data = [':id' => $file->getIdFile(), ':id_user' => $res->getIdUser(), ':size' => $res->getSize()];
             if (!$this->db->action($sql, $data)) {
                 throw $this->dbException();
             }
@@ -192,9 +193,11 @@ class StoreData extends RepositoryLocatableAbstract
      */
     public function fileList(FilesFilter $filter)
     {
-        if (!$filter->getIdUser() or !$filter->getPage()) {
+        if (!is_numeric($filter->getIdUser()) or !is_numeric($filter->getPage())) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
+
+        $filter->clean();
 
         // Build the query
         $data = [':id_user' => $filter->getIdUser(), ':status' => $filter->getStatus()];
@@ -216,6 +219,12 @@ class StoreData extends RepositoryLocatableAbstract
                     $where .= ' AND CONFIRMED = 0 AND TRANSACTION IS NOT NULL';
                     break;
             }
+        }
+
+        // Name
+        if ($filter->getName()) {
+            $data[':name'] = $filter->getName();
+            $where .= ' AND MATCH(NAME, TAG, DESCRIPTION) AGAINST(:name  IN NATURAL LANGUAGE MODE)';
         }
 
         // Orders
