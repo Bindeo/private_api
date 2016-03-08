@@ -16,7 +16,11 @@ class EsEs extends TranslateAbstract
             'registry_explanation'      => 'Ayúdanos a asegurar tu cuenta Bindeo verificando tu dirección de e-mail',
             'registry_verify_button'    => 'Verifica la dirección de e-mail',
             'verification_subject'      => 'Verifica tu dirección de email %s',
-            'verification_explanation'  => 'Confirma tu dirección de email %s pulsando en el botón siguiente'
+            'verification_explanation'  => 'Confirma tu dirección de email %s pulsando en el botón siguiente',
+            'password_subject'          => 'Restablece tu contraseña %s',
+            'password_explanation'      => 'Has solicitado restablecer la contraseña de tu cuenta de Bindeo, pulsa en el botón siguiente para elegir una nueva, recuerda que este enlace expira en 24 horas',
+            'password_button'           => 'Elegir nueva contraseña',
+            'password_notifyus'         => 'Si no has solicitado restablecer tu contraseña, por favor, %snotifícanoslo%s',
         ];
     }
 }

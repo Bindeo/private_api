@@ -14,6 +14,7 @@ $app->group('/account', function () {
     $this->post('', 'Api\Controller\Accounts:create');
     $this->put('', 'Api\Controller\Accounts:modify');
     $this->delete('', 'Api\Controller\Accounts:delete');
+    $this->get('/password', 'Api\Controller\Accounts:resetPassword');
     $this->put('/password', 'Api\Controller\Accounts:modifyPassword');
     $this->put('/email', 'Api\Controller\Accounts:modifyEmail');
     $this->put('/type', 'Api\Controller\Accounts:changeType');

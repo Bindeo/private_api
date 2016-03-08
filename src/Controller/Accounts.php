@@ -88,7 +88,26 @@ class Accounts
     public function modifyPassword(Request $request, Response $response, $args)
     {
         // Populate the user object and modify the password
-        $this->model->modifyPassword(new User($request->getParams()));
+        $user = $this->model->modifyPassword(new User($request->getParams()));
+
+        $res = ['data' => ['type' => 'users', 'attributes' => $user]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
+     * Reset an account password
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function resetPassword(Request $request, Response $response, $args)
+    {
+        // Populate the user object and modify the password
+        $this->model->resetPassword(new User($request->getParams()));
 
         return $response->withJson('', 204);
     }

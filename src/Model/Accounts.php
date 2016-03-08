@@ -119,11 +119,50 @@ class Accounts
      *
      * @param User $user
      *
+     * @return array
      * @throws \Exception
      */
     public function modifyPassword(User $user)
     {
-        $this->usersRepo->modifyPassword($user);
+        $data = $this->usersRepo->modifyPassword($user);
+
+        return $data ? $data->toArray() : [];
+    }
+
+    /**
+     * Reset an account password
+     *
+     * @param User $user
+     *
+     * @throws \Exception
+     */
+    public function resetPassword(User $user)
+    {
+        // Check the requested params
+        if (!$user->getLang()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Create the token
+        $token = $this->usersRepo->resetPassword($user);
+
+        // Render the email template
+        $translate = TranslateFactory::factory($user->getLang());
+
+        $response = $this->view->render(new Response(), 'email/password-reset.html.twig',
+            ['translate' => $translate, 'user' => $user, 'token' => $token]);
+
+        // Send and email
+        try {
+            $res = $this->email->sendEmail($user->getEmail(),
+                $translate->translate('password_subject', $user->getName()), $response->getBody()->__toString());
+
+            if (!$res or $res->http_response_code != 200) {
+                $this->logger->addError('Error sending and email', $user);
+            }
+        } catch (\Exception $e) {
+            $this->logger->addError('Error sending and email', $user);
+        }
     }
 
     /**

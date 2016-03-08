@@ -16,7 +16,11 @@ class EnUs extends TranslateAbstract
             'registry_explanation'      => 'Help us secure your Bindeo\'s account by verifiying your email address',
             'registry_verify_button'    => 'Verify email address',
             'verification_subject'      => 'Verify your email address %s',
-            'verification_explanation'  => 'Confirm your email address %s by clicking on the following button'
+            'verification_explanation'  => 'Confirm your email address %s by clicking on the following button',
+            'password_subject'          => 'Reset your password %s',
+            'password_explanation'      => 'You have requested reset your Bindeo\'s account password, click the following button for choose a new one, remember that this link expires in 24 hours',
+            'password_button'           => 'Choose new password',
+            'password_notifyus'         => 'If you haven\'t requested to reset your password, please, %snotify us%s',
         ];
     }
 }

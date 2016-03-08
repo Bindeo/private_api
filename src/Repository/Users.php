@@ -176,9 +176,11 @@ class Users extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
+        $user->clean();
+
         $sql = 'SELECT ID_USER, EMAIL, PASSWORD, TYPE, NAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
                 FROM USERS WHERE EMAIL = :email';
-        $params = [':email' => trim(mb_strtolower($user->getEmail()))];
+        $params = [':email' => mb_strtolower($user->getEmail())];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\User');
 
@@ -291,7 +293,7 @@ class Users extends RepositoryLocatableAbstract
         $user->clean();
 
         // Check the type of the update
-        if (!$user->getIdUser() or !$user->getName() or !$user->getIp() or !$user->getLang()) {
+        if (!$user->getIdUser() or !$user->getIp() or !$user->getLang()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -300,13 +302,12 @@ class Users extends RepositoryLocatableAbstract
         $user = $this->geolocalize($user);
 
         // Prepare query and data
-        $sql = 'UPDATE USERS SET NAME = :name, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(),
-                LANG = :lang, LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
+        $sql = 'UPDATE USERS SET CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(), LANG = :lang,
+                  LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
                 WHERE ID_USER = :id';
 
         $data = [
             ':id'          => $user->getIdUser(),
-            ':name'        => $user->getName(),
             ':ip'          => $user->getIp(),
             ':lang'        => $user->getLang(),
             ':id_geonames' => $user->getIdGeonames() ? $user->getIdGeonames() : null,
@@ -327,7 +328,7 @@ class Users extends RepositoryLocatableAbstract
      *
      * @param User $user
      *
-     * @return \Api\Entity\ResultSet
+     * @return User
      * @throws \Exception
      */
     public function modifyPassword(User $user)
@@ -341,7 +342,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Check if the password is correct
         $sql = 'SELECT PASSWORD FROM USERS WHERE ID_USER = :id';
-        $res = $this->db->query($sql, ['id' => $user->getIdUser()]);
+        $res = $this->db->query($sql, [':id' => $user->getIdUser()]);
         if (!$res or $res->getNumRows() != 1 or !password_verify($user->getOldPassword(),
                 $res->getRows()[0]['PASSWORD'])
         ) {
@@ -368,9 +369,74 @@ class Users extends RepositoryLocatableAbstract
 
         // Execute query
         if ($this->db->action($sql, $data)) {
-            return true;
+            return $this->find($user);
         } else {
             throw $this->dbException();
+        }
+    }
+
+    /**
+     * Reset an account password
+     *
+     * @param User $user
+     *
+     * @return \Api\Entity\ResultSet
+     * @throws \Exception
+     */
+    public function resetPassword(User $user)
+    {
+        $user->clean();
+
+        // Check the requested params
+        if (!$user->getEmail() or !$user->getIp()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Check if the user exists
+        $sql = 'SELECT ID_USER, NAME, EMAIL FROM USERS WHERE EMAIL = :email';
+        $res = $this->db->query($sql, [':email' => mb_strtolower($user->getEmail())]);
+        if (!$res or $res->getNumRows() != 1) {
+            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
+        }
+        $user->setIdUser($res->getRows()[0]['ID_USER'])->setName($res->getRows()[0]['NAME']);
+
+        // Check if we already have a non expired or confirmed token with the same change
+        $sql = 'SELECT TOKEN FROM USERS_VALIDATIONS
+                WHERE FK_ID_USER = :id AND EMAIL = :email AND TYPE = :type AND CONFIRMED = 0 AND
+                  CTRL_DATE < SYSDATE() + INTERVAL 1 DAY';
+        $data = [
+            ':id'    => $user->getIdUser(),
+            ':email' => mb_strtolower($user->getEmail()),
+            ':type'  => 'P'
+        ];
+        $res = $this->db->query($sql, $data);
+
+        if ($res->getNumRows() == 0) {
+            // Geolocalize the user
+            /** @var \Api\Entity\User $user */
+            $user = $this->geolocalize($user);
+
+            // Generate validation code
+            $token = md5($user->getIdUser() . $user->getEmail() . time());
+
+            // Insert the validation token
+            $sql = 'INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP)
+                    VALUES (:token, :type, :id, :email, SYSDATE(), :ip)';
+            $data = [
+                ':token' => $token,
+                ':type'  => 'P',
+                ':id'    => $user->getIdUser(),
+                ':email' => mb_strtolower($user->getEmail()),
+                ':ip'    => $user->getIp()
+            ];
+
+            if ($this->db->action($sql, $data)) {
+                return $token;
+            } else {
+                throw $this->dbException();
+            }
+        } else {
+            return $res->getRows()[0]['TOKEN'];
         }
     }
 
