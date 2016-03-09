@@ -4,6 +4,7 @@ namespace Api\Model;
 
 use Api\Entity\ResultSet;
 use Api\Entity\User;
+use Api\Entity\UserIdentity;
 use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
 use Api\Model\General\OAuthRegistry;
@@ -90,10 +91,10 @@ class Accounts
                 $translate->translate('registry_subject', $user->getName()), $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $user);
+                $this->logger->addError('Error sending and email', $user->toArray());
             }
         } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $user);
+            $this->logger->addError('Error sending and email', $user->toArray());
         }
 
         return $user->setIdUser($data['idUser'])->toArray();
@@ -158,10 +159,10 @@ class Accounts
                 $translate->translate('password_subject', $user->getName()), $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $user);
+                $this->logger->addError('Error sending and email', $user->toArray());
             }
         } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $user);
+            $this->logger->addError('Error sending and email', $user->toArray());
         }
     }
 
@@ -194,10 +195,10 @@ class Accounts
                 $translate->translate('verification_subject', $user->getName()), $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $user);
+                $this->logger->addError('Error sending and email', $user->toArray());
             }
         } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $user);
+            $this->logger->addError('Error sending and email', $user->toArray());
         }
     }
 
@@ -245,10 +246,10 @@ class Accounts
                 $translate->translate('verification_subject', $user->getName()), $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $user);
+                $this->logger->addError('Error sending and email', $user->toArray());
             }
         } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $user);
+            $this->logger->addError('Error sending and email', $user->toArray());
         }
     }
 
@@ -290,5 +291,18 @@ class Accounts
     public function getIdentities(User $user)
     {
         return $this->usersRepo->getIdentities($user);
+    }
+
+    /**
+     * Modify or create an identity
+     *
+     * @param UserIdentity $identity
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function saveIdentity(UserIdentity $identity)
+    {
+        return $this->usersRepo->saveIdentity($identity);
     }
 }

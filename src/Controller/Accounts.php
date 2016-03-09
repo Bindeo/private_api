@@ -2,6 +2,7 @@
 
 namespace Api\Controller;
 
+use Api\Entity\UserIdentity;
 use Bindeo\DataModel\Exceptions;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
@@ -224,6 +225,26 @@ class Accounts
         $data = $this->model->getIdentities(new User($request->getParams()));
 
         $res = ['data' => $data->toArray('user_identity'), 'total_pages' => 1];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
+     * Modify or create an identity
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     * @throws \Exception
+     */
+    public function saveIdentity(Request $request, Response $response, $args)
+    {
+        // Populate the user identity object and save it
+        $userIdentity = $this->model->saveIdentity(new UserIdentity($request->getParams()));
+
+        $res = ['data' => ['type' => 'UserIdentity', 'attributes' => $userIdentity]];
 
         return $response->withJson($res, 200);
     }

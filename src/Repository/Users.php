@@ -4,6 +4,7 @@ namespace Api\Repository;
 
 use Api\Entity\ResultSet;
 use Api\Entity\User;
+use Api\Entity\UserIdentity;
 use Bindeo\DataModel\Exceptions;
 use \MaxMind\Db\Reader;
 
@@ -833,9 +834,11 @@ class Users extends RepositoryLocatableAbstract
      */
     public function getIdentities(User $user, $main = false)
     {
+        // Check necessary fields
         if (!$user->getIdUser()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
+        // Create query
         $sql = "SELECT ID_IDENTITY, FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, STATUS
                 FROM USERS_IDENTITIES WHERE FK_ID_USER = :id AND STATUS = 'A'";
         if ($main) {
@@ -852,5 +855,20 @@ class Users extends RepositoryLocatableAbstract
         }
 
         return $data;
+    }
+
+    public function saveIdentity(UserIdentity $identity)
+    {
+        // Check necessary fields
+        if (!$identity->getIdIdentity() or !$identity->getName() or !$identity->getValue() or !$identity->getIp()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Check if the user is confirmed
+        $sql = 'SELECT U.ID_USER, U.CONFIRMED FROM USERS U, USERS_IDENTITIES I
+                WHERE U.ID_USER = I.FK_ID_USER AND I.ID_IDENTITY = :id';
+        $user = $this->db->query($sql, [':id' => $identity->getIdIdentity()]);
+
+
     }
 }

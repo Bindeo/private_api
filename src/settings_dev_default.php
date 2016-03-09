@@ -19,4 +19,5 @@ $settings['settings']['blockchain']['development'] = [
         'user' => '8JXHicdG9N2aaTWatmmneiZxQYSjFtEkeLzxyHTSwYuf'
     ]
 ];
+// http://dev.maxmind.com/geoip/geoip2/geolite2/
 $settings['settings']['maxmind'] = '/usr/local/share/geoIP/GeoLite2-City.mmdb';

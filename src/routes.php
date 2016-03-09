@@ -21,6 +21,7 @@ $app->group('/account', function () {
     $this->get('/token', 'Api\Controller\Accounts:resendToken');
     $this->put('/token', 'Api\Controller\Accounts:validateToken');
     $this->get('/identities', 'Api\Controller\Accounts:getIdentities');
+    $this->put('/identities', 'Api\Controller\Accounts:saveIdentity');
 });
 
 // Users routes
