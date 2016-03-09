@@ -1,4 +1,5 @@
 <?php
+
 return [
     'settings' => [
         'displayErrorDetails' => true,
@@ -27,7 +28,7 @@ return [
 
         // Files
         'files'               => [
-            'development' => [
+            'production' => [
                 'basePath' => '/var/www/files',
                 'baseUrl'  => '/files'
             ]
@@ -35,7 +36,7 @@ return [
 
         // MySQL
         'mysql'               => [
-            'development' => [
+            'production' => [
                 'host'   => 'localhost',
                 'user'   => 'API',
                 'pass'   => 'dd9b15947a493f7ce7067a41f8a3edd1',
@@ -65,14 +66,7 @@ return [
 
         // BlockChain
         'blockchain'          => [
-            'development' => [
-                'bitcoin' => [
-                    'host' => '127.0.0.1',
-                    'port' => 18332,
-                    'user' => '8JXHicdG9N2aaTWatmmneiZxQYSjFtEkeLzxyHTSwYuf'
-                ]
-            ],
-            'production'  => [
+            'production' => [
                 'bitcoin' => [
                     'host' => '127.0.0.1',
                     'port' => 8332,
@@ -80,5 +74,5 @@ return [
                 ]
             ]
         ]
-    ],
+    ]
 ];

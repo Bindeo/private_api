@@ -25,6 +25,11 @@ session_start();
 
 // Instantiate the app
 $settings = require __DIR__ . '/../src/settings.php';
+
+if (ENV == "development") {
+    require __DIR__ . '/../src/settings_dev.php';
+}
+
 $app = new \Slim\App($settings);
 
 // Set up dependencies
