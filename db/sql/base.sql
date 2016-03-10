@@ -24,34 +24,34 @@ DROP TABLE TRANSLATIONS;
 
 # Tables
 
-source /var/www/html/project/api/db/tables/TRANSLATIONS.sql;
-source /var/www/html/project/api/db/tables/FILE_TYPES.sql;
-source /var/www/html/project/api/db/tables/MEDIA_TYPES.sql;
-source /var/www/html/project/api/db/tables/MEDIA_EXTENSIONS.sql;
-source /var/www/html/project/api/db/tables/ACCOUNT_TYPES.sql;
-source /var/www/html/project/api/db/tables/USERS.sql;
-source /var/www/html/project/api/db/tables/USERS_DELETED.sql;
-source /var/www/html/project/api/db/tables/USERS_LOGINS.sql;
-source /var/www/html/project/api/db/tables/USERS_VALIDATIONS.sql;
-source /var/www/html/project/api/db/tables/USERS_TYPES.sql;
-source /var/www/html/project/api/db/tables/USERS_IDENTITIES.sql;
-source /var/www/html/project/api/db/tables/BLOCKCHAIN.sql;
-source /var/www/html/project/api/db/tables/FILES.sql;
-source /var/www/html/project/api/db/tables/FILES_DELETED.sql;
-source /var/www/html/project/api/db/tables/EMAILS.sql;
-source /var/www/html/project/api/db/tables/EMAILS_DELETED.sql;
-source /var/www/html/project/api/db/tables/EMAILS_TO.sql;
+source ../tables/TRANSLATIONS.sql;
+source ../tables/FILE_TYPES.sql;
+source ../tables/MEDIA_TYPES.sql;
+source ../tables/MEDIA_EXTENSIONS.sql;
+source ../tables/ACCOUNT_TYPES.sql;
+source ../tables/USERS.sql;
+source ../tables/USERS_DELETED.sql;
+source ../tables/USERS_LOGINS.sql;
+source ../tables/USERS_VALIDATIONS.sql;
+source ../tables/USERS_TYPES.sql;
+source ../tables/USERS_IDENTITIES.sql;
+source ../tables/BLOCKCHAIN.sql;
+source ../tables/FILES.sql;
+source ../tables/FILES_DELETED.sql;
+source ../tables/EMAILS.sql;
+source ../tables/EMAILS_DELETED.sql;
+source ../tables/EMAILS_TO.sql;
 
 # Triggers
-source /var/www/html/project/api/db/triggers/TGR_BD_USERS.sql;
-source /var/www/html/project/api/db/triggers/TGR_BD_FILES.sql;
-source /var/www/html/project/api/db/triggers/TGR_BD_EMAILS.sql;
+source ../triggers/TGR_BD_USERS.sql;
+source ../triggers/TGR_BD_FILES.sql;
+source ../triggers/TGR_BD_EMAILS.sql;
 
 # Translates
-source /var/www/html/project/api/db/sql/translations.sql;
-source /var/www/html/project/api/db/sql/account_types.sql;
-source /var/www/html/project/api/db/sql/file_types.sql;
-source /var/www/html/project/api/db/sql/media_types.sql;
-source /var/www/html/project/api/db/sql/media_extensions.sql;
+source ../sql/translations.sql;
+source ../sql/account_types.sql;
+source ../sql/file_types.sql;
+source ../sql/media_types.sql;
+source ../sql/media_extensions.sql;
 
 COMMIT;
