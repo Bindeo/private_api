@@ -167,42 +167,6 @@ class Accounts
     }
 
     /**
-     * Modify an email account
-     *
-     * @param User $user
-     *
-     * @throws \Exception
-     */
-    public function modifyEmail(User $user)
-    {
-        // Check data
-        if (!$user->getLang() or !$user->getName() or !$user->getEmail()) {
-            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        }
-
-        // Modify email
-        $token = $this->usersRepo->modifyEmail($user);
-
-        // Send a confirmation
-        $translate = TranslateFactory::factory($user->getLang());
-
-        $response = $this->view->render(new Response(), 'email/verification.html.twig',
-            ['translate' => $translate, 'user' => $user, 'token' => $token]);
-
-        // Send and email
-        try {
-            $res = $this->email->sendEmail($user->getEmail(),
-                $translate->translate('verification_subject', $user->getName()), $response->getBody()->__toString());
-
-            if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $user->toArray());
-            }
-        } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $user->toArray());
-        }
-    }
-
-    /**
      * Modify an account type
      *
      * @param User $user
@@ -298,11 +262,41 @@ class Accounts
      *
      * @param UserIdentity $identity
      *
-     * @return ResultSet
+     * @return array
      * @throws \Exception
      */
     public function saveIdentity(UserIdentity $identity)
     {
-        return $this->usersRepo->saveIdentity($identity);
+        // Save the identity
+        $response = $this->usersRepo->saveIdentity($identity);
+
+        /** @var User $user */
+        $user = $response['user']->setEmail($identity->getValue())->setName($identity->getName());
+
+        // If the email has changed, send the validation email
+        if ($response['token']) {
+            // Send a confirmation
+            $translate = TranslateFactory::factory($user->getLang());
+
+            $response = $this->view->render(new Response(), 'email/verification.html.twig',
+                ['translate' => $translate, 'user' => $user, 'token' => $response['token']]);
+
+            // Send and email
+            try {
+                $res = $this->email->sendEmail($user->getEmail(),
+                    $translate->translate('verification_subject', $user->getName()),
+                    $response->getBody()->__toString());
+
+                if (!$res or $res->http_response_code != 200) {
+                    $this->logger->addError('Error sending and email', $user->toArray());
+                }
+            } catch (\Exception $e) {
+                $this->logger->addError('Error sending and email', $user->toArray());
+            }
+        }
+
+        // Return current user, with changes or without direct changes
+        $user = $this->usersRepo->find($user);
+        return $user ? $user->toArray() : [];
     }
 }

@@ -133,23 +133,6 @@ class Accounts
     }
 
     /**
-     * Modify an account email
-     *
-     * @param Request|\Slim\Http\Request   $request
-     * @param Response|\Slim\Http\Response $response
-     * @param array                        $args [optional]
-     *
-     * @return \Slim\Http\Response
-     */
-    public function modifyEmail(Request $request, Response $response, $args)
-    {
-        // Populate the user object and modify the email
-        $this->model->modifyEmail(new User($request->getParams()));
-
-        return $response->withJson('', 204);
-    }
-
-    /**
      * Validate a token
      *
      * @param Request|\Slim\Http\Request   $request
@@ -241,10 +224,10 @@ class Accounts
      */
     public function saveIdentity(Request $request, Response $response, $args)
     {
-        // Populate the user identity object and save it
-        $userIdentity = $this->model->saveIdentity(new UserIdentity($request->getParams()));
+        // Populate the user object and save it
+        $user = $this->model->saveIdentity(new UserIdentity($request->getParams()));
 
-        $res = ['data' => ['type' => 'UserIdentity', 'attributes' => $userIdentity]];
+        $res = ['data' => ['type' => 'users', 'attributes' => $user]];
 
         return $response->withJson($res, 200);
     }

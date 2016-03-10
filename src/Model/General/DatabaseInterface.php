@@ -2,6 +2,8 @@
 
 namespace Api\Model\General;
 
+use Api\Entity\ResultSet;
+
 interface DatabaseInterface
 {
     /**
@@ -53,7 +55,7 @@ interface DatabaseInterface
      * @param int    $page    [optional] Number of requested page
      * @param int    $numRows [optional] Number of rows per page
      *
-     * @return mixed
+     * @return ResultSet
      */
     public function query($query, $params = null, $class = null, $page = 0, $numRows = 0);
 }

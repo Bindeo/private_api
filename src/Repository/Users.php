@@ -469,74 +469,201 @@ class Users extends RepositoryLocatableAbstract
     }
 
     /**
-     * Modify an account email
+     * Modify or create an identity
      *
-     * @param User $user
+     * @param UserIdentity $identity
      *
-     * @return string
+     * @return array
      * @throws \Exception
      */
-    public function modifyEmail(User $user)
+    public function saveIdentity(UserIdentity $identity)
     {
-        $user->clean();
-
-        // Check data
-        if (!$user->getIdUser() or !$user->getPassword() or !$user->getEmail() or !$user->getIp()) {
+        // Check necessary fields
+        if ((!$identity->getIdIdentity() and !$identity->getIdUser()) or !$identity->getName() or !$identity->getValue() or !$identity->getIp()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // Check if the password is correct
-        $sql = 'SELECT PASSWORD, EMAIL FROM USERS WHERE ID_USER = :id';
-        $oldUser = $this->db->query($sql, [':id' => $user->getIdUser()]);
-        if (!$oldUser or $oldUser->getNumRows() != 1 or !password_verify($user->getPassword(),
-                $oldUser->getRows()[0]['PASSWORD'])
-        ) {
-            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
+        $identity->setValue(mb_strtolower($identity->getValue()))->clean();
+
+        // Check if the user is confirmed
+        $sql = 'SELECT U.ID_USER, U.CONFIRMED, U.EMAIL, U.LANG, I.ID_IDENTITY FROM USERS U, USERS_IDENTITIES I
+                WHERE U.ID_USER = I.FK_ID_USER';
+
+        if ($identity->getIdIdentity()) {
+            $sql .= ' AND I.ID_IDENTITY = :id';
+        } else {
+            $sql .= " AND I.FK_ID_USER = :id AND I.MAIN = 1 AND I.STATUS = 'A'";
+        }
+
+        $res = $this->db->query($sql,
+            [':id' => $identity->getIdIdentity() ? $identity->getIdIdentity() : $identity->getIdUser()]);
+
+        if ($res->getNumRows() != 1) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        } else {
+            // Instantiate the user
+            $identity->setIdIdentity($res->getRows()[0]['ID_IDENTITY']);
+            $user = new User([
+                'idUser'    => $res->getRows()[0]['ID_USER'],
+                'confirmed' => $res->getRows()[0]['CONFIRMED'],
+                'email'     => $res->getRows()[0]['EMAIL'],
+                'lang'      => $res->getRows()[0]['LANG']
+            ]);
+        }
+
+        // Generate empty response
+        $response = ['user' => $user, 'token' => ''];
+        $emailChanged = $user->getEmail() != $identity->getValue();
+
+        if (!$emailChanged and $user->getName() == $identity->getName()) {
+            return $response;
         }
 
         // Check if the new email is already used
         $sql = 'SELECT EMAIL FROM USERS WHERE ID_USER != :id AND EMAIL = :email';
-        $res = $this->db->query($sql, [':id' => $user->getIdUser(), ':email' => $user->getEmail()]);
+        $res = $this->db->query($sql, [':id' => $user->getIdUser(), ':email' => $identity->getValue()]);
         if ($res->getNumRows() > 0) {
             throw new \Exception(Exceptions::DUPLICATED_KEY, 409);
         }
 
-        // Check if we already have a non expired or confirmed token with the same change
-        $sql = 'SELECT TOKEN FROM USERS_VALIDATIONS
-                WHERE FK_ID_USER = :id AND EMAIL = :email AND TYPE = :type AND CONFIRMED = 0 AND
-                  CTRL_DATE < SYSDATE() + INTERVAL 1 DAY';
-        $data = [
-            ':id'    => $user->getIdUser(),
-            ':email' => mb_strtolower($user->getEmail()),
-            ':type'  => 'E'
-        ];
-        $res = $this->db->query($sql, $data);
+        // Begin db transaction
+        $this->db->beginTransaction();
 
-        if ($res->getNumRows() == 0) {
-            // Generate validation code
-            $token = md5($user->getIdUser() . $user->getEmail() . time());
+        // If the user is not confirmed we can update the identity and user profile
+        if (!$user->getConfirmed()) {
+            $sql = "UPDATE USERS_IDENTITIES SET NAME = :name, VALUE = :value, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                    WHERE ID_IDENTITY = :id;
+                    UPDATE USERS SET NAME = :name, EMAIL = :value, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                    WHERE ID_USER = :id_user;
+                    UPDATE USERS_VALIDATIONS SET EMAIL = :value WHERE FK_ID_USER = :id_user AND TYPE = 'V';";
 
-            // Insert the validation token
-            $sql = 'INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP, OLD_EMAIL)
-                    VALUES (:token, :type, :id, :email, SYSDATE(), :ip, :old_email);';
-
-            $data = [
-                ':token'     => $token,
-                ':type'      => 'E',
-                ':id'        => $user->getIdUser(),
-                ':email'     => mb_strtolower($user->getEmail()),
-                ':ip'        => $user->getIp(),
-                ':old_email' => $oldUser->getRows()[0]['EMAIL']
+            $params = [
+                ':id'      => $identity->getIdIdentity(),
+                ':name'    => $identity->getName(),
+                ':value'   => $identity->getValue(),
+                ':ip'      => $identity->getIp(),
+                ':id_user' => $user->getIdUser()
             ];
 
-            if ($this->db->action($sql, $data)) {
-                return $token;
-            } else {
-                throw $this->dbException();
+            // Execute query
+            if (!$this->db->action($sql, $params)) {
+                $this->db->rollBack();
+                throw new \Exception('', 500);
+            }
+
+            // If the email changed, we need to resend the validation token
+            if ($emailChanged) {
+                $sql = "SELECT TOKEN FROM USERS_VALIDATIONS WHERE FK_ID_USER = :id_user AND TYPE = 'V'";
+                $res = $this->db->query($sql, [':id_user' => $user->getIdUser()]);
+
+                if ($res->getNumRows() == 1) {
+                    $response['token'] = $res->getRows()[0]['TOKEN'];
+                }
             }
         } else {
-            return $res->getRows()[0]['TOKEN'];
+            if (!$emailChanged) {
+                // If the email didn't change we can create a new confirmed identity and deprecate the old one
+                $sql = "UPDATE USERS_IDENTITIES SET MAIN = 0, STATUS = 'D', CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                        WHERE ID_IDENTITY = :id;
+                        INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, CTRL_IP, CTRL_DATE)
+                        VALUES (:id_user, 1, 'E', :name, :value, 1, :ip, SYSDATE());
+                        UPDATE USERS SET NAME = :name, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                        WHERE ID_USER = :id_user;";
+                $params = [
+                    ':id'      => $identity->getIdIdentity(),
+                    ':name'    => $identity->getName(),
+                    ':value'   => $user->getEmail(),
+                    ':ip'      => $identity->getIp(),
+                    ':id_user' => $user->getIdUser()
+                ];
+
+                // Execute query
+                if (!$this->db->action($sql, $params)) {
+                    $this->db->rollBack();
+                    throw new \Exception('', 500);
+                }
+            } else {
+                // Check if we already have an unconfirmed identity created
+                $sql = "SELECT ID_IDENTITY FROM USERS_IDENTITIES
+                        WHERE STATUS = 'A' AND TYPE = 'E' AND CONFIRMED = 0 AND FK_ID_USER = :id_user AND
+                          NAME = :name AND VALUE = :value";
+
+                $params = [
+                    ':id_user' => $user->getIdUser(),
+                    ':name'    => $identity->getName(),
+                    ':value'   => $identity->getValue()
+                ];
+                $res = $this->db->query($sql, $params);
+
+                if ($res->getNumRows() > 0) {
+                    // Update the token
+                    $sql = 'UPDATE USERS_VALIDATIONS SET CTRL_DATE = SYSDATE(), CTRL_IP = :ip, CONFIRMED = 0
+                            WHERE FK_ID_USER = :id_user AND NEW_IDENTITY = :id';
+                    $params = [
+                        ':id_user' => $user->getIdUser(),
+                        ':ip'      => $identity->getIp(),
+                        ':id'      => $res->getRows()[0]['ID_IDENTITY']
+                    ];
+                    // Execute query
+                    if (!$this->db->action($sql, $params)) {
+                        $this->db->rollBack();
+                        throw new \Exception('', 500);
+                    }
+
+                    // Resend the token
+                    $sql = 'SELECT TOKEN FROM USERS_VALIDATIONS WHERE FK_ID_USER = :id_user AND NEW_IDENTITY = :id';
+                    $params = [
+                        ':id_user' => $user->getIdUser(),
+                        ':id'      => $res->getRows()[0]['ID_IDENTITY']
+                    ];
+                    $response['token'] = $this->db->query($sql, $params)->getRows()[0]['TOKEN'];
+                } else {
+                    // It doesn't exists, we need to create a new unconfirmed identity and token
+                    // Generate validation code as response
+                    $response['token'] = md5($user->getIdUser() . $identity->getValue() . time());
+
+                    // Create the identity
+                    $sql = "INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, CTRL_IP, CTRL_DATE)
+                            VALUES (:id_user, 0, 'E', :name, :value, 0, :ip, SYSDATE());";
+                    $params = [
+                        ':name'    => $identity->getName(),
+                        ':value'   => $identity->getValue(),
+                        ':ip'      => $identity->getIp(),
+                        ':id_user' => $user->getIdUser()
+                    ];
+
+                    // Execute query
+                    if (!$this->db->action($sql, $params)) {
+                        $this->db->rollBack();
+                        throw new \Exception('', 500);
+                    }
+
+                    // Create the token
+                    $sql = "INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP, NEW_IDENTITY, OLD_IDENTITY)
+                            VALUES (:token, 'E', :id_user, :value, SYSDATE(), :ip, :new_id, :old_id)";
+
+                    $params = [
+                        ':token'   => $response['token'],
+                        ':value'   => $identity->getValue(),
+                        ':ip'      => $identity->getIp(),
+                        ':id_user' => $user->getIdUser(),
+                        ':new_id'  => $this->db->lastInsertId(),
+                        ':old_id'  => $identity->getIdIdentity()
+                    ];
+
+                    // Execute query
+                    if (!$this->db->action($sql, $params)) {
+                        $this->db->rollBack();
+                        throw new \Exception('', 500);
+                    }
+                }
+            }
         }
+
+        // Commit the transaction
+        $this->db->commit();
+
+        return $response;
     }
 
     /**
@@ -583,7 +710,7 @@ class Users extends RepositoryLocatableAbstract
     public function validateToken($token, $ip, $password = null)
     {
         // Retrieve the token information if is still valid
-        $sql = "SELECT V.TOKEN, V.TYPE, V.FK_ID_USER, V.EMAIL, V.OLD_EMAIL, U.CONFIRMED, U.NAME
+        $sql = "SELECT V.TOKEN, V.TYPE, V.FK_ID_USER, V.EMAIL, V.OLD_IDENTITY, V.NEW_IDENTITY, U.CONFIRMED, U.NAME
                 FROM USERS_VALIDATIONS V, USERS U
                 WHERE U.ID_USER = V.FK_ID_USER AND V.TOKEN = :token AND V.CONFIRMED = 0 AND
                   (V.TYPE = 'V' OR V.CTRL_DATE < SYSDATE() + INTERVAL 1 DAY)";
@@ -606,7 +733,7 @@ class Users extends RepositoryLocatableAbstract
         $sql = 'UPDATE USERS_VALIDATIONS SET CONFIRMED = 1 WHERE TOKEN = :token';
         $this->db->action($sql, ['token' => $token]);
 
-        if ($res['TYPE'] == 'V') {
+        if ($res['TYPE'] == 'V' or $res['TYPE'] == 'E' and $res['CONFIRMED'] != 1) {
             // Initial account validation
             $sql = "UPDATE USERS SET CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
                     LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
@@ -622,42 +749,40 @@ class Users extends RepositoryLocatableAbstract
                 ':id_geonames' => $user->getIdGeonames()
             ];
         } elseif ($res['TYPE'] == 'E') {
-            // If the user is not confirmed, we will change the identity email, otherwise we create a new identity and deprecate the old one
-            $params = [
-                ':id'        => $user->getIdUser(),
-                ':old_email' => $res['OLD_EMAIL'],
-                ':email'     => $user->getEmail(),
-                ':ip'        => $user->getIp()
-            ];
-
-            if ($res['CONFIRMED'] == 1) {
-                // Get the main status of replaced field
-                $sql = "SELECT COUNT(*) MAIN FROM USERS_IDENTITIES WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :old_email AND STATUS = 'A' AND MAIN = 1";
-                $params[':main'] = $this->db->query($sql,
-                    [':id' => $user->getIdUser(), ':old_email' => $res['OLD_EMAIL']])->getRows()[0]['MAIN'];
-
-                $sql = "UPDATE USERS_IDENTITIES SET STATUS = 'D', MAIN = 0, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
-                        WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :old_email;
-                        INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, CTRL_IP, CTRL_DATE)
-                        VALUES (:id, :main, 'E', :name, :email, 1, :ip, SYSDATE());";
-            } else {
-                $sql = "UPDATE USERS_IDENTITIES SET VALUE = :email, CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
-                        WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :old_email";
+            // Check if the email is still free
+            $sql = 'SELECT EMAIL FROM USERS WHERE ID_USER != :id AND EMAIL = :email';
+            $exists = $this->db->query($sql, [':id' => $user->getIdUser(), ':email' => $user->getEmail()]);
+            if ($exists->getNumRows() > 0) {
+                throw new \Exception(Exceptions::DUPLICATED_KEY, 409);
             }
-            $this->db->action($sql, $params);
 
-            // Confirm the email change
-            $sql = 'UPDATE USERS SET CONFIRMED = 1, EMAIL = :email, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
-                    LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
-                    WHERE ID_USER = :id';
+            // We confirm the identity represented by the token
             $params = [
                 ':id'          => $user->getIdUser(),
+                ':new_id'      => $res['NEW_IDENTITY'],
+                ':old_id'      => $res['OLD_IDENTITY'],
                 ':email'       => $user->getEmail(),
                 ':ip'          => $user->getIp(),
                 ':latitude'    => $user->getLatitude(),
                 ':longitude'   => $user->getLongitude(),
                 ':id_geonames' => $user->getIdGeonames()
             ];
+
+            // Get the main status of replaced field
+            $sql = "SELECT COUNT(*) MAIN FROM USERS_IDENTITIES
+                    WHERE FK_ID_USER = :id AND TYPE = 'E' AND ID_IDENTITY = :id_old AND STATUS = 'A' AND MAIN = 1";
+            $params[':main'] = $this->db->query($sql, [':id' => $user->getIdUser(), ':id_old' => $res['OLD_IDENTITY']])
+                                        ->getRows()[0]['MAIN'];
+
+            // Confirm changes
+            $sql = "UPDATE USERS_IDENTITIES SET STATUS = 'D', MAIN = 0, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
+                    WHERE FK_ID_USER = :id AND TYPE = 'E' AND ID_IDENTITY = :old_id;
+                    UPDATE USERS_IDENTITIES SET MAIN = :main, CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
+                    WHERE FK_ID_USER = :id AND TYPE = 'E' AND ID_IDENTITY = :new_id;
+                    UPDATE USERS SET CONFIRMED = 1, EMAIL = :email, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
+                    LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude,
+                    NAME = (SELECT NAME FROM USERS_IDENTITIES WHERE ID_IDENTITY = :new_id)
+                    WHERE ID_USER = :id;";
         } elseif ($res['TYPE'] == 'P' and $password) {
             // Password recovery
             $sql = 'UPDATE USERS SET CONFIRMED = 1, PASSWORD = :password, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
@@ -677,7 +802,7 @@ class Users extends RepositoryLocatableAbstract
 
         // Execute query
         if ($this->db->action($sql, $params)) {
-            return $user;
+            return $this->find($user);
         } else {
             throw $this->dbException();
         }
@@ -855,20 +980,5 @@ class Users extends RepositoryLocatableAbstract
         }
 
         return $data;
-    }
-
-    public function saveIdentity(UserIdentity $identity)
-    {
-        // Check necessary fields
-        if (!$identity->getIdIdentity() or !$identity->getName() or !$identity->getValue() or !$identity->getIp()) {
-            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        }
-
-        // Check if the user is confirmed
-        $sql = 'SELECT U.ID_USER, U.CONFIRMED FROM USERS U, USERS_IDENTITIES I
-                WHERE U.ID_USER = I.FK_ID_USER AND I.ID_IDENTITY = :id';
-        $user = $this->db->query($sql, [':id' => $identity->getIdIdentity()]);
-
-
     }
 }
