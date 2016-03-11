@@ -37,9 +37,9 @@ return [
         // MySQL
         'mysql'               => [
             'production' => [
-                'host'   => 'localhost',
+                'host'   => 'mysql.bindeo.com',
                 'user'   => 'API',
-                'pass'   => 'dd9b15947a493f7ce7067a41f8a3edd1',
+                'pass'   => 'a1607b03e86453ebaf35bec81b4194ae',
                 'scheme' => 'API'
             ]
         ],
@@ -61,7 +61,7 @@ return [
             ]
         ],
 
-        // Maxmind
+        // Maxmind - http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz
         'maxmind'             => '/usr/local/share/geoIP/GeoLite2-City.mmdb',
 
         // BlockChain
