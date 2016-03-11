@@ -40,16 +40,20 @@ class Accounts
      */
     private $view;
 
+    private $frontUrls;
+
     public function __construct(
         RepositoryAbstract $usersRepo,
         LoggerInterface $logger,
         EmailInterface $email,
-        Twig $view
+        Twig $view,
+        array $frontUrls
     ) {
         $this->usersRepo = $usersRepo;
         $this->logger = $logger;
         $this->email = $email;
         $this->view = $view;
+        $this->frontUrls = $frontUrls;
     }
 
     /**
@@ -82,8 +86,11 @@ class Accounts
 
         $translate = TranslateFactory::factory($user->getLang());
 
+        $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.'
+                : '') . 'www.bindeo.com/user/validate';
+
         $response = $this->view->render(new Response(), 'email/registry.html.twig',
-            ['translate' => $translate, 'user' => $user, 'token' => $data['token']]);
+            ['translate' => $translate, 'user' => $user, 'token' => $data['token'], 'url' => $url]);
 
         // Send and email
         try {
@@ -150,8 +157,11 @@ class Accounts
         // Render the email template
         $translate = TranslateFactory::factory($user->getLang());
 
+        $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.'
+                : '') . 'www.bindeo.com/user/validate';
+
         $response = $this->view->render(new Response(), 'email/password-reset.html.twig',
-            ['translate' => $translate, 'user' => $user, 'token' => $token]);
+            ['translate' => $translate, 'user' => $user, 'token' => $token, 'url' => $url]);
 
         // Send and email
         try {
@@ -201,8 +211,11 @@ class Accounts
         // Send a confirmation
         $translate = TranslateFactory::factory($user->getLang());
 
+        $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.'
+                : '') . 'www.bindeo.com/user/validate';
+
         $response = $this->view->render(new Response(), 'email/verification.html.twig',
-            ['translate' => $translate, 'user' => $user, 'token' => $token]);
+            ['translate' => $translate, 'user' => $user, 'token' => $token, 'url' => $url]);
 
         // Send and email
         try {
@@ -278,8 +291,11 @@ class Accounts
             // Send a confirmation
             $translate = TranslateFactory::factory($user->getLang());
 
+            $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.'
+                    : '') . 'www.bindeo.com/user/validate';
+
             $response = $this->view->render(new Response(), 'email/verification.html.twig',
-                ['translate' => $translate, 'user' => $user, 'token' => $response['token']]);
+                ['translate' => $translate, 'user' => $user, 'token' => $response['token'], 'url' => $url]);
 
             // Send and email
             try {
@@ -297,6 +313,7 @@ class Accounts
 
         // Return current user, with changes or without direct changes
         $user = $this->usersRepo->find($user);
+
         return $user ? $user->toArray() : [];
     }
 }

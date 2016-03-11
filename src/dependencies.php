@@ -97,7 +97,7 @@ $container['Api\Repository\StoreData'] = function ($c) {
 // Models
 $container['Api\Model\Accounts'] = function ($c) {
     return new Api\Model\Accounts($c->get('Api\Repository\Users'), $c->get('logger'), $c->get('Api\Model\Email\Email'),
-        $c->get('view'));
+        $c->get('view'), $c->get('settings')['front_urls']);
 };
 
 $container['Api\Model\StoreData'] = function ($c) {

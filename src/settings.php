@@ -53,7 +53,7 @@ return [
                     'key'    => 'key-7068eebbe6808e44b7816aa7b88ba21a',
                     'from'   => 'mail@bindeo.com'
                 ],
-                'production'  => [
+                'production' => [
                     'domain' => 'mg.bindeo.com',
                     'key'    => 'key-7068eebbe6808e44b7816aa7b88ba21a',
                     'from'   => 'mail@bindeo.com'
@@ -73,6 +73,12 @@ return [
                     'user' => '8JXHicdG9N2aaTWatmmneiZxQYSjFtEkeLzxyHTSwYuf'
                 ]
             ]
+        ],
+
+        // Host and front urls for emails
+        'front_urls'          => [
+            'host'             => 'http://',
+            'validation_token' => 'www.bindeo.com/user/validate'
         ]
     ]
 ];
