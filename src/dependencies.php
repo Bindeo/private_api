@@ -64,8 +64,11 @@ $container['Api\Model\General\Database'] = function ($c) {
             return null;
         }
         $params = $c->get('settings')['mysql'][ENV];
-
-        $database->connect($params["host"], $params["user"], $params["pass"], $params["scheme"]);
+        try {
+            $database->connect($params["host"], $params["user"], $params["pass"], $params["scheme"]);
+        } catch(\Exception $e) {
+            throw new \Exception('Database not connected', 503);
+        }
     }
 
     return $database;
