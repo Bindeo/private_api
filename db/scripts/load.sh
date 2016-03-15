@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-mysql -u ivelasco -p API < ../sql/$1
+mysql -u ivelasco -p API < ../sqls/$1

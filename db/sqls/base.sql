@@ -48,10 +48,10 @@ source ../triggers/TGR_BD_FILES.sql;
 source ../triggers/TGR_BD_EMAILS.sql;
 
 # Translates
-source ../sql/translations.sql;
-source ../sql/account_types.sql;
-source ../sql/file_types.sql;
-source ../sql/media_types.sql;
-source ../sql/media_extensions.sql;
+source ../sqls/translations.sql;
+source ../sqls/account_types.sql;
+source ../sqls/file_types.sql;
+source ../sqls/media_types.sql;
+source ../sqls/media_extensions.sql;
 
 COMMIT;

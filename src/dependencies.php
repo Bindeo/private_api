@@ -45,12 +45,12 @@ $container['MaxMind\Db\Reader'] = function ($c) {
 
 // BlockChain
 $container['Api\Lib\BlockChain\BlockChain'] = function ($c) {
-    \Api\Lib\BlockChain\BlockChain::setConf($c->get('settings')['blockchain'][ENV]);
+    \Api\Lib\BlockChain\BlockChain::setConf($c->get('settings')['blockchain']);
 };
 
 // Files
 $container['Api\Model\General\FilesStorage'] = function ($c) {
-    $settings = $c->get('settings')['files'][ENV];
+    $settings = $c->get('settings')['files'];
 
     return new \Api\Model\General\FilesStorage($c->get('logger'), $settings['basePath'], $settings['baseUrl']);
 };
@@ -60,10 +60,10 @@ $container['Api\Model\General\Database'] = function ($c) {
     $database = \Api\Model\General\MySQL::getInstance();
 
     if (!$database->isConnected()) {
-        if (!isset($c->get('settings')['mysql'][ENV])) {
+        if (!isset($c->get('settings')['mysql'])) {
             return null;
         }
-        $params = $c->get('settings')['mysql'][ENV];
+        $params = $c->get('settings')['mysql'];
         try {
             $database->connect($params["host"], $params["user"], $params["pass"], $params["scheme"]);
         } catch(\Exception $e) {
@@ -78,7 +78,7 @@ $container['Api\Model\General\Database'] = function ($c) {
 $container['Api\Model\Email\Email'] = function ($c) {
     $conf = $c->get('settings')['email'];
 
-    return \Api\Model\Email\EmailManager::factory($conf['current'], $conf[$conf['current']][ENV]);
+    return \Api\Model\Email\EmailManager::factory($conf['current'], $conf[$conf['current']]);
 };
 
 // Repositories

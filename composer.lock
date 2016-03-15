@@ -285,16 +285,16 @@
         },
         {
             "name": "monolog/monolog",
-            "version": "1.18.0",
+            "version": "1.18.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Seldaek/monolog.git",
-                "reference": "e19b764b5c855580e8ffa7e615f72c10fd2f99cc"
+                "reference": "a5f2734e8c16f3aa21b3da09715d10e15b4d2d45"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Seldaek/monolog/zipball/e19b764b5c855580e8ffa7e615f72c10fd2f99cc",
-                "reference": "e19b764b5c855580e8ffa7e615f72c10fd2f99cc",
+                "url": "https://api.github.com/repos/Seldaek/monolog/zipball/a5f2734e8c16f3aa21b3da09715d10e15b4d2d45",
+                "reference": "a5f2734e8c16f3aa21b3da09715d10e15b4d2d45",
                 "shasum": ""
             },
             "require": {
@@ -359,7 +359,7 @@
                 "logging",
                 "psr-3"
             ],
-            "time": "2016-03-01 18:00:40"
+            "time": "2016-03-13 16:08:35"
         },
         {
             "name": "nikic/fast-route",
@@ -583,16 +583,16 @@
         },
         {
             "name": "slim/slim",
-            "version": "3.2.2",
+            "version": "3.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/slimphp/Slim.git",
-                "reference": "1d99b8846c784d885201b2b709bfedb63656ed30"
+                "reference": "939f2e85d57508de9cff241d10091cd972f221c3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/slimphp/Slim/zipball/1d99b8846c784d885201b2b709bfedb63656ed30",
-                "reference": "1d99b8846c784d885201b2b709bfedb63656ed30",
+                "url": "https://api.github.com/repos/slimphp/Slim/zipball/939f2e85d57508de9cff241d10091cd972f221c3",
+                "reference": "939f2e85d57508de9cff241d10091cd972f221c3",
                 "shasum": ""
             },
             "require": {
@@ -646,20 +646,20 @@
                 "micro",
                 "router"
             ],
-            "time": "2016-03-05 19:36:16"
+            "time": "2016-03-10 21:37:40"
         },
         {
             "name": "slim/twig-view",
-            "version": "2.1.0",
+            "version": "2.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/slimphp/Twig-View.git",
-                "reference": "65bb8dfed1d4d24e168228ce49fc4df9828b7214"
+                "reference": "16fded26a44b8e8e0e041f1cff32afa21daeb284"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/slimphp/Twig-View/zipball/65bb8dfed1d4d24e168228ce49fc4df9828b7214",
-                "reference": "65bb8dfed1d4d24e168228ce49fc4df9828b7214",
+                "url": "https://api.github.com/repos/slimphp/Twig-View/zipball/16fded26a44b8e8e0e041f1cff32afa21daeb284",
+                "reference": "16fded26a44b8e8e0e041f1cff32afa21daeb284",
                 "shasum": ""
             },
             "require": {
@@ -696,7 +696,7 @@
                 "twig",
                 "view"
             ],
-            "time": "2016-03-07 10:28:09"
+            "time": "2016-03-13 20:58:41"
         },
         {
             "name": "twig/twig",
