@@ -3,7 +3,7 @@
 namespace Api\Model\General;
 
 use Bindeo\DataModel\Exceptions;
-use Bindeo\DataModel\FileAbstract;
+use Bindeo\DataModel\StorableFileInterface;
 use Psr\Log\LoggerInterface;
 
 class FilesStorage implements FilesInterface
@@ -42,15 +42,14 @@ class FilesStorage implements FilesInterface
     /**
      * Save the file
      *
-     * @param FileAbstract $file
+     * @param StorableFileInterface $file
      *
-     * @return string
      * @throws \Exception
      */
-    public function save(FileAbstract $file)
+    public function save(StorableFileInterface $file)
     {
         // Get the subpath based on the id
-        $path = $this->createPath($file->getIdUser());
+        $path = $this->createPath($file);
         // Generate a file name with the uploaded extension
         $ext = [];
         $ext = preg_match('/\.[a-zA-Z]+$/', $file->getFileOrigName(), $ext) ? strtolower($ext[0]) : '';
@@ -63,49 +62,44 @@ class FilesStorage implements FilesInterface
         }
 
         $file->setFileName($name);
-
-        return $name;
     }
 
     /**
      * Get the file
      *
-     * @param int    $idClient
-     * @param string $name
+     * @param StorableFileInterface $file
      *
      * @return string public path
      */
-    public function get($idClient, $name)
+    public function get(StorableFileInterface $file)
     {
         // Get the subpath
-        return $this->baseUrl . $this->getSubPath($idClient) . '/' . $name;
+        return $this->baseUrl . $this->getSubPath($file) . '/' . $file->getFileName();
     }
 
     /**
      * Get the file hash
      *
-     * @param int    $idClient
-     * @param string $name
+     * @param StorableFileInterface $file
      *
      * @return string hash code
      */
-    public function getHash($idClient, $name)
+    public function getHash(StorableFileInterface $file)
     {
         // Get the subpath
-        return hash_file('sha256', $this->basePath . $this->getSubPath($idClient) . '/' . $name);
+        return hash_file('sha256', $this->basePath . $this->getSubPath($file) . '/' . $file->getFileName());
     }
 
     /**
      * Delete a file
      *
-     * @param int    $idClient
-     * @param string $name
+     * @param StorableFileInterface $file
      *
      * @return bool
      */
-    public function delete($idClient, $name)
+    public function delete(StorableFileInterface $file)
     {
-        $file = $this->basePath . $this->getSubPath($idClient) . '/' . $name;
+        $file = $this->basePath . $this->getSubPath($file) . '/' . $file->getFileName();
 
         return unlink($file);
     }
@@ -114,13 +108,14 @@ class FilesStorage implements FilesInterface
      * Generate the subpath based on the received id, fragmenting it into small pieces.
      * Example: for a given 1129 id and chunking value of 2 the result will be /29/11
      *
-     * @param string $id Id number
+     * @param StorableFileInterface $file
      *
      * @return string $subPath
      */
-    private function getSubPath($id)
+    private function getSubPath(StorableFileInterface $file)
     {
-        $path = '';
+        $path = ($file->getStorageType() == 'bulk' ? '/bulk' : '');
+        $id = $file->getIdUser();
         // Generate necessary folders
         do {
             // We take the last chunking value digits, if we have less digits we prefix it with 0
@@ -139,19 +134,19 @@ class FilesStorage implements FilesInterface
     /**
      * Create the subpath based on the received id
      *
-     * @param int $id
+     * @param StorableFileInterface $file
      *
      * @return string
      * @throws \Exception
      */
-    private function createPath($id)
+    private function createPath(StorableFileInterface $file)
     {
         if (!is_dir($this->basePath)) {
             throw new \Exception('', 500);
         }
 
         // Generate the path
-        $path = $this->basePath . $this->getSubPath($id);
+        $path = $this->basePath . $this->getSubPath($file);
 
         // If the path doesn't exist we create it
         if (!is_dir($path) and !mkdir($path, 0777, true)) {

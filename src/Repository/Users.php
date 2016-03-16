@@ -35,8 +35,7 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Geolocalize the user
-        /** @var User $user */
-        $user = $this->geolocalize($user);
+        $this->geolocalize($user);
 
         // The user hasn't paid yet, we change him to free user
         $sql = 'UPDATE USERS_TYPES SET DATE_END = SYSDATE() WHERE FK_ID_USER = :id AND DATE_END IS NULL;
@@ -219,8 +218,7 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Geolocalize the user
-        /** @var User $user */
-        $user = $this->geolocalize($user);
+        $this->geolocalize($user);
 
         $this->db->beginTransaction();
         // Prepare query and mandatory data
@@ -299,8 +297,7 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Geolocalize the user
-        /** @var User $user */
-        $user = $this->geolocalize($user);
+        $this->geolocalize($user);
 
         // Prepare query and data
         $sql = 'UPDATE USERS SET CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(), LANG = :lang,
@@ -351,8 +348,7 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Geolocalize the user
-        /** @var \Api\Entity\User $user */
-        $user = $this->geolocalize($user);
+        $this->geolocalize($user);
 
         // Prepare query and data
         $sql = 'UPDATE USERS SET PASSWORD = :password, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(),
@@ -414,8 +410,7 @@ class Users extends RepositoryLocatableAbstract
 
         if ($res->getNumRows() == 0) {
             // Geolocalize the user
-            /** @var \Api\Entity\User $user */
-            $user = $this->geolocalize($user);
+            $this->geolocalize($user);
 
             // Generate validation code
             $token = md5($user->getIdUser() . $user->getEmail() . time());
@@ -722,12 +717,12 @@ class Users extends RepositoryLocatableAbstract
         $res = $res->getRows()[0];
 
         // Geolocalize the user
-        /** @var User $user */
-        $user = $this->geolocalize(new User([
+        $user = new User([
             'id_user' => $res['FK_ID_USER'],
             'email'   => $res['EMAIL'],
             'ip'      => $ip
-        ]));
+        ]);
+        $this->geolocalize($user);
 
         // Process the token
         $sql = 'UPDATE USERS_VALIDATIONS SET CONFIRMED = 1 WHERE TOKEN = :token';
@@ -856,7 +851,7 @@ class Users extends RepositoryLocatableAbstract
         $userAux->setPassword(null)->setRenew(null);
 
         // Geolocalize the user
-        $userAux = $this->geolocalize($userAux);
+        $this->geolocalize($userAux);
 
         // Login is successful, record tracking data
         $this->db->beginTransaction();
@@ -915,8 +910,7 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Geolocalize the user
-        /** @var User $user */
-        $user = $this->geolocalize($user);
+        $this->geolocalize($user);
 
         $this->db->beginTransaction();
         $sql = 'UPDATE USERS SET CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(), LAST_ID_GEONAMES = :id_geonames,

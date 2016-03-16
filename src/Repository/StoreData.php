@@ -70,9 +70,8 @@ class StoreData extends RepositoryLocatableAbstract
     /**
      * Create a new file
      *
-     * @param \Api\Entity\File $file
+     * @param File $file
      *
-     * @return array
      * @throws \Exception
      */
     public function createFile(File $file)
@@ -95,9 +94,8 @@ class StoreData extends RepositoryLocatableAbstract
             // TODO Insert into the db logger
         }
 
-        // Geolocalize the user
-        /** @var \Api\Entity\File $file */
-        $file = $this->geolocalize($file);
+        // Geolocalize the file
+        $this->geolocalize($file);
 
         $this->db->beginTransaction();
         // Prepare query and mandatory data
@@ -127,10 +125,8 @@ class StoreData extends RepositoryLocatableAbstract
         // Execute query
         $this->db->action($sql, $data);
         if (!$this->db->getError()) {
-            $id = $this->db->lastInsertId();
+            $file->setIdFile($this->db->lastInsertId());
             $this->db->commit();
-
-            return $id;
         } else {
             $this->db->rollBack();
             throw $this->dbException();
@@ -140,9 +136,9 @@ class StoreData extends RepositoryLocatableAbstract
     /**
      * Delete a file o send it to trash
      *
-     * @param \Api\Entity\File $file
+     * @param File $file
      *
-     * @return \Api\Entity\File
+     * @return File
      * @throws \Exception
      */
     public function deleteFile(File $file)
@@ -258,7 +254,7 @@ class StoreData extends RepositoryLocatableAbstract
 
         $sql = "SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE, CTRL_DATE,
                   TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE
-                FROM ".$from." WHERE FK_ID_USER = :id_user" . $where . " AND STATUS = :status ORDER BY " . $order;
+                FROM " . $from . " WHERE FK_ID_USER = :id_user" . $where . " AND STATUS = :status ORDER BY " . $order;
 
         return $this->db->query($sql, $data, 'Api\Entity\File', $filter->getPage(), $filter->getNumRows());
     }
@@ -274,14 +270,13 @@ class StoreData extends RepositoryLocatableAbstract
     public function signAsset(BlockChain $blockchain)
     {
         if (!$blockchain->getIdElement() or !$blockchain->getIdUser() or !$blockchain->getIp() or !$blockchain->getNet() or !$blockchain->getTransaction() or !$blockchain->getHash() or !$blockchain->getJsonData() or !in_array($blockchain->getType(),
-                ['F', 'T'])
+                ['F', 'T', 'B'])
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // Geolocalize the $blockChain
-        /** @var \Api\Entity\BlockChain $blockchain */
-        $blockchain = $this->geolocalize($blockchain);
+        $this->geolocalize($blockchain);
 
         $this->db->beginTransaction();
         // Insert the transaction
@@ -310,6 +305,8 @@ class StoreData extends RepositoryLocatableAbstract
                 $sql = 'UPDATE FILES SET HASH = :hash, TRANSACTION = :txid WHERE ID_FILE = :id';
             } elseif ($blockchain->getType() == 'F') {
                 $sql = 'UPDATE EMAILS SET HASH = :hash, TRANSACTION = :txid WHERE ID_EMAIL = :id';
+            } elseif ($blockchain->getType() == 'B') {
+                $sql = 'UPDATE BULK_TRANSACTION SET HASH = :hash, TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
             }
             $data = [
                 ':id'   => $blockchain->getIdElement(),

@@ -65,7 +65,7 @@ class StoreData
 
         if ($file) {
             // Get the public path
-            $file->setPath($this->storage->get($file->getIdUser(), $file->getName()));
+            $file->setPath($this->storage->get($file));
 
             // Convert the object into an array
             $file = $file->toArray();
@@ -104,27 +104,27 @@ class StoreData
 
         // Storage the file in our file system
         try {
-            $name = $this->storage->save($file);
+            $this->storage->save($file);
         } catch (\Exception $e) {
             throw new \Exception('', 500);
         }
 
         // Hash the file
-        $file->setHash($this->storage->getHash($file->getIdUser(), $name));
+        $file->setHash($this->storage->getHash($file));
 
         // Calculate the media type
         $file->setIdMedia($this->dataRepo->calculateMediaType($file));
 
         // Save the file registry
         try {
-            $id = $this->dataRepo->createFile($file);
+            $this->dataRepo->createFile($file);
         } catch (\Exception $e) {
             // Remove the uploaded file
-            $this->storage->delete($file->getIdUser(), $file->getFileName());
+            $this->storage->delete($file);
             throw $e;
         }
 
-        return $this->getFile($file->setIdFile($id));
+        return $this->getFile($file);
     }
 
     /**
@@ -140,7 +140,7 @@ class StoreData
         if ($oldFile = $this->dataRepo->deleteFile($file)) {
             // Delete the file if it has been completely deleted
             if ($file->getStatus() == 'D') {
-                $this->storage->delete($oldFile->getIdUser(), $oldFile->getFileName());
+                $this->storage->delete($oldFile);
             }
         }
     }
@@ -187,7 +187,7 @@ class StoreData
         }
 
         // Check if the stored hash is correct
-        $hash = $this->storage->getHash($file->getIdUser(), $file->getFileName());
+        $hash = $this->storage->getHash($file);
         if ($hash != $file->getHash()) {
             // We need to store the new hash after sign the file
             $this->logger->addNotice('Hash Incongruence', $file->toArray());

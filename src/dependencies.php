@@ -66,7 +66,7 @@ $container['Api\Model\General\Database'] = function ($c) {
         $params = $c->get('settings')['mysql'];
         try {
             $database->connect($params["host"], $params["user"], $params["pass"], $params["scheme"]);
-        } catch(\Exception $e) {
+        } catch (\Exception $e) {
             throw new \Exception('Database not connected', 503);
         }
     }
@@ -94,6 +94,10 @@ $container['Api\Repository\StoreData'] = function ($c) {
     return new Api\Repository\StoreData($c->get('Api\Model\General\Database'), $c->get('MaxMind\Db\Reader'));
 };
 
+$container['Api\Repository\BulkTransactions'] = function ($c) {
+    return new Api\Repository\BulkTransactions($c->get('Api\Model\General\Database'), $c->get('MaxMind\Db\Reader'));
+};
+
 // Models
 $container['Api\Model\Accounts'] = function ($c) {
     return new Api\Model\Accounts($c->get('Api\Repository\Users'), $c->get('logger'), $c->get('Api\Model\Email\Email'),
@@ -105,6 +109,13 @@ $container['Api\Model\StoreData'] = function ($c) {
 
     return new Api\Model\StoreData($c->get('Api\Repository\StoreData'), $c->get('Api\Repository\Users'),
         $c->get('Api\Model\General\FilesStorage'), $c->get('logger'));
+};
+
+$container['Api\Model\BulkTransactions'] = function ($c) {
+    $c->get('Api\Lib\BlockChain\BlockChain');
+
+    return new Api\Model\BulkTransactions($c->get('Api\Repository\BulkTransactions'),
+        $c->get('Api\Repository\StoreData'), $c->get('Api\Model\General\FilesStorage'), $c->get('logger'));
 };
 
 // Controllers
@@ -122,4 +133,8 @@ $container['Api\Controller\Users'] = function ($c) {
 
 $container['Api\Controller\StoreData'] = function ($c) {
     return new Api\Controller\StoreData($c->get('Api\Model\StoreData'));
+};
+
+$container['Api\Controller\BulkTransactions'] = function ($c) {
+    return new Api\Controller\BulkTransactions($c->get('Api\Model\BulkTransactions'));
 };

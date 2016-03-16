@@ -41,4 +41,9 @@ $app->group('/data', function () {
     $this->get('/blockchain/test', 'Api\Controller\StoreData:testAsset');
 });
 
+// Edu routes
+$app->group('/bulk', function() {
+    $this->post('', 'Api\Controller\BulkTransactions:createBulk');
+});
+
 //$app->get('/tests', 'Api\Controller\StoreData:tests');

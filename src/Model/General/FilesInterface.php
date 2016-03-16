@@ -2,7 +2,7 @@
 
 namespace Api\Model\General;
 
-use Bindeo\DataModel\FileAbstract;
+use Bindeo\DataModel\StorableFileInterface;
 use Psr\Log\LoggerInterface;
 
 interface FilesInterface
@@ -12,39 +12,34 @@ interface FilesInterface
     /**
      * Save the file
      *
-     * @param FileAbstract $file
-     *
-     * @return string file name
+     * @param StorableFileInterface $file
      */
-    public function save(FileAbstract $file);
+    public function save(StorableFileInterface $file);
 
     /**
      * Get the file
      *
-     * @param int    $idClient
-     * @param string $name
+     * @param StorableFileInterface $file
      *
      * @return string full path
      */
-    public function get($idClient, $name);
+    public function get(StorableFileInterface $file);
 
     /**
      * Get the file hash
      *
-     * @param int    $idClient
-     * @param string $name
+     * @param StorableFileInterface $file
      *
      * @return string hash code
      */
-    public function getHash($idClient, $name);
+    public function getHash(StorableFileInterface $file);
 
     /**
      * Delete a file
      *
-     * @param int    $idClient
-     * @param string $name
+     * @param StorableFileInterface $file
      *
      * @return bool
      */
-    public function delete($idClient, $name);
+    public function delete(StorableFileInterface $file);
 }

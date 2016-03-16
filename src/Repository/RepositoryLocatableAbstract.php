@@ -23,8 +23,6 @@ abstract class RepositoryLocatableAbstract extends RepositoryAbstract
      * Geolocalize a data model
      *
      * @param \Bindeo\DataModel\LocatableInterface $model
-     *
-     * @return LocatableInterface
      */
     protected function geolocalize(LocatableInterface $model)
     {
@@ -41,7 +39,5 @@ abstract class RepositoryLocatableAbstract extends RepositoryAbstract
             $model->setIdGeonames(isset($geoip['location']['geoname_id']) ? $geoip['location']['geoname_id']
                 : $geoip['country']['geoname_id']);
         }
-
-        return $model;
     }
 }
