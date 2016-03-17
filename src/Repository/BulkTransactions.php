@@ -115,9 +115,9 @@ class BulkTransactions extends RepositoryLocatableAbstract
         $sql = 'UPDATE BULK_TRANSACTION SET STRUCTURE = :structure, HASH = :hash
                 WHERE ID_BULK_TRANSACTION = :id';
         $data = [
-            ':id'          => $bulk->getIdBulkTransaction(),
-            ':structure'   => $bulk->getStructure(),
-            ':hash'        => $bulk->getHash()
+            ':id'        => $bulk->getIdBulkTransaction(),
+            ':structure' => $bulk->getStructure(),
+            ':hash'      => $bulk->getHash()
         ];
 
         // Execute query
@@ -189,5 +189,76 @@ class BulkTransactions extends RepositoryLocatableAbstract
             $this->db->rollBack();
             throw $this->dbException();
         }
+    }
+
+    /**
+     * Find an active bulk file by its unique Id or hash
+     *
+     * @param BulkFile $file
+     *
+     * @return BulkFile
+     * @throws \Exception
+     */
+    public function findFile(BulkFile $file)
+    {
+        $file->clean();
+        // Check mandatory data
+        if (!$file->getUniqueId() and !$file->getHash()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Build the query
+        $sql = 'SELECT ID_BULK_FILE, FK_ID_BULK, UNIQUE_ID, FK_ID_USER, FILE_NAME, FILE_ORIG_NAME, FILE_TYPE, ID_SIGN,
+                  FULL_NAME, FILE_DATE, FK_ID_CONTENT, QUALIFICATION, HASH, SIZE, STATUS
+                FROM BULK_FILES WHERE STATUS = :status';
+        $data = [':status' => 'A'];
+
+        if ($file->getUniqueId()) {
+            $sql .= ' AND UNIQUE_ID = :id';
+            $data[':id'] = $file->getUniqueId();
+        } else {
+            $sql .= ' AND HASH = :hash';
+            $data[':hash'] = $file->getHash();
+        }
+
+        // Execute query
+        $res = $this->db->query($sql, $data, 'Api\Entity\BulkFile');
+
+        if (!$res or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
+        }
+
+        return $res->getNumRows() ? $res->getRows()[0] : null;
+    }
+
+    /**
+     * Find an active bulk file by its unique Id or hash
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return BulkTransaction
+     * @throws \Exception
+     */
+    public function findBulk(BulkTransaction $bulk)
+    {
+        $bulk->clean();
+        // Check mandatory data
+        if (!$bulk->getIdBulkTransaction()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Build the query
+        $sql = "SELECT ID_BULK_TRANSACTION, FK_ID_USER, NUM_FILES, STRUCTURE, HASH, STATUS, TRANSACTION, CONFIRMED,
+                  ID_GEONAMES, LATITUDE, LONGITUDE
+                FROM BULK_TRANSACTION WHERE ID_BULK_TRANSACTION = :id AND STATUS = 'A'";
+
+        // Execute query
+        $res = $this->db->query($sql, [':id' => $bulk->getIdBulkTransaction()], 'Api\Entity\BulkTransaction');
+
+        if (!$res or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
+        }
+
+        return $res->getNumRows() ? $res->getRows()[0] : null;
     }
 }

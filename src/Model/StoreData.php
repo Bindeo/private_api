@@ -268,15 +268,33 @@ class StoreData
      * Get a blockchain transaction by id from our db
      *
      * @param BlockChain $blockchain
+     * @param string     $mode [optional] 'light' mode for only db data, 'full' mode for db data enriched with online
+     *                         blockchain info
      *
      * @return array
+     * @throws \Exception
      */
-    public function getTransaction(BlockChain $blockchain)
+    public function getTransaction(BlockChain $blockchain, $mode = 'light')
     {
         // Get the blockchain transaction
         $blockchain = $this->dataRepo->findTransaction($blockchain);
 
         if ($blockchain) {
+            // If we are in full mode we need to recover some extra information from blockchain
+            if ($mode == 'full') {
+                $basicInfo = $this->getTransactionInfo($blockchain);
+                if ($basicInfo) {
+                    // If we check transactions too quickly it is possible that it doesn't exist in blockchain yet
+                    if (isset($basicInfo['time'])) {
+                        $blockchain->setBcDate(\DateTime::createFromFormat('U', $basicInfo['time']));
+                    }
+                    if (isset($basicInfo['blockhash'])) {
+                        $blockchain->setBcBlock($basicInfo['blockhash']);
+                    }
+                }
+                //TODO We need to fill original signer, maybe in information from getrawtransaction -> scriptPubKey and look for the hex with decodescript
+            }
+
             $blockchain = $blockchain->toArray();
         }
 
@@ -323,7 +341,7 @@ class StoreData
     }
 
     /**
-     * Get an extended blockchain transaction by id from blockchain
+     * Get an extended blockchain transaction by id from blockchain raw transaction
      *
      * @param BlockChain $blockchain
      *
@@ -352,6 +370,40 @@ class StoreData
         };
         // Obtain encoded data from blockchain
         $res = $net->getRawTransaction($blockchain->getTransaction(), 1);
+
+        return $res;
+    }
+
+    /**
+     * Get an extended blockchain transaction by id from blockchain transaction
+     *
+     * @param BlockChain $blockchain
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function getTransactionInfo(BlockChain $blockchain)
+    {
+        if (!$blockchain->getTransaction()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // If net has not been provided, we assume is a transaction from our system, we take it from db
+        if (!$blockchain->getNet()) {
+            $blockchain = $this->dataRepo->findTransaction($blockchain);
+            if (!$blockchain) {
+                throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+            }
+        }
+
+        // Get the blockchain transaction
+        $net = \Api\Lib\BlockChain\BlockChain::getInstance($blockchain->getNet());
+        if (!$net) {
+            $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
+            throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
+        };
+        // Obtain encoded data from blockchain
+        $res = $net->getTransaction($blockchain->getTransaction());
 
         return $res;
     }

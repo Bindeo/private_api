@@ -152,7 +152,7 @@ class StoreData
     public function getTransaction(Request $request, Response $response, $args)
     {
         // Get the transaction
-        $res = $this->model->getTransaction(new BlockChain($request->getParams()));
+        $res = $this->model->getTransaction(new BlockChain($request->getParams()), $request->getParam('mode', 'light'));
         $res = ['data' => ['type' => 'blockchain', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -168,11 +168,19 @@ class StoreData
      * @return \Slim\Http\Response
      * @throws \Exception
      */
-    public function getTransactionInfo(Request $request, Response $response, $args)
-    {
+    public function getOnlineTransaction(Request $request, Response $response, $args)
+    {/*
+        $date = (new \DateTime())->setTimestamp(1458216533);
+        //$date = \DateTime::createFromFormat('U', 1458216533);
+        echo $date->format('d-m-Y H:i:s');
+        exit;*/
+
         if ($request->getParam('mode') == 'hash') {
             $type = 'hash';
             $res = $this->model->getTransactionHash(new BlockChain($request->getParams()));
+        } elseif ($request->getParam('mode') == 'info') {
+            $type = 'transaction';
+            $res = $this->model->getTransactionInfo(new BlockChain($request->getParams()));
         } elseif ($request->getParam('mode') == 'extended') {
             $type = 'transaction';
             $res = $this->model->getTransactionExtended(new BlockChain($request->getParams()));

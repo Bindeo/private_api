@@ -37,13 +37,14 @@ $app->group('/data', function () {
     $this->put('/blockchain', 'Api\Controller\StoreData:signFile');
     $this->get('/blockchain', 'Api\Controller\StoreData:getTransaction');
     $this->get('/blockchain/coins', 'Api\Controller\StoreData:getBalance');
-    $this->get('/blockchain/info', 'Api\Controller\StoreData:getTransactionInfo');
+    $this->get('/blockchain/info', 'Api\Controller\StoreData:getOnlineTransaction');
     $this->get('/blockchain/test', 'Api\Controller\StoreData:testAsset');
 });
 
 // Edu routes
 $app->group('/bulk', function() {
     $this->post('', 'Api\Controller\BulkTransactions:createBulk');
+    $this->get('/verify', 'Api\Controller\BulkTransactions:verifyFile');
 });
 
 //$app->get('/tests', 'Api\Controller\StoreData:tests');

@@ -2,6 +2,7 @@
 
 namespace Api\Controller;
 
+use Api\Entity\BulkFile;
 use Api\Entity\BulkTransaction;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
@@ -36,6 +37,25 @@ class BulkTransactions
 
         $res = $this->model->createBulk($bulk);
         $res = ['data' => ['type' => 'blockchain', 'attributes' => $res]];
+
+        return $response->withJson($res, 201);
+    }
+
+    /**
+     * Verify file integrity
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     * @throws \Exception
+     */
+    public function verifyFile(Request $request, Response $response, $args)
+    {
+        $res = $this->model->verifyFile(new BulkFile($request->getParams()));
+
+        $res = ['data' => ['type' => 'bulk_files', 'attributes' => $res]];
 
         return $response->withJson($res, 201);
     }

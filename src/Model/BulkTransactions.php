@@ -181,8 +181,7 @@ class BulkTransactions
                                      ->setIp($bulk->getIp()));
 
             // Add data to structure
-            $structure['docs'][] = [
-                'id'   => $file->getUniqueId(),
+            $structure['docs'][$file->getUniqueId()] = [
                 'hash' => $file->getHash(),
                 'to'   => hash('sha256', $file->getFullName())
             ];
@@ -197,5 +196,72 @@ class BulkTransactions
         $blockchain = $this->signBulkTransaction($bulk);
 
         return $blockchain->toArray();
+    }
+
+    /**
+     * Verify file integrity with exhaustive verifications
+     *
+     * @param BulkFile $file
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function verifyFile(BulkFile $file)
+    {
+        // Check necessary fields
+        if (!$file->getUniqueId() and (!$file->getPath() or !is_file($file->getPath()))) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // If we have the uploaded file path, we need to get its hash
+        if ($file->getPath()) {
+            $file->setHash(hash_file('sha256', $file->getPath()));
+        }
+
+        // Get file from database
+        $file = $this->bulkRepo->findFile($file);
+        if (!$file) {
+            return [];
+        }
+
+        // Check stored file hash is not corrupted
+        if ($file->getHash() != $this->storage->getHash($file)) {
+            return [];
+        }
+
+        // Get associated bulk transaction
+        $bulk = $this->bulkRepo->findBulk(new BulkTransaction(['idBulkTransaction' => $file->getIdBulk()]));
+        if (!$bulk or !$bulk->getTransaction()) {
+            return [];
+        }
+
+        // Check if bulk transaction is not corrupted
+        if (hash('sha256', $bulk->getStructure()) != $bulk->getHash()) {
+            return [];
+        }
+
+        // Check if file actually exists inside bulk structure
+        try {
+            $structure = json_decode($bulk->getStructure(), true);
+
+            if (!isset($structure['docs'][$file->getUniqueId()]) or $structure['docs'][$file->getUniqueId()]['hash'] != $file->getHash()) {
+                return [];
+            }
+        } catch (\Exception $e) {
+            return [];
+        }
+
+        // Finally check hash against the blockchain
+        $blockchain = \Api\Lib\BlockChain\BlockChain::getInstance();
+        if (!$blockchain) {
+            $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
+            throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
+        };
+        $res = $blockchain->getDecodedData($bulk->getTransaction());
+        if (!isset($res['data']) or $bulk->getHash() != $res['data']) {
+            return [];
+        }
+
+        return $file->setTransaction($bulk->getTransaction())->toArray();
     }
 }
