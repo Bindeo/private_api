@@ -56,9 +56,10 @@ return [
         // BlockChain
         'blockchain'          => [
             'bitcoin' => [
-                'host' => '127.0.0.1',
-                'port' => 8332,
-                'user' => '8JXHicdG9N2aaTWatmmneiZxQYSjFtEkeLzxyHTSwYuf'
+                'host' => 'bitcoin.bindeo.com',
+                //'port' => 8332, // Real net
+                'port' => 18332, // Test net
+                'user' => '5658a02023c98f90ade9974a7504c945d46db41011001a19d4ec4d3e96190423'
             ]
         ],
 
