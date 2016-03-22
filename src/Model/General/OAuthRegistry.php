@@ -9,7 +9,7 @@ class OAuthRegistry
 {
     protected static $me;
     protected        $grantType;
-    protected        $clientId;
+    protected        $appId;
     protected        $appName;
     protected        $appRole;
 
@@ -59,19 +59,19 @@ class OAuthRegistry
     /**
      * @return mixed
      */
-    public function getClientId()
+    public function getAppId()
     {
-        return $this->clientId;
+        return $this->appId;
     }
 
     /**
-     * @param mixed $clientId
+     * @param mixed $appId
      *
      * @return OAuthRegistry
      */
-    public function setClientId($clientId)
+    public function setAppId($appId)
     {
-        $this->clientId = $clientId;
+        $this->appId = $appId;
 
         return $this;
     }

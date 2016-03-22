@@ -20,8 +20,14 @@ return [
         'oauth'               => [
             '75be9f5e5234406d544d84e32e1747e4' => [
                 'grantType' => 'client_credentials',
-                'clientId'  => '1',
+                'appId'     => '2',
                 'appName'   => 'front',
+                'appRole'   => 'all'
+            ],
+            '5f20ba1d9f033c18e8c930e2f82678a1' => [
+                'grantType' => 'client_credentials',
+                'appId'     => '2',
+                'appName'   => 'api',
                 'appRole'   => 'all'
             ]
         ],

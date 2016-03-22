@@ -31,7 +31,7 @@ class OAuth
 
         OAuthRegistry::getInstance()
                      ->setGrantType($data['grantType'])
-                     ->setClientId($data['clientId'])
+                     ->setAppId($data['appId'])
                      ->setAppName($data['appName'])
                      ->setAppRole($data['appRole']);
 
