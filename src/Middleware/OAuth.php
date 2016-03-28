@@ -25,7 +25,7 @@ class OAuth
      *
      * @return \Slim\Http\Response
      */
-    public function run(Request $request, Response $response, callable $next)
+    public function __invoke(Request $request, Response $response, callable $next)
     {
         $data = $this->oauth->verify($request);
 

@@ -15,15 +15,25 @@ class OAuthStorage implements OAuthStorageInterface
     }
 
     /**
+     * @param string $clientId
+     * @param string $clientSecret
+     * @param string $authCode
+     *
+     * @return mixed
+     */
+    public function authorize($clientId = null, $clientSecret = null, $authCode = null)
+    {
+        // TODO: Implement authorize() method.
+    }
+
+    /**
      * @param string $type
      * @param string $oauthToken
-     * @param int    $clientId
-     * @param string $clientSecret
      *
      * @return array
      * @throws \Exception
      */
-    public function getOAuth($type, $oauthToken = null, $clientId = null, $clientSecret = null)
+    public function getOAuth($type, $oauthToken = null)
     {
         // Validate the OAuth token
         if ($type != "Bearer" or !$oauthToken or !isset($this->conf[$oauthToken])) {

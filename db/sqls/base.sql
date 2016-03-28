@@ -25,6 +25,7 @@ DROP TABLE TRANSLATIONS;
 # Tables
 
 source ../tables/TRANSLATIONS.sql;
+source ../tables/OAUTH_CLIENTS.sql;
 source ../tables/FILE_TYPES.sql;
 source ../tables/MEDIA_TYPES.sql;
 source ../tables/MEDIA_EXTENSIONS.sql;
@@ -53,5 +54,8 @@ source ../sqls/account_types.sql;
 source ../sqls/file_types.sql;
 source ../sqls/media_types.sql;
 source ../sqls/media_extensions.sql;
+
+# OAuth Clients
+source ../sqls/oauth_clients.sql;
 
 COMMIT;

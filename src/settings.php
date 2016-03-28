@@ -18,16 +18,16 @@ return [
 
         // Storage for private OAuth apps
         'oauth'               => [
-            '75be9f5e5234406d544d84e32e1747e4' => [
+            '680ef7583f177ef707ebd0800de41c13f86270ed92948442a91c7e21cf5a0bbe' => [
                 'grantType' => 'client_credentials',
-                'appId'     => '2',
+                'appId'     => '1',
                 'appName'   => 'front',
                 'appRole'   => 'all'
             ],
-            '5f20ba1d9f033c18e8c930e2f82678a1' => [
+            'd5f14b4a435a5ef685bbaedbdd49de9fa7bd728344451113b15e9b0fd29e183a' => [
                 'grantType' => 'client_credentials',
                 'appId'     => '2',
-                'appName'   => 'api',
+                'appName'   => 'mobile app',
                 'appRole'   => 'all'
             ]
         ],

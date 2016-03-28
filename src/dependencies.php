@@ -82,6 +82,10 @@ $container['Api\Model\Email\Email'] = function ($c) {
 };
 
 // Repositories
+$container['Api\Repository\OAuth'] = function ($c) {
+    return new Api\Repository\OAuth($c->get('Api\Model\General\Database'));
+};
+
 $container['Api\Repository\General'] = function ($c) {
     return new Api\Repository\General($c->get('Api\Model\General\Database'));
 };
@@ -119,6 +123,10 @@ $container['Api\Model\BulkTransactions'] = function ($c) {
 };
 
 // Controllers
+$container['Api\Controller\OAuth'] = function ($c) {
+    return new Api\Controller\OAuth($c->get('Api\Repository\OAuth'));
+};
+
 $container['Api\Controller\General'] = function ($c) {
     return new Api\Controller\General($c->get('Api\Repository\General'));
 };

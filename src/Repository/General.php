@@ -77,8 +77,8 @@ class General extends RepositoryAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = "SELECT A.ID_TYPE, T.VALUE NAME
-                FROM MEDIA_TYPES A, TRANSLATIONS T WHERE T.ID_TRANSLATION = A.FK_ID_TRANSLATION AND T.LANG = :lang";
+        $sql = 'SELECT A.ID_TYPE, T.VALUE NAME
+                FROM MEDIA_TYPES A, TRANSLATIONS T WHERE T.ID_TRANSLATION = A.FK_ID_TRANSLATION AND T.LANG = :lang';
         $params = [':lang' => $lang];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\MediaType');

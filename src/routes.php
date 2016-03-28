@@ -8,6 +8,11 @@ $app->group('/general', function () {
     $this->get('/media-types', 'Api\Controller\General:mediaTypes');
 });
 
+// OAuth routes
+$app->group('/oauth', function() {
+    $this->get('/clients', 'Api\Controller\OAuth:oauthClient');
+});
+
 // Accounts routes
 $app->group('/account', function () {
     $this->get('', 'Api\Controller\Accounts:login');

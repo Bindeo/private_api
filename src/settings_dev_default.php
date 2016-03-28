@@ -34,19 +34,3 @@ $settings['settings']['email']['mailgun'] = [
 
 // Maxmind db route
 $settings['settings']['maxmind'] = '/usr/local/share/geoIP/GeoLite2-City.mmdb';
-
-// Storage for private OAuth apps
-$settings['settings']['oauth'] = [
-    '15fea1eb473efc33982c321bebc1756f' => [
-        'grantType' => 'client_credentials',
-        'appId'     => '1',
-        'appName'   => 'front',
-        'appRole'   => 'all'
-    ],
-    '3f154e8e946347b610dab4311560fce3' => [
-        'grantType' => 'client_credentials',
-        'appId'     => '2',
-        'appName'   => 'api',
-        'appRole'   => 'all'
-    ]
-];

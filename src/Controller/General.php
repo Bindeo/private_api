@@ -2,6 +2,7 @@
 
 namespace Api\Controller;
 
+use Api\Entity\OAuthClient;
 use Api\Repository\RepositoryAbstract;
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;

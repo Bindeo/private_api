@@ -816,7 +816,7 @@ class Users extends RepositoryLocatableAbstract
     {
         if (!$user->getEmail() or !$user->getPassword() or !$user->getIp()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        } elseif (!in_array($source, ['front', 'api'])) {
+        } elseif (!in_array($source, ['front', 'mobile app'])) {
             throw new \Exception(Exceptions::UNAUTHORIZED, 401);
         }
 
