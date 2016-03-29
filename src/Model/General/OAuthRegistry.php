@@ -31,7 +31,7 @@ class OAuthRegistry
         return self::$me;
     }
 
-    // Impedimos que los objetos de esta clase puedan ser clonados o deserializados, para asegurar el singleton
+    // We prevent that objects of this class can be cloned or deserialized to ensure the singleton pattern
     public function __clone() { }
 
     public function __wakeup() { }

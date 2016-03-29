@@ -9,8 +9,11 @@ $app->group('/general', function () {
 });
 
 // OAuth routes
-$app->group('/oauth', function() {
+$app->group('/oauth', function () {
     $this->get('/clients', 'Api\Controller\OAuth:oauthClient');
+    $this->post('/token', 'Api\Controller\OAuth:saveToken');
+    $this->delete('/token', 'Api\Controller\OAuth:expireToken');
+    $this->get('/token', 'Api\Controller\OAuth:getToken');
 });
 
 // Accounts routes
@@ -47,7 +50,7 @@ $app->group('/data', function () {
 });
 
 // Edu routes
-$app->group('/bulk', function() {
+$app->group('/bulk', function () {
     $this->post('', 'Api\Controller\BulkTransactions:createBulk');
     $this->get('/verify', 'Api\Controller\BulkTransactions:verifyFile');
 });

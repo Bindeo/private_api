@@ -26,6 +26,7 @@ DROP TABLE TRANSLATIONS;
 
 source ../tables/TRANSLATIONS.sql;
 source ../tables/OAUTH_CLIENTS.sql;
+source ../tables/OAUTH_TOKENS.sql;
 source ../tables/FILE_TYPES.sql;
 source ../tables/MEDIA_TYPES.sql;
 source ../tables/MEDIA_EXTENSIONS.sql;

@@ -33,7 +33,7 @@ class MySQL implements DatabaseInterface
         return self::$me;
     }
 
-    // Objects of this class cannot be deserialize because singleton pattern
+    // We prevent that objects of this class can be cloned or deserialized to ensure the singleton pattern
     public function __clone() { }
 
     public function __wakeup() { }
