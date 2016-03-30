@@ -78,7 +78,9 @@ class StoreData extends RepositoryLocatableAbstract
     {
         $file->clean();
         // Check the received data
-        if (!$file->getIdUser() or !$file->getIdType() or !$file->getIdMedia() or !$file->getName() or !$file->getFileName() or !$file->getFileOrigName() or !$file->getIp() or !$file->getHash()) {
+        if (!$file->getIdUser() or !$file->getIdType() or !$file->getIdMedia() or !$file->getName() or
+            !$file->getFileName() or !$file->getFileOrigName() or !$file->getIp() or !$file->getHash()
+        ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -269,8 +271,9 @@ class StoreData extends RepositoryLocatableAbstract
      */
     public function signAsset(BlockChain $blockchain)
     {
-        if (!$blockchain->getIdElement() or !$blockchain->getIdUser() or !$blockchain->getIp() or !$blockchain->getNet() or !$blockchain->getTransaction() or !$blockchain->getHash() or !$blockchain->getJsonData() or !in_array($blockchain->getType(),
-                ['F', 'T', 'B'])
+        if (!$blockchain->getIdElement() or !$blockchain->getIdUser() or !$blockchain->getIp() or
+            !$blockchain->getNet() or !$blockchain->getTransaction() or !$blockchain->getHash() or
+            !$blockchain->getJsonData() or !in_array($blockchain->getType(), ['F', 'T', 'B'])
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }

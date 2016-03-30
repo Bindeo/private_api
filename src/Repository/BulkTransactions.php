@@ -36,7 +36,9 @@ class BulkTransactions extends RepositoryLocatableAbstract
     public function verifyBulkFile(BulkFile $file)
     {
         // Check the received data
-        if (!$file->getUniqueId() or !$file->getFileOrigName() or !$file->getFileType() or !$file->getIdSign() or !$file->getFullName() or !$file->getFileDate()) {
+        if (!$file->getUniqueId() or !$file->getFileOrigName() or !$file->getFileType() or !$file->getIdSign() or
+            !$file->getFullName() or !$file->getFileDate()
+        ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
     }
@@ -138,7 +140,9 @@ class BulkTransactions extends RepositoryLocatableAbstract
     {
         $this->verifyBulkFile($file->clean());
         // Check remain data
-        if (!$file->getIdUser() or !$file->getIdBulk() or !$file->getFileName() or !$file->getSize() or !$file->getHash() or !$file->getIp()) {
+        if (!$file->getIdUser() or !$file->getIdBulk() or !$file->getFileName() or !$file->getSize() or
+            !$file->getHash() or !$file->getIp()
+        ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 

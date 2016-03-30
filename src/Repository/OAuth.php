@@ -47,8 +47,8 @@ class OAuth extends RepositoryAbstract
     public function saveToken(OAuthToken $token)
     {
         $token->clean();
-        if (!$token->getToken() or !in_array($token->getType(),
-                ['A', 'R']) or !$token->getExpiration() or !$token->getIp()
+        if (!$token->getToken() or !in_array($token->getType(), ['A', 'R']) or !$token->getExpiration() or
+            !$token->getIp()
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }

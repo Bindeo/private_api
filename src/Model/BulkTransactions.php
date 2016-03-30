@@ -244,7 +244,9 @@ class BulkTransactions
         try {
             $structure = json_decode($bulk->getStructure(), true);
 
-            if (!isset($structure['docs'][$file->getUniqueId()]) or $structure['docs'][$file->getUniqueId()]['hash'] != $file->getHash()) {
+            if (!isset($structure['docs'][$file->getUniqueId()]) or
+                $structure['docs'][$file->getUniqueId()]['hash'] != $file->getHash()
+            ) {
                 return [];
             }
         } catch (\Exception $e) {

@@ -22,8 +22,8 @@ class Users extends RepositoryLocatableAbstract
      */
     private function changeType(User $user, $newType, ResultSet $types = null)
     {
-        if (!$user->getIdUser() or !in_array($user->getType(), [1, 2, 3]) or !in_array($newType,
-                [1, 2, 3]) or !$user->getIp()
+        if (!$user->getIdUser() or !in_array($user->getType(), [1, 2, 3]) or !in_array($newType, [1, 2, 3]) or
+            !$user->getIp()
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -46,7 +46,8 @@ class Users extends RepositoryLocatableAbstract
                     LAST_LONGITUDE = :longitude, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
                 WHERE ID_USER = :id;';
 
-        $storageLeft = $types->getRows()[$newType - 1]->getMaxStorage() - $types->getRows()[$user->getType() - 1]->getMaxStorage();
+        $storageLeft = $types->getRows()[$newType - 1]->getMaxStorage() -
+                       $types->getRows()[$user->getType() - 1]->getMaxStorage();
 
         $data = [
             ':id'          => $user->getIdUser(),
@@ -180,7 +181,7 @@ class Users extends RepositoryLocatableAbstract
 
         $sql = 'SELECT ID_USER, EMAIL, PASSWORD, TYPE, NAME, CONFIRMED, LANG, STORAGE_LEFT, STAMPS_LEFT
                 FROM USERS WHERE EMAIL = :email';
-        $params = [':email' => mb_strtolower($user->getEmail())];
+        $params = [':email' => $user->getEmail()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\User');
 
@@ -203,8 +204,8 @@ class Users extends RepositoryLocatableAbstract
     {
         $user->clean();
         // Check the received data
-        if (!$user->getEmail() or !$user->getPassword() or !in_array($user->getType(),
-                [1, 2, 3]) or !$user->getName() or !$user->getIp() or !$user->getLang()
+        if (!$user->getEmail() or !filter_var($user->getEmail(), FILTER_VALIDATE_EMAIL) or !$user->getPassword() or
+            !in_array($user->getType(), [1, 2, 3]) or !$user->getName() or !$user->getIp() or !$user->getLang()
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -227,7 +228,7 @@ class Users extends RepositoryLocatableAbstract
                 VALUES (:email, :password, :type, :name, :ip, SYSDATE(), :lang, :id_geonames, :latitude,
                   :longitude, :storage, SYSDATE(), :stamps)';
         $data = [
-            ':email'       => mb_strtolower($user->getEmail()),
+            ':email'       => $user->getEmail(),
             ':password'    => password_hash($user->getPassword(), PASSWORD_DEFAULT),
             ':type'        => $user->getType(),
             ':name'        => $user->getName(),
@@ -263,7 +264,7 @@ class Users extends RepositoryLocatableAbstract
             ':type_val' => 'V',
             ':id'       => $id,
             ':type'     => $user->getType(),
-            ':email'    => mb_strtolower($user->getEmail()),
+            ':email'    => $user->getEmail(),
             ':ip'       => $user->getIp(),
             ':name'     => $user->getName()
         ];
@@ -292,7 +293,7 @@ class Users extends RepositoryLocatableAbstract
         $user->clean();
 
         // Check the type of the update
-        if (!$user->getIdUser() or !$user->getIp() or !$user->getLang()) {
+        if (!$user->getIdUser() or !$user->getIp() or !in_array($user->getLang(), ['es_ES', 'en_US'])) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -341,8 +342,8 @@ class Users extends RepositoryLocatableAbstract
         // Check if the password is correct
         $sql = 'SELECT PASSWORD FROM USERS WHERE ID_USER = :id';
         $res = $this->db->query($sql, [':id' => $user->getIdUser()]);
-        if (!$res or $res->getNumRows() != 1 or !password_verify($user->getOldPassword(),
-                $res->getRows()[0]['PASSWORD'])
+        if (!$res or $res->getNumRows() != 1 or
+            !password_verify($user->getOldPassword(), $res->getRows()[0]['PASSWORD'])
         ) {
             throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
         }
@@ -390,12 +391,14 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Check if the user exists
-        $sql = 'SELECT ID_USER, NAME, EMAIL FROM USERS WHERE EMAIL = :email';
-        $res = $this->db->query($sql, [':email' => mb_strtolower($user->getEmail())]);
+        $sql = 'SELECT ID_USER, NAME, EMAIL, LANG FROM USERS WHERE EMAIL = :email';
+        $res = $this->db->query($sql, [':email' => $user->getEmail()]);
         if (!$res or $res->getNumRows() != 1) {
             throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
         }
-        $user->setIdUser($res->getRows()[0]['ID_USER'])->setName($res->getRows()[0]['NAME']);
+        $user->setIdUser($res->getRows()[0]['ID_USER'])
+             ->setName($res->getRows()[0]['NAME'])
+             ->setLang($res->getRows()[0]['LANG']);
 
         // Check if we already have a non expired or confirmed token with the same change
         $sql = 'SELECT TOKEN FROM USERS_VALIDATIONS
@@ -403,7 +406,7 @@ class Users extends RepositoryLocatableAbstract
                   CTRL_DATE < SYSDATE() + INTERVAL 1 DAY';
         $data = [
             ':id'    => $user->getIdUser(),
-            ':email' => mb_strtolower($user->getEmail()),
+            ':email' => $user->getEmail(),
             ':type'  => 'P'
         ];
         $res = $this->db->query($sql, $data);
@@ -422,7 +425,7 @@ class Users extends RepositoryLocatableAbstract
                 ':token' => $token,
                 ':type'  => 'P',
                 ':id'    => $user->getIdUser(),
-                ':email' => mb_strtolower($user->getEmail()),
+                ':email' => $user->getEmail(),
                 ':ip'    => $user->getIp()
             ];
 
@@ -474,7 +477,9 @@ class Users extends RepositoryLocatableAbstract
     public function saveIdentity(UserIdentity $identity)
     {
         // Check necessary fields
-        if ((!$identity->getIdIdentity() and !$identity->getIdUser()) or !$identity->getName() or !$identity->getValue() or !$identity->getIp()) {
+        if ((!$identity->getIdIdentity() and !$identity->getIdUser()) or !$identity->getName() or
+            !$identity->getValue() or !$identity->getIp()
+        ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -671,17 +676,33 @@ class Users extends RepositoryLocatableAbstract
      */
     public function getValidationToken(User $user)
     {
+        $user->clean();
+
         // Check data
-        if (!$user->getIdUser() or !$user->getEmail()) {
+        if (!$user->getIdUser()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
+
+        // Check if the user exists
+        $sql = 'SELECT EMAIL, NAME, LANG FROM USERS WHERE ID_USER = :id';
+        $res = $this->db->query($sql, [':id' => $user->getIdUser()]);
+        if (!$res or $res->getNumRows() != 1) {
+            throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
+        }
+        // If email is not provided, we get the current user email
+        if (!$user->getEmail()) {
+            $user->setEmail($res->getRows()[0]['EMAIL']);
+        }
+
+        $user->setName($res->getRows()[0]['NAME'])
+             ->setLang($res->getRows()[0]['LANG']);
 
         // Check if we already have a non expired or confirmed token with the same change
         $sql = "SELECT TOKEN FROM USERS_VALIDATIONS
                 WHERE FK_ID_USER = :id AND EMAIL = :email AND TYPE = 'V' AND CONFIRMED = 0";
         $data = [
             ':id'    => $user->getIdUser(),
-            ':email' => mb_strtolower($user->getEmail())
+            ':email' => $user->getEmail()
         ];
         $res = $this->db->query($sql, $data);
 
@@ -825,13 +846,13 @@ class Users extends RepositoryLocatableAbstract
                 CASE WHEN TYPE > 1 AND LAST_RESET <= SYSDATE() - INTERVAL 1 MONTH THEN 1 ELSE 0 END RENEW
                 FROM USERS WHERE EMAIL = :email';
         $user->clean();
-        $params = [':email' => mb_strtolower($user->getEmail())];
+        $params = [':email' => $user->getEmail()];
         $data = $this->db->query($sql, $params, 'Api\Entity\User');
 
         // If we don't have the user, maybe the pass is not correct
         /** @var \Api\Entity\User $userAux */
-        if ($data->getNumRows() == 0 or !($userAux = $data->getRows()[0]) or !password_verify($user->getPassword(),
-                $userAux->getPassword())
+        if ($data->getNumRows() == 0 or !($userAux = $data->getRows()[0]) or
+            !password_verify($user->getPassword(), $userAux->getPassword())
         ) {
             throw new \Exception(Exceptions::INCORRECT_PASSWORD, 403);
         } elseif (!$data and $this->db->getError()) {

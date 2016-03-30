@@ -158,7 +158,7 @@ class Accounts
     }
 
     /**
-     * Resend the initial validation token
+     * Resend initial validation token
      *
      * @param Request|\Slim\Http\Request   $request
      * @param Response|\Slim\Http\Response $response
