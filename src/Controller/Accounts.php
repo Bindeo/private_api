@@ -207,7 +207,7 @@ class Accounts
     {
         $data = $this->model->getIdentities(new User($request->getParams()));
 
-        $res = ['data' => $data->toArray('user_identity'), 'total_pages' => 1];
+        $res = ['data' => $data->toArray('user_identities'), 'total_pages' => 1];
 
         return $response->withJson($res, 200);
     }
