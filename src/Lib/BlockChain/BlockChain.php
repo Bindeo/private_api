@@ -178,6 +178,21 @@ class BlockChain
         return $this->client->storeData($data, $type, $accountTo, $accountFrom, $txid);
     }
 
+    // Complex functionality
+    /**
+     * Store data in the blockchain, we can store a Stamp, a Genesis operation or a Transfer operation
+     *
+     * @param float  $amount
+     * @param string $accountTo
+     * @param string $accountFrom [optional]
+     *
+     * @return array
+     */
+    public function transferCoins($amount, $accountTo, $accountFrom = null)
+    {
+        return $this->client->transferCoins($amount, $accountTo, $accountFrom);
+    }
+
     /**
      * Get stored data from a transaction id
      *

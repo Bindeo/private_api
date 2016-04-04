@@ -130,6 +130,11 @@ class BitcoinClient implements BlockChainClientInterface
         return $this->bitcoin->signrawtransaction($tx, $output, $key, $sig_hash);
     }
 
+    public function dumpPrivKey($address)
+    {
+        return $this->bitcoin->dumpprivkey($address);
+    }
+
     // Complex functionality
 
     // PRIVATE METHODS
@@ -146,7 +151,7 @@ class BitcoinClient implements BlockChainClientInterface
     private function selectInputs($amount, $account = null, $txid = null)
     {
         // Select unspent transactions
-        $unspentInputs = $this->listUnspent('');
+        $unspentInputs = $this->listUnspent();
 
         if (!is_array($unspentInputs)) {
             return ['error' => 'Could not retrieve list of unspent inputs'];
@@ -155,15 +160,22 @@ class BitcoinClient implements BlockChainClientInterface
         $selectedInputs = [];
 
         // Look for the requested account and txid
-        if ($account and $txid) {
+        if ($account) {
+            // Select unspent inputs from requested account
             $inputs = $this->listUnspent($account);
-            foreach ($inputs as $input) {
-                if ($input['account'] == $account and $input['txid'] == $txid) {
-                    $selectedInputs[] = $input;
+
+            if ($txid) {
+                // Choose the right transaction
+                foreach ($inputs as $input) {
+                    if ($input['account'] == $account and $input['txid'] == $txid) {
+                        $selectedInputs[] = $input;
+                    }
                 }
-            }
-            if (count($selectedInputs) == 0) {
-                return ['error' => 'Could not find requested account and txid'];
+                if (count($selectedInputs) == 0) {
+                    return ['error' => 'Could not find requested account and txid'];
+                }
+            } else {
+                $unspentInputs = $inputs;
             }
         }
 
@@ -381,13 +393,15 @@ class BitcoinClient implements BlockChainClientInterface
 
         // $encodedInputs - set the encoded varint, then work out if any input hex is to be displayed.
         $decimalInputsCount = count($rawTransactionArray['vin']);
-        $encodedInputs = $this->encodeVint($decimalInputsCount) . (($decimalInputsCount > 0)
-                ? $this->encodeInputs($rawTransactionArray['vin'], $decimalInputsCount) : '');
+        $encodedInputs = $this->encodeVint($decimalInputsCount) .
+                         (($decimalInputsCount > 0) ? $this->encodeInputs($rawTransactionArray['vin'],
+                             $decimalInputsCount) : '');
 
         // $encodedOutputs - set varint, then work out if output hex is required.
         $decimalOutputsCount = count($rawTransactionArray['vout']);
-        $encodedOutputs = $this->encodeVint($decimalOutputsCount) . (($decimalInputsCount > 0)
-                ? $this->encodeOutputs($rawTransactionArray['vout'], $decimalOutputsCount) : '');
+        $encodedOutputs = $this->encodeVint($decimalOutputsCount) .
+                          (($decimalInputsCount > 0) ? $this->encodeOutputs($rawTransactionArray['vout'],
+                              $decimalOutputsCount) : '');
 
         // Transaction locktime
         $encodedLocktime = $this->decToBytes($rawTransactionArray['locktime'], 4, true);
@@ -461,23 +475,23 @@ class BitcoinClient implements BlockChainClientInterface
 
         // Create a raw transaction with all the information
         $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
-/*
-        // Old method to include OP_RETURN data
-        $txn = $this->decodeRawTransaction($txn);
+        /*
+                // Old method to include OP_RETURN data
+                $txn = $this->decodeRawTransaction($txn);
 
-        // Add OP_RETURN data
-        if (isset($txn['vout'])) {
-            $key = unpack('H*', chr($dataLen) . $data);
-        }
-        $txn['vout'][] = [
-            'value'        => 0,
-            'n'            => count($txn['vout']),
-            'scriptPubKey' => ['hex' => '6a' . reset($key)]
-        ];
+                // Add OP_RETURN data
+                if (isset($txn['vout'])) {
+                    $key = unpack('H*', chr($dataLen) . $data);
+                }
+                $txn['vout'][] = [
+                    'value'        => 0,
+                    'n'            => count($txn['vout']),
+                    'scriptPubKey' => ['hex' => '6a' . reset($key)]
+                ];
 
-        // Encode the transaction into raw format
-        $txn = $this->encodeTransaction($txn);
-*/
+                // Encode the transaction into raw format
+                $txn = $this->encodeTransaction($txn);
+        */
 
         // Sign the transaction
         $txn = $this->signRawTransaction($txn);
@@ -494,6 +508,57 @@ class BitcoinClient implements BlockChainClientInterface
         // If the transaction was ok and we did a transaction, we move the satoshi from accountFrom to default
         if ($accountFrom) {
             $this->move($accountFrom, '', self::SATOSHI);
+        }
+
+        return ['txid' => $result];
+    }
+
+    /**
+     * Transfer some coins from one account to another
+     *
+     * @param float  $amount
+     * @param string $accountTo
+     * @param string $accountFrom [optional]
+     *
+     * @return array
+     */
+    public function transferCoins($amount, $accountTo, $accountFrom = null)
+    {
+        $totalAmount = $amount + self::TRANSACTION_FEE;
+
+        // Get the change address to return coins
+        $changeAddress = $this->bitcoin->getaddressesbyaccount($accountFrom ? $accountFrom : '')[0];
+
+        $inputs = $this->selectInputs($amount, $accountFrom);
+        if (isset($inputs['error'])) {
+            return $inputs;
+        }
+
+        // Build the transaction
+        $totalAmount = $inputs['total'] - $totalAmount;
+
+        $outputs = [];
+        if ($totalAmount > 0) {
+            $outputs[$changeAddress] = $totalAmount;
+
+            // Set the account target to send him the coins
+            $userAccount = $this->getAccountAddress($accountTo);
+            $outputs[$userAccount] = $amount;
+        };
+
+        // Create a raw transaction with all the information
+        $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
+
+        // Sign the transaction
+        $txn = $this->signRawTransaction($txn);
+        if (!$txn['complete']) {
+            return ['error' => 'Could not sign the transaction'];
+        }
+
+        // Send the transaction
+        $result = $this->sendRawTransaction($txn['hex']);
+        if (strlen($result) != 64) {
+            return ['error' => 'Could not send the transaction'];
         }
 
         return ['txid' => $result];

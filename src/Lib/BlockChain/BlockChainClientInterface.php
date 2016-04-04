@@ -50,6 +50,7 @@ interface BlockChainClientInterface
 
     // Complex functionality
     public function storeData($data, $type, $accountTo = null, $accountFrom = null, $txid = null);
+    public function transferCoins($amount, $accountTo, $accountFrom = null);
 
     public function getDecodedData($txid);
 
