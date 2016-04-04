@@ -252,18 +252,22 @@ class StoreData
     public function tests(Request $request, Response $response, $args)
     {
         $blockchain = \Api\Lib\BlockChain\BlockChain::getInstance();
-        $res = $blockchain->transferCoins(0.0001, '', 'test');
+        echo '<pre>';
+
+        $res = $blockchain->transferCoins(0.002, 'test2', '');
         echo '<pre>';
         print_r($res);
 
         /*
-        $res = $blockchain->getRawTransaction('59f91fd845430e8b8b13e7325e23f8c3b866cae1db78b3a427f94a1c1a0fed0b', 1);
-        $res1 = $blockchain->getRawTransaction('7c2cb65d25e67a1b2e9221db756c01434476ebf8e5d9d0b63140a77ea38abbc5', 1);
-        echo '<pre>';
-        print_r($res);
-        print_r($res1);
-        */
+        try {
+            $res = $blockchain->getRawTransaction('32b7682f11063bd9a9cf4d118f881c562919fa4977482f710da9e8eb83382293', 1);
+            $res = $blockchain->getRawTransaction('2adec1c7475e6f4a945881a16c6122b5fe8f77f6f8dff67d718fcf24fa3a6b1c', 1);
 
+            print_r($res);
+        }catch(\Exception $e) {
+            print_r($e);
+        }
+        */
 
         exit;
     }

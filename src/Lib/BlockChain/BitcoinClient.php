@@ -45,7 +45,13 @@ class BitcoinClient implements BlockChainClientInterface
 
     public function getAccountAddress($account)
     {
-        return $this->bitcoin->getaccountaddress($account);
+        $address = $this->bitcoin->getaddressesbyaccount($account)[0];
+
+        if (!$address) {
+            $address = $this->bitcoin->getaccountaddress($account);
+        }
+
+        return $address;
     }
 
     public function getBalance($account = '')
@@ -160,7 +166,7 @@ class BitcoinClient implements BlockChainClientInterface
         $selectedInputs = [];
 
         // Look for the requested account and txid
-        if ($account) {
+        if ($account !== null) {
             // Select unspent inputs from requested account
             $inputs = $this->listUnspent($account);
 
@@ -538,12 +544,13 @@ class BitcoinClient implements BlockChainClientInterface
         $totalAmount = $inputs['total'] - $totalAmount;
 
         $outputs = [];
-        if ($totalAmount > 0) {
-            $outputs[$changeAddress] = $totalAmount;
 
-            // Set the account target to send him the coins
-            $userAccount = $this->getAccountAddress($accountTo);
-            $outputs[$userAccount] = $amount;
+        // Set the account target to send him the coins
+        $outputs[$this->getAccountAddress($accountTo)] = $amount;
+
+        // Change
+        if ($totalAmount > 0) {
+            $outputs[$changeAddress] = (isset($outputs[$changeAddress]) ? $outputs[$changeAddress] : 0) + $totalAmount;
         };
 
         // Create a raw transaction with all the information
