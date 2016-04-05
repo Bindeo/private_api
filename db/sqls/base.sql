@@ -18,6 +18,9 @@ DROP TABLE MEDIA_EXTENSIONS;
 DROP TABLE MEDIA_TYPES;
 DROP TABLE FILE_TYPES;
 DROP TABLE TRANSLATIONS;
+DROP TABLE BULK_FILES;
+DROP TABLE BULK_EVENTS;
+DROP TABLE BULK_TRANSACTIONS;
 */
 
 # CREATION
@@ -43,6 +46,9 @@ source ../tables/FILES_DELETED.sql;
 source ../tables/EMAILS.sql;
 source ../tables/EMAILS_DELETED.sql;
 source ../tables/EMAILS_TO.sql;
+source ../tables/BULK_TRANSACTIONS.sql;
+source ../tables/BULK_FILES.sql;
+source ../tables/BULK_EVENTS.sql;
 
 # Triggers
 source ../triggers/TGR_BD_USERS.sql;
