@@ -520,6 +520,19 @@ class BitcoinClient implements BlockChainClientInterface
     }
 
     /**
+     * Store data in blockchain signed by one account
+     *
+     * @param $data
+     * @param $account
+     *
+     * @return array
+     */
+    public function signdata($data, $account)
+    {
+        return ['txid' => $result];
+    }
+
+    /**
      * Transfer some coins from one account to another
      *
      * @param float  $amount

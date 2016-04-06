@@ -7,6 +7,8 @@ use Bindeo\DataModel\Exceptions;
 
 class BulkTransaction extends BulkTransactionAbstract
 {
+    protected $typeObject;
+
     /**
      * Transform original Json string of files into an array of BulkFile objects
      * @throws \Exception
@@ -21,15 +23,49 @@ class BulkTransaction extends BulkTransactionAbstract
         // Try to decode files
         try {
             $files = json_decode($this->files, true);
-        } catch(\Exception $e) {
+        } catch (\Exception $e) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // Populate objects
         $this->files = [];
         foreach ($files as $file) {
-            $this->files[] = (new BulkFile($file))->setIdUser($this->idUser)->setIp($this->ip);
+            $this->files[] = (new BulkFile($file))->setClientType($this->clientType)
+                                                  ->setIdClient($this->idClient)
+                                                  ->setIp($this->ip);
         }
-        $this->numFiles = count($this->files);
+        $this->numItems = count($this->files);
+    }
+
+    /**
+     * Generate bulk transaction hash
+     *
+     * @return $this
+     */
+    public function hash()
+    {
+        $this->hash = hash('sha256', $this->structure);
+
+        return $this;
+    }
+
+    /**
+     * @return BulkType
+     */
+    public function getTypeObject()
+    {
+        return $this->typeObject;
+    }
+
+    /**
+     * @param BulkType $typeObject
+     *
+     * @return BulkTransaction
+     */
+    public function setTypeObject($typeObject)
+    {
+        $this->typeObject = $typeObject;
+
+        return $this;
     }
 }

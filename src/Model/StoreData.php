@@ -87,12 +87,12 @@ class StoreData
     public function saveFile(File $file)
     {
         // We try to create file first
-        if (!$file->getIdUser() or !$file->getPath() or !file_exists($file->getPath()) or !$file->getFileOrigName()) {
+        if (!$file->getIdClient() or !$file->getPath() or !file_exists($file->getPath()) or !$file->getFileOrigName()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // We need to check if the user has enough free space
-        if (!($user = $this->usersRepo->find(new User(['idUser' => $file->getIdUser()])))) {
+        if (!($user = $this->usersRepo->find(new User(['idUser' => $file->getIdClient()])))) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
@@ -212,7 +212,7 @@ class StoreData
         $blockchainObj = new BlockChain([
             'ip'         => $file->getIp(),
             'net'        => $blockchain->getNet(),
-            'idUser'     => $file->getIdUser(),
+            'idUser'     => $file->getIdClient(),
             'idIdentity' => $signature->getAuxIdentity(),
             'hash'       => $signature->getAssetHash(),
             'jsonData'   => $signature->generate(true),

@@ -53,7 +53,7 @@ class FilesStorage implements FilesInterface
         // Generate a file name with the uploaded extension
         $ext = [];
         $ext = preg_match('/\.[a-zA-Z]+$/', $file->getFileOrigName(), $ext) ? strtolower($ext[0]) : '';
-        $name = md5($file->getIdUser() . $file->getFileOrigName() . time()) . $ext;
+        $name = md5($file->getIdClient() . $file->getFileOrigName() . time()) . $ext;
 
         // Move to the final folder
         if (!rename($file->getPath(), $path . '/' . $name)) {
@@ -115,7 +115,7 @@ class FilesStorage implements FilesInterface
     private function getSubPath(StorableFileInterface $file)
     {
         $path = ($file->getStorageType() == 'bulk' ? '/bulk' : '');
-        $id = $file->getIdUser();
+        $id = $file->getIdClient();
         // Generate necessary folders
         do {
             // We take the last chunking value digits, if we have less digits we prefix it with 0

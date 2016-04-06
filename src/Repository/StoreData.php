@@ -78,7 +78,7 @@ class StoreData extends RepositoryLocatableAbstract
     {
         $file->clean();
         // Check the received data
-        if (!$file->getIdUser() or !$file->getIdType() or !$file->getIdMedia() or !$file->getName() or
+        if (!$file->getIdClient() or !$file->getIdType() or !$file->getIdMedia() or !$file->getName() or
             !$file->getFileName() or !$file->getFileOrigName() or !$file->getIp() or !$file->getHash()
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
@@ -88,7 +88,7 @@ class StoreData extends RepositoryLocatableAbstract
         $sql = "SELECT A.NUM FORBIDDEN, B.NUM WARNING FROM
                 (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND FK_ID_USER = :id_user) A,
                 (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND FK_ID_USER != :id_user) B";
-        $res = $this->db->query($sql, ['id_user' => $file->getIdUser(), ':hash' => $file->getHash()]);
+        $res = $this->db->query($sql, ['id_user' => $file->getIdClient(), ':hash' => $file->getHash()]);
 
         if ($res->getRows()[0]['FORBIDDEN'] > 0) {
             throw new \Exception(Exceptions::DUPLICATED_FILE, 409);
@@ -108,7 +108,7 @@ class StoreData extends RepositoryLocatableAbstract
                   :description, :id_geonames, :latitude, :longitude);';
 
         $data = [
-            ':id_user'     => $file->getIdUser(),
+            ':id_user'     => $file->getIdClient(),
             ':id_type'     => $file->getIdType(),
             ':id_media'    => $file->getIdMedia(),
             ':name'        => $file->getName(),
@@ -172,7 +172,7 @@ class StoreData extends RepositoryLocatableAbstract
         if ($file->getStatus() == 'D') {
             $sql = 'DELETE FROM FILES WHERE ID_FILE = :id;
                     UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_USER = :id_user;';
-            $data = [':id' => $file->getIdFile(), ':id_user' => $res->getIdUser(), ':size' => $res->getSize()];
+            $data = [':id' => $file->getIdFile(), ':id_user' => $res->getIdClient(), ':size' => $res->getSize()];
             if (!$this->db->action($sql, $data)) {
                 throw $this->dbException();
             }
@@ -271,7 +271,7 @@ class StoreData extends RepositoryLocatableAbstract
      */
     public function signAsset(BlockChain $blockchain)
     {
-        if (!$blockchain->getIdElement() or !$blockchain->getIdUser() or !$blockchain->getIp() or
+        if (!$blockchain->getIdElement() or !$blockchain->getIdClient() or !$blockchain->getIp() or
             !$blockchain->getNet() or !$blockchain->getTransaction() or !$blockchain->getHash() or
             !$blockchain->getJsonData() or !in_array($blockchain->getType(), ['F', 'T', 'B'])
         ) {
@@ -283,14 +283,15 @@ class StoreData extends RepositoryLocatableAbstract
 
         $this->db->beginTransaction();
         // Insert the transaction
-        $sql = "INSERT INTO BLOCKCHAIN(TRANSACTION, NET, FK_ID_USER, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE,
+        $sql = "INSERT INTO BLOCKCHAIN(TRANSACTION, NET, CLIENT_TYPE, FK_ID_CLIENT, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE,
                   CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE)
-                VALUES (:txid, :net, :id_user, :id_identity, :hash, :json_data, SYSDATE(), :ip, :type, :id_element,
+                VALUES (:txid, :net, :client_type, :id_client, :id_identity, :hash, :json_data, SYSDATE(), :ip, :type, :id_element,
                   :id_geonames, :latitude, :longitude)";
         $data = [
             ':txid'        => $blockchain->getTransaction(),
             ':net'         => $blockchain->getNet(),
-            ':id_user'     => $blockchain->getIdUser(),
+            ':client_type' => $blockchain->getClientType(),
+            ':id_client'   => $blockchain->getIdClient(),
             ':id_identity' => $blockchain->getIdIdentity(),
             ':hash'        => $blockchain->getHash(),
             ':json_data'   => $blockchain->getJsonData(),
@@ -309,7 +310,7 @@ class StoreData extends RepositoryLocatableAbstract
             } elseif ($blockchain->getType() == 'F') {
                 $sql = 'UPDATE EMAILS SET HASH = :hash, TRANSACTION = :txid WHERE ID_EMAIL = :id';
             } elseif ($blockchain->getType() == 'B') {
-                $sql = 'UPDATE BULK_TRANSACTION SET HASH = :hash, TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
+                $sql = 'UPDATE BULK_TRANSACTIONS SET HASH = :hash, TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
             }
             $data = [
                 ':id'   => $blockchain->getIdElement(),

@@ -52,7 +52,11 @@ $app->group('/data', function () {
 // Edu routes
 $app->group('/bulk', function () {
     $this->post('', 'Api\Controller\BulkTransactions:createBulk');
+    $this->put('', 'Api\Controller\BulkTransactions:closeBulk');
+    $this->delete('', 'Api\Controller\BulkTransactions:deleteBulk');
+    $this->post('/{id}', 'Api\Controller\BulkTransactions:addItem');
     $this->get('/verify', 'Api\Controller\BulkTransactions:verifyFile');
+    $this->get('/types', 'Api\Controller\BulkTransactions:bulkTypes');
 });
 
 //$app->get('/tests', 'Api\Controller\StoreData:tests');

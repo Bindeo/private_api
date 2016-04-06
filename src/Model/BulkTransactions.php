@@ -3,8 +3,10 @@
 namespace Api\Model;
 
 use Api\Entity\BlockChain;
+use Api\Entity\BulkEvent;
 use Api\Entity\BulkFile;
 use Api\Entity\BulkTransaction;
+use Api\Entity\BulkType;
 use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
@@ -46,6 +48,159 @@ class BulkTransactions
         $this->dataRepo = $dataRepo;
         $this->storage = $storage;
         $this->logger = $logger;
+    }
+
+    /**
+     * Factory method to generate a valid BulkTransaction object depending on the bulk type structure and client
+     * permissions
+     *
+     * @param array $params
+     *
+     * @return BulkTransaction
+     * @throws \Exception
+     */
+    private function bulkFactory(array $params)
+    {
+        // Instantiate bulk transaction
+        $bulk = new BulkTransaction($params);
+
+        // Check data
+        if (!$bulk->getType() or !$bulk->getClientType() or !$bulk->getIdClient()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Check if client is able to use this type of bulk transaction
+        $res = $this->bulkRepo->checkType((new BulkType())->setClientType($bulk->getClientType())
+                                                          ->setIdClient($bulk->getIdClient())
+                                                          ->setType($bulk->getType()));
+        if ($res->getNumRows() != 1) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Set type object
+        $bulk->setTypeObject($res->getRows()[0])->setElementsType($bulk->getTypeObject()->getElementsType());
+
+        // Build extra info attribute with Bulk Type structure
+        $bulkInfo = $bulk->getTypeObject()->getBulkInfo(true);
+        $defaultInfo = $bulk->getTypeObject()->getDefaultInfo(true);
+        $extraInfo = [];
+        // Fill extra info with given params or default info
+        foreach ($bulkInfo['fields'] as $field) {
+            if (isset($params[$field])) {
+                $extraInfo[$field] = $params[$field];
+            } elseif ($defaultInfo and isset($defaultInfo[$field])) {
+                $extraInfo[$field] = $defaultInfo[$field];
+            } else {
+                throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+            }
+        }
+        // Initialize structure
+        $structure = [$bulkInfo['title'] => $extraInfo];
+        if ($bulk->getElementsType() == 'E') {
+            $structure['events'] = [];
+        } elseif ($bulk->getElementsType() == 'F') {
+            $structure['docs'] = [];
+        }
+        $bulk->setStructure(json_encode($structure));
+
+        return $bulk;
+    }
+
+    /**
+     * Get the bulk types list of a client
+     *
+     * @param BulkType $bulk
+     *
+     * @return \Api\Entity\ResultSet
+     * @throws \Exception
+     */
+    public function bulkTypes(BulkType $bulk)
+    {
+        return $this->bulkRepo->bulkTypes($bulk);
+    }
+
+    /**
+     * Open a new bulk transaction
+     *
+     * @param array $params
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function openBulk(array $params)
+    {
+        // Factory creation
+        $bulk = $this->bulkFactory($params);
+
+        // Open the bulk transaction
+        $this->bulkRepo->openBulk($bulk);
+
+        return $bulk->toArray();
+    }
+
+    /**
+     * Close an opened Bulk Transaction
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function closeBulk(BulkTransaction $bulk)
+    {
+        // Open the bulk transaction
+        $bulk = $this->bulkRepo->closeBulk($bulk);
+
+        // Sign transaction in blockchain
+        $res = $this->signBulkTransaction($bulk->setClosed(1)->hash());
+
+        return $bulk->toArray();
+    }
+
+    /**
+     * Delete an opened bulk transaction
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @throws \Exception
+     */
+    public function deleteBulk(BulkTransaction $bulk)
+    {
+        // Open the bulk transaction
+        $this->bulkRepo->deleteBulk($bulk);
+    }
+
+    /**
+     * Open a new bulk transaction
+     *
+     * @param BulkEvent $event
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function addEvent(BulkEvent $event)
+    {
+        // Get opened bulk transaction
+        $bulk = $this->bulkRepo->getBulk((new BulkTransaction())->setExternalId($event->getBulkExternalId())
+                                                                ->setClientType($event->getClientType())
+                                                                ->setIdClient($event->getIdClient()));
+        if ($bulk->getClosed() == 0) {
+            throw new \Exception(409, Exceptions::ALREADY_CLOSED);
+        }
+
+        // Create bulk event
+        $this->bulkRepo->createEvent($event->setIdBulk($bulk->getIdBulkTransaction()));
+
+        // Add event to bulk transaction structure
+        $bulk->incNumItems();
+        $structure = $bulk->getStructure(true);
+        $structure['events'][] = $event->getStructure();
+        $bulk->setStructure(json_encode($structure));
+
+        // Update bulk transaction with new elements
+        $this->bulkRepo->updateBulk($bulk);
+
+        return $bulk->toArray();
     }
 
     /**
@@ -103,7 +258,7 @@ class BulkTransactions
         // Check if the stored hash is correct
         $hash = hash('sha256', $bulk->getStructure());
         if ($hash != $bulk->getHash()) {
-            // We need to store the new hash after sign the file
+            // We need to store the new hash after sign the bulk
             $this->logger->addNotice('Hash Incongruence', $bulk->toArray());
             $bulk->setHash($hash);
         }
@@ -119,7 +274,8 @@ class BulkTransactions
         $blockchainObj = new BlockChain([
             'ip'         => $bulk->getIp(),
             'net'        => $blockchain->getNet(),
-            'idUser'     => $bulk->getIdUser(),
+            'clientType' => $bulk->getClientType(),
+            'idClient'   => $bulk->getIdClient(),
             'idIdentity' => 0,
             'hash'       => $bulk->getHash(),
             'jsonData'   => $bulk->getStructure(),
@@ -177,7 +333,7 @@ class BulkTransactions
         foreach ($bulk->getFiles() as $file) {
             // Set bulk transaction data
             $this->saveBulkFile($file->setIdBulk($bulk->getIdBulkTransaction())
-                                     ->setIdUser($bulk->getIdUser())
+                                     ->setIdClient($bulk->getIdClient())
                                      ->setIp($bulk->getIp()));
 
             // Add data to structure
@@ -230,7 +386,7 @@ class BulkTransactions
         }
 
         // Get associated bulk transaction
-        $bulk = $this->bulkRepo->findBulk(new BulkTransaction(['idBulkTransaction' => $file->getIdBulk()]));
+        $bulk = $this->bulkRepo->getBulk(new BulkTransaction(['idBulkTransaction' => $file->getIdBulk()]));
         if (!$bulk or !$bulk->getTransaction()) {
             return [];
         }

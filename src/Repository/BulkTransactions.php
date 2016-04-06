@@ -2,12 +2,13 @@
 
 namespace Api\Repository;
 
+use Api\Entity\BulkEvent;
 use Api\Entity\BulkFile;
 use Api\Entity\BulkTransaction;
+use Api\Entity\BulkType;
 use Api\Entity\ResultSet;
 use Bindeo\DataModel\Exceptions;
 use \MaxMind\Db\Reader;
-use Api\Entity\BlockChain;
 
 class BulkTransactions extends RepositoryLocatableAbstract
 {
@@ -21,7 +22,9 @@ class BulkTransactions extends RepositoryLocatableAbstract
     public function verifyBulkTransaction(BulkTransaction $bulk)
     {
         // Check the received data
-        if (!$bulk->getIdUser() or !$bulk->getNumFiles() or !$bulk->getIp()) {
+        if (!in_array($bulk->getClientType(), ['U', 'C']) or !$bulk->getIdClient() or !$bulk->getIp() or
+            !$bulk->getExternalId() or !in_array($bulk->getElementsType(), ['F', 'E']) or !$bulk->getType()
+        ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
     }
@@ -44,50 +47,87 @@ class BulkTransactions extends RepositoryLocatableAbstract
     }
 
     /**
+     * Get an existent Bulk Transaction
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return BulkTransaction
+     * @throws \Exception
+     */
+    public function getBulk(BulkTransaction $bulk)
+    {
+        $bulk->clean();
+
+        // Check mandatory data
+        if (!$bulk->getIdBulkTransaction() and
+            (!$bulk->getClientType() or !$bulk->getIdClient() or !$bulk->getExternalId())
+        ) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Build the query
+        $sql = "SELECT ID_BULK_TRANSACTION, EXTERNAL_ID, TYPE, ELEMENTS_TYPE, CLIENT_TYPE, FK_ID_CLIENT, NUM_ITEMS, CLOSED,
+                  STRUCTURE, HASH, STATUS, TRANSACTION, CONFIRMED
+                FROM BULK_TRANSACTIONS WHERE STATUS = 'A'";
+
+        if ($bulk->getIdBulkTransaction()) {
+            $sql .= ' AND ID_BULK_TRANSACTION = :id';
+            $params = [':id' => $bulk->getIdBulkTransaction()];
+        } else {
+            $sql .= ' AND CLIENT_TYPE = :type AND ID_CLIENT = :id_client AND EXTERNAL_ID = :id';
+            $params = [
+                ':type'      => $bulk->getClientType(),
+                ':id_client' => $bulk->getIdClient(),
+                ':id'        => $bulk->getExternalId()
+            ];
+        }
+
+        // Execute query
+        $res = $this->db->query($sql, $params, 'Api\Entity\BulkTransaction');
+
+        if (!$res or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
+        }
+
+        return $res->getNumRows() ? $res->getRows()[0] : null;
+    }
+
+    /**
      * Create a new Bulk Transaction
      *
      * @param BulkTransaction $bulk
      *
      * @throws \Exception
      */
-    public function createBulk(BulkTransaction $bulk)
+    public function openBulk(BulkTransaction $bulk)
     {
         $this->verifyBulkTransaction($bulk->clean());
 
         // Check remain data
-        if (!$bulk->getStructure() or !$bulk->getHash()) {
+        if (!$bulk->getStructure() or !json_decode($bulk->getStructure(), true)) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        }
-
-        // Look for another bulk with the same hash and same user
-        $sql = "SELECT A.NUM FORBIDDEN, B.NUM WARNING FROM
-                (SELECT COUNT(*) NUM FROM BULK_TRANSACTION WHERE STATUS = 'A' AND HASH = :hash AND FK_ID_USER = :id_user) A,
-                (SELECT COUNT(*) NUM FROM BULK_TRANSACTION WHERE STATUS = 'A' AND HASH = :hash AND FK_ID_USER != :id_user) B";
-        $res = $this->db->query($sql, ['id_user' => $bulk->getIdUser(), ':hash' => $bulk->getHash()]);
-
-        if ($res->getRows()[0]['FORBIDDEN'] > 0) {
-            throw new \Exception(Exceptions::DUPLICATED_FILE, 409);
-        } elseif ($res->getRows()[0]['WARNING'] > 0) {
-            // TODO Insert into the db logger
         }
 
         // Geolocalize the bulk transaction
         $this->geolocalize($bulk);
 
         // Prepare query and mandatory data
-        $sql = 'INSERT INTO BULK_TRANSACTION(FK_ID_USER, NUM_FILES, STRUCTURE, HASH, CTRL_DATE, CTRL_IP, ID_GEONAMES,
-                  LATITUDE, LONGITUDE)
-                VALUES (:id_user, :num_files, :structure, :hash, SYSDATE(), :ip, :id_geonames, :latitude, :longitude)';
+        $sql = "INSERT INTO BULK_TRANSACTIONS(EXTERNAL_ID, TYPE, ELEMENTS_TYPE, CLIENT_TYPE, FK_ID_CLIENT,
+                  NUM_ITEMS, STRUCTURE, HASH, CTRL_DATE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
+                VALUES (:external_id, :type, :elements_type, :client_type, :id_client, 0, :structure, 'PENDING',
+                  SYSDATE(), :ip, :id_geonames, :latitude, :longitude)";
 
         $data = [
-            ':id_user'     => $bulk->getIdUser(),
-            ':num_files'   => $bulk->getNumFiles(),
-            ':structure'   => $bulk->getStructure(),
-            ':hash'        => $bulk->getHash(),
-            ':ip'          => $bulk->getIp(),
-            ':id_geonames' => $bulk->getIdGeonames() ? $bulk->getIdGeonames() : null,
-            ':latitude'    => $bulk->getLatitude() ? $bulk->getLatitude() : null,
-            ':longitude'   => $bulk->getLongitude() ? $bulk->getLongitude() : null
+            ':external_id'   => $bulk->getExternalId(),
+            ':type'          => $bulk->getType(),
+            ':elements_type' => $bulk->getElementsType(),
+            ':client_type'   => $bulk->getClientType(),
+            ':id_client'     => $bulk->getIdClient(),
+            ':structure'     => $bulk->getStructure(),
+            ':ip'            => $bulk->getIp(),
+            ':id_geonames'   => $bulk->getIdGeonames() ? $bulk->getIdGeonames() : null,
+            ':latitude'      => $bulk->getLatitude() ? $bulk->getLatitude() : null,
+            ':longitude'     => $bulk->getLongitude() ? $bulk->getLongitude() : null
         ];
 
         // Execute query
@@ -100,7 +140,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
     }
 
     /**
-     * Update a Bulk Transaction with final structure and hash data
+     * Update a Bulk Transaction adding elements
      *
      * @param BulkTransaction $bulk
      *
@@ -110,21 +150,154 @@ class BulkTransactions extends RepositoryLocatableAbstract
     {
         $bulk->clean();
         // Check remain data
-        if (!$bulk->getIdBulkTransaction() or !$bulk->getStructure() or !$bulk->getHash()) {
+        if (!$bulk->getIdBulkTransaction() or !$bulk->getStructure() or !$bulk->getHash() or !$bulk->getNumItems()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'UPDATE BULK_TRANSACTION SET STRUCTURE = :structure, HASH = :hash
-                WHERE ID_BULK_TRANSACTION = :id';
+        $sql = 'UPDATE BULK_TRANSACTIONS SET STRUCTURE = :structure, HASH = :hash, NUM_ITEMS = :num_items
+                WHERE ID_BULK_TRANSACTION = :id AND CLOSED = 0';
         $data = [
             ':id'        => $bulk->getIdBulkTransaction(),
             ':structure' => $bulk->getStructure(),
-            ':hash'      => $bulk->getHash()
+            ':hash'      => $bulk->getHash(),
+            ':num_items' => $bulk->getNumItems()
+        ];
+
+        // Execute query
+        if (!$this->db->action($sql, $data)) {
+            if ($this->db->getError()) {
+                throw $this->dbException();
+            } else {
+                throw new \Exception(409, Exceptions::ALREADY_CLOSED);
+            }
+        }
+    }
+
+    /**
+     * Close an opened Bulk Transaction
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return BulkTransaction
+     * @throws \Exception
+     */
+    public function closeBulk(BulkTransaction $bulk)
+    {
+        $bulk->clean();
+
+        // Check data
+        if (!$bulk->getIp() or !$bulk->getIdBulkTransaction() and
+                               (!$bulk->getClientType() or !$bulk->getIdClient() or !$bulk->getExternalId())
+        ) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Obtain main id if it hasn't been given
+        if (!$bulk->getIdBulkTransaction()) {
+            $ip = $bulk->getIp();
+            $bulk = $this->getBulk($bulk);
+
+            if (!$bulk) {
+                throw new \Exception(Exceptions::NON_EXISTENT, 409);
+            }
+
+            $bulk->setIp($ip);
+        }
+
+        $sql = 'UPDATE BULK_TRANSACTIONS SET CTRL_DATE_CLOSED = SYSDATE(), CTRL_IP_CLOSED = :ip, CLOSED = 1
+                WHERE CLOSED = 0 AND ID_BULK_TRANSACTION = :id';
+
+        $params = [':id' => $bulk->getIdBulkTransaction(), ':ip' => $bulk->getIp()];
+
+        // Execute query
+        if (!$this->db->action($sql, $params)) {
+            if ($this->db->getError()) {
+                throw $this->dbException();
+            } else {
+                throw new \Exception(409, Exceptions::ALREADY_CLOSED);
+            }
+        } else {
+            return $bulk;
+        }
+    }
+
+    /**
+     * Delete a Bulk Transaction, only for Events type
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @throws \Exception
+     */
+    public function deleteBulk(BulkTransaction $bulk)
+    {
+        $bulk->clean();
+        // Check remain data
+        if (!$bulk->getIdBulkTransaction() and
+            (!$bulk->getClientType() or !$bulk->getIdClient() or !$bulk->getExternalId())
+        ) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $sql = 'DELETE FROM BULK_TRANSACTIONS WHERE CLOSED = 0';
+        // Close with main id or external id and client data
+        if ($bulk->getIdBulkTransaction()) {
+            $sql .= ' AND ID_BULK_TRANSACTION = :id';
+            $params = [':id' => $bulk->getIdBulkTransaction()];
+        } else {
+            $sql .= ' AND CLIENT_TYPE = :type AND ID_CLIENT = :id_client AND EXTERNAL_ID = :id';
+            $params = [
+                ':type'      => $bulk->getClientType(),
+                ':id_client' => $bulk->getIdClient(),
+                ':id'        => $bulk->getExternalId()
+            ];
+        }
+
+        // Execute query
+        if (!$this->db->action($sql, $params)) {
+            if ($this->db->getError()) {
+                throw $this->dbException();
+            } else {
+                throw new \Exception(409, Exceptions::ALREADY_CLOSED);
+            }
+        }
+    }
+
+    /**
+     * Create a new bulk event
+     *
+     * @param BulkEvent $event
+     *
+     * @throws \Exception
+     */
+    public function createEvent(BulkEvent $event)
+    {
+        $event->clean();
+        // Check remain data
+        if (!$event->getClientType() or !$event->getIdClient() or !$event->getIdBulk() or !$event->getName() or
+            !$event->getTimestamp() or !$event->getData() or !$event->getIp()
+        ) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Prepare query and mandatory data
+        $sql = 'INSERT INTO BULK_EVENTS(FK_ID_BULK, CLIENT_TYPE, FK_ID_CLIENT, NAME, TIMESTAMP, DATA, CTRL_DATE, CTRL_IP)
+                VALUES (:id_bulk, :client_type, :id_client, :name, :timestamp, :data, SYSDATE(), :ip)';
+
+        $data = [
+            ':id_bulk'     => $event->getIdBulk(),
+            ':client_type' => $event->getClientType(),
+            ':id_client'   => $event->getIdClient(),
+            ':name'        => $event->getName(),
+            ':timestamp'   => $event->getFormattedTimestamp(),
+            ':data'        => $event->getData(),
+            ':ip'          => $event->getIp()
         ];
 
         // Execute query
         $this->db->action($sql, $data);
-        if ($this->db->getError()) {
+        if (!$this->db->getError()) {
+            $event->setIdBulkEvent($this->db->lastInsertId());
+        } else {
             throw $this->dbException();
         }
     }
@@ -140,7 +313,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
     {
         $this->verifyBulkFile($file->clean());
         // Check remain data
-        if (!$file->getIdUser() or !$file->getIdBulk() or !$file->getFileName() or !$file->getSize() or
+        if (!$file->getIdClient() or !$file->getIdBulk() or !$file->getFileName() or !$file->getSize() or
             !$file->getHash() or !$file->getIp()
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
@@ -170,7 +343,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
         $data = [
             ':id_bulk'       => $file->getIdBulk(),
             ':unique_id'     => $file->getUniqueId(),
-            ':id_user'       => $file->getIdUser(),
+            ':id_user'       => $file->getIdClient(),
             ':file_name'     => $file->getFileName(),
             ':file_orig'     => $file->getFileOrigName(),
             ':file_type'     => $file->getFileType(),
@@ -236,33 +409,59 @@ class BulkTransactions extends RepositoryLocatableAbstract
     }
 
     /**
-     * Find an active bulk file by its unique Id or hash
+     * Get the bulk types list of a client
      *
-     * @param BulkTransaction $bulk
+     * @param BulkType $bulk
      *
-     * @return BulkTransaction
+     * @return ResultSet
      * @throws \Exception
      */
-    public function findBulk(BulkTransaction $bulk)
+    public function bulkTypes(BulkType $bulk)
     {
         $bulk->clean();
-        // Check mandatory data
-        if (!$bulk->getIdBulkTransaction()) {
+
+        if (!$bulk->getClientType() or !$bulk->getIdClient()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // Build the query
-        $sql = "SELECT ID_BULK_TRANSACTION, FK_ID_USER, NUM_FILES, STRUCTURE, HASH, STATUS, TRANSACTION, CONFIRMED,
-                  ID_GEONAMES, LATITUDE, LONGITUDE
-                FROM BULK_TRANSACTION WHERE ID_BULK_TRANSACTION = :id AND STATUS = 'A'";
+        $sql = "SELECT TYPE, BULK_INFO FROM BULK_TYPES WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id";
+        $params = [':type' => $bulk->getType(), ':id' => $bulk->getIdClient()];
 
-        // Execute query
-        $res = $this->db->query($sql, [':id' => $bulk->getIdBulkTransaction()], 'Api\Entity\BulkTransaction');
+        $data = $this->db->query($sql, $params, 'Api\Entity\BulkType');
 
-        if (!$res or $this->db->getError()) {
+        if (!$data or $this->db->getError()) {
             throw new \Exception($this->db->getError(), 400);
         }
 
-        return $res->getNumRows() ? $res->getRows()[0] : null;
+        return $data;
+    }
+
+    /**
+     * Check if client is able to use requested type
+     *
+     * @param BulkType $bulk
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function checkType(BulkType $bulk)
+    {
+        $bulk->clean();
+
+        if (!$bulk->getClientType() or !$bulk->getIdClient() or !$bulk->getType()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $sql = "SELECT CLIENT_TYPE, FK_ID_CLIENT, TYPE, BULK_INFO, DEFAULT_INFO FROM BULK_TYPES
+                WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id AND TYPE = :name";
+        $params = [':type' => $bulk->getType(), ':id' => $bulk->getIdClient(), ':name' => $bulk->getType()];
+
+        $data = $this->db->query($sql, $params, 'Api\Entity\BulkType');
+
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
+        }
+
+        return $data;
     }
 }
