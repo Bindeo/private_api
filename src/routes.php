@@ -56,7 +56,7 @@ $app->group('/bulk', function () {
 });
 
 // Direct access to blockchain
-$app->group('/advance/blockchain', function () {
+$app->group('/advanced/blockchain', function () {
     $this->post('', 'Api\Controller\StoreData:postBlockchainData');
     $this->get('', 'Api\Controller\StoreData:getBlockchainData');
 });

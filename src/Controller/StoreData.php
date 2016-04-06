@@ -285,11 +285,11 @@ class StoreData
     {
         $res = $this->model->postBlockchainData($request->getParam('data'));
 
-        return $response->withJson($res, 201);
+        return $response->withJson(['array' => $res], 201);
     }
 
     /**
-     * Post data into blockchain
+     * Get data from blockchain
      *
      * @param Request|\Slim\Http\Request   $request
      * @param Response|\Slim\Http\Response $response
@@ -301,6 +301,6 @@ class StoreData
     {
         $res = $this->model->getBlockchainData($request->getParam('mode'), $request->getParam('txid'));
 
-        return $response->withJson($res, 200);
+        return $response->withJson(['array' => $res], 200);
     }
 }
