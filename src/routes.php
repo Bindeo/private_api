@@ -55,4 +55,10 @@ $app->group('/bulk', function () {
     $this->get('/verify', 'Api\Controller\BulkTransactions:verifyFile');
 });
 
+// Direct access to blockchain
+$app->group('/advance/blockchain', function () {
+    $this->post('', 'Api\Controller\StoreData:postBlockchainData');
+    $this->get('', 'Api\Controller\StoreData:getBlockchainData');
+});
+
 //$app->get('/tests', 'Api\Controller\StoreData:tests');

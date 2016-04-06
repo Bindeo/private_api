@@ -487,4 +487,56 @@ class StoreData
             'sign_info'       => $signature->generate()
         ];
     }
+
+    /**
+     * Save direct data string into blockchain
+     *
+     * @param $data
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function postBlockchainData($data)
+    {
+        if (!$data) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        if (!($blockchain = \Api\Lib\BlockChain\BlockChain::getInstance('bitcoin'))) {
+            $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
+            throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
+        }
+
+        // Store string in blockchain
+        return $blockchain->storeData($data, 'S');
+    }
+
+    /**
+     * Get data from blockchain
+     *
+     * @param $mode
+     * @param $txid
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function getBlockchainData($mode, $txid)
+    {
+        if (!in_array($mode, ['basic_info', 'advance_info', 'data']) or !$txid or !ctype_xdigit($txid)) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        if (!($blockchain = \Api\Lib\BlockChain\BlockChain::getInstance('bitcoin'))) {
+            $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
+            throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
+        }
+
+        if ($mode == 'data') {
+            return $blockchain->getDecodedData($txid);
+        } elseif ($mode == 'basic_info') {
+            return $blockchain->getTransaction($txid);
+        } else {
+            return $blockchain->getRawTransaction($txid, 1);
+        }
+    }
 }

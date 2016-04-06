@@ -432,6 +432,11 @@ class BitcoinClient implements BlockChainClientInterface
      */
     public function storeData($data, $type, $accountTo = null, $accountFrom = null, $txid = null)
     {
+        // Check data type
+        if (!ctype_xdigit($data)) {
+            return ['error' => 'Data must be hexadecimal'];
+        }
+
         // Check correct data length
         $dataLen = strlen($data);
         if ($dataLen == 0) {
@@ -480,7 +485,11 @@ class BitcoinClient implements BlockChainClientInterface
         };
 
         // Create a raw transaction with all the information
-        $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
+        try {
+            $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
+        } catch(\Exception $e) {
+            return ['error' => 'Data is not valid'];
+        }
         /*
                 // Old method to include OP_RETURN data
                 $txn = $this->decodeRawTransaction($txn);
