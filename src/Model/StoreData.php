@@ -522,7 +522,7 @@ class StoreData
      */
     public function getBlockchainData($mode, $txid)
     {
-        if (!in_array($mode, ['basic_info', 'advance_info', 'data']) or !$txid or !ctype_xdigit($txid)) {
+        if (!in_array($mode, ['basic_info', 'advanced_info', 'data']) or !$txid or !ctype_xdigit($txid)) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
