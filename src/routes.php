@@ -59,4 +59,10 @@ $app->group('/bulk', function () {
     $this->get('/types', 'Api\Controller\BulkTransactions:bulkTypes');
 });
 
+// Direct access to blockchain
+$app->group('/advanced/blockchain', function () {
+    $this->post('', 'Api\Controller\StoreData:postBlockchainData');
+    $this->get('', 'Api\Controller\StoreData:getBlockchainData');
+});
+
 //$app->get('/tests', 'Api\Controller\StoreData:tests');
