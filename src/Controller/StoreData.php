@@ -254,7 +254,11 @@ class StoreData
         $blockchain = \Api\Lib\BlockChain\BlockChain::getInstance();
         echo '<pre>';
 
-        $res = $blockchain->transferCoins(0.002, 'test2', '');
+        $res = $blockchain->transferCoins(0.001, [
+            "miiytUqeemXnHbQtJGG111JaAtCCXuExAd",
+            "mpYWJxZiTTDuxRRfwFfXZ4Jua7vKA4ESPM",
+            "ms42HQxgEEzxvPPFoWZh4uegR889PA5dcq"
+        ], 5, '');
         echo '<pre>';
         print_r($res);
 

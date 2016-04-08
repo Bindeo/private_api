@@ -9,6 +9,7 @@ class BitcoinClient implements BlockChainClientInterface
     const MAX_DATA_LENGTH = 128; // 80 bytes in hex characters
     const STAMP_FEE       = (ENV == 'development') ? 0.000013 * 10 : 0.000013; // 1300 satoshis
     const TRANSACTION_FEE = (ENV == 'development') ? 0.000023 * 10 : 0.000023; // 2300 satoshis
+    const BULK_STAMP_FEE  = self::STAMP_FEE * 2;
     const SATOSHI         = 0.00000001; // 1 satoshi
 
     private $bitcoin;
@@ -111,7 +112,11 @@ class BitcoinClient implements BlockChainClientInterface
 
     public function listUnspent($account = null)
     {
-        $accounts = $account !== null ? $this->bitcoin->getaddressesbyaccount($account) : [];
+        if ($account !== null) {
+            $accounts = is_array($account) ? $account : $this->bitcoin->getaddressesbyaccount($account);
+        } else {
+            $accounts = [];
+        }
 
         return $this->bitcoin->listunspent(0, 9999999, $accounts);
     }
@@ -144,6 +149,24 @@ class BitcoinClient implements BlockChainClientInterface
     // Complex functionality
 
     // PRIVATE METHODS
+    private function orderInputs($inputs)
+    {
+        // We choose in first place confirmed transactions and in the same level the one with less amount
+        usort($inputs, function ($a, $b) {
+            if ($a['confirmations'] > 0 and $b['confirmations'] == 0) {
+                return 1;
+            } elseif ($b['confirmations'] > 0 and $a['confirmations'] == 0) {
+                return -1;
+            } elseif ($a['amount'] > $b['amount']) {
+                return 1;
+            } elseif ($b['amount'] > $a['amount']) {
+                return -1;
+            } else {
+                return 0;
+            }
+        });
+    }
+
     /**
      * Select necessary inputs for the given amount, if an account and txid are given, we choose those transactions
      * first
@@ -185,20 +208,8 @@ class BitcoinClient implements BlockChainClientInterface
             }
         }
 
-        // We choose in first place confirmed transactions and in the same level the one with less amount
-        usort($unspentInputs, function ($a, $b) {
-            if ($a['confirmations'] > 0 and $b['confirmations'] == 0) {
-                return 1;
-            } elseif ($b['confirmations'] > 0 and $a['confirmations'] == 0) {
-                return -1;
-            } elseif ($a['amount'] > $b['amount']) {
-                return 1;
-            } elseif ($b['amount'] > $a['amount']) {
-                return -1;
-            } else {
-                return 0;
-            }
-        });
+        // Order inputs array
+        $this->orderInputs($unspentInputs);
 
         // Spend inputs
         $inputAmount = 0;
@@ -215,6 +226,66 @@ class BitcoinClient implements BlockChainClientInterface
         }
 
         if ($inputAmount < $amount) {
+            return ['error' => 'Not enough funds are available to cover the amount and fee'];
+        }
+
+        // Return the inputs
+        return ['inputs' => $selectedInputs, 'total' => $inputAmount];
+    }
+
+    /**
+     * @param float  $amount
+     * @param string $account
+     * @param int    $number
+     *
+     * @return array
+     */
+    private function selectPreparedInputs($amount, $account, $number)
+    {
+        // Select account addresses
+        $addresses = $this->bitcoin->getaddressesbyaccount($account);
+
+        // Select first N addresses or generate them if the account doesn't have them
+        $total = count($addresses);
+        if ($total > $number) {
+            $addresses = array_slice($addresses, 0, $number);
+        } elseif ($total < $number) {
+            // Generate necessary addresses
+            for ($i = $number - $total; $i < $number; $i++) {
+                $this->bitcoin->getnewaddress($account);
+            }
+
+            $addresses = $this->bitcoin->getaddressesbyaccount($account);
+        }
+
+        // Select addresses unspent inputs
+        $unspentInputs = $this->listUnspent($addresses);
+
+        if (!is_array($unspentInputs)) {
+            return ['error' => 'Could not retrieve list of unspent inputs'];
+        }
+
+        // Order inputs array
+        $this->orderInputs($unspentInputs);
+
+        // Spend inputs
+        $selectedInputs = [];
+        $inputAmount = 0;
+        foreach ($unspentInputs as $unspentInput) {
+            if ($unspentInput['amount'] > 0) {
+                $selectedInputs[] = $unspentInput;
+                $inputAmount += $unspentInput['amount'];
+
+                // Stop when we have enough coins
+                if ($inputAmount >= $amount) {
+                    break;
+                }
+            }
+        }
+
+        // We need to transfer coins
+        if ($inputAmount < $amount) {
+
             return ['error' => 'Not enough funds are available to cover the amount and fee'];
         }
 
@@ -415,22 +486,14 @@ class BitcoinClient implements BlockChainClientInterface
         return $encodedVersion . $encodedInputs . $encodedOutputs . $encodedLocktime;
     }
 
-
-    // PUBLIC METHODS
-
     /**
-     * Store data in the blockchain as OP_RETURN data (nulldata transaction), we can store a Stamp, a Genesis operation
-     * or a Transfer operation
+     * Check valid data to store into the blockchain
      *
-     * @param string $data
-     * @param string $type        Type of seal - S: Stamp, G: Genesis, T: Transfer
-     * @param string $accountTo   [optional]
-     * @param string $accountFrom [optional]
-     * @param string $txid        [optional]
+     * @param $data
      *
      * @return array
      */
-    public function storeData($data, $type, $accountTo = null, $accountFrom = null, $txid = null)
+    private function checkData($data)
     {
         // Check data type
         if (!ctype_xdigit($data)) {
@@ -443,55 +506,29 @@ class BitcoinClient implements BlockChainClientInterface
             return ['error' => 'Some data is required to be stored'];
         } elseif ($dataLen > self::MAX_DATA_LENGTH) {
             return ['error' => 'Data is bigger than ' . self::MAX_DATA_LENGTH . ' bytes'];
-        }
-
-        // Check correct types and set the minimum amount
-        if ($type == 'S') {
-            $accountTo = null;
-            $accountFrom = null;
-            $txid = null;
-            $amount = self::STAMP_FEE;
-        } elseif ($type == 'G' and $accountTo) {
-            $accountFrom = null;
-            $txid = null;
-            $amount = self::STAMP_FEE + self::SATOSHI;
-        } elseif ($type == 'T' and $accountTo and $accountFrom and $txid) {
-            $amount = self::TRANSACTION_FEE + self::SATOSHI;
         } else {
-            return ['error' => 'Incorrect type or account data'];
+            return ['ok'];
         }
+    }
 
-        // Get the change address to return coins
-        $changeAddress = $this->bitcoin->getaddressesbyaccount("")[0];
-
-        $inputs = $this->selectInputs($amount, $accountFrom, $txid);
-        if (isset($inputs['error'])) {
-            return $inputs;
-        }
-
-        // Build the transaction
-        $amount = $inputs['total'] - $amount;
-
-        $outputs = ['data' => $data];
-        //$outputs = [];
-        if ($amount > 0) {
-            $outputs[$changeAddress] = $amount;
-
-            // Set the account target to send him the colored coin
-            if ($accountTo) {
-                $userAccount = $this->getAccountAddress($accountTo);
-                $outputs[$userAccount] = self::SATOSHI;
-            }
-        };
-
+    /**
+     * Create and send a blockchain transaction from given input and output arrays
+     *
+     * @param $inputs
+     * @param $outputs
+     *
+     * @return array
+     */
+    private function createTransaction($inputs, $outputs)
+    {
         // Create a raw transaction with all the information
         try {
-            $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
-        } catch(\Exception $e) {
+            $txn = $this->createRawTransaction($inputs, $outputs);
+        } catch (\Exception $e) {
             return ['error' => 'Data is not valid'];
         }
         /*
-                // Old method to include OP_RETURN data
+                // Old method to include OP_RETURN data, it allows to include no hexadecimal data
                 $txn = $this->decodeRawTransaction($txn);
 
                 // Add OP_RETURN data
@@ -520,63 +557,229 @@ class BitcoinClient implements BlockChainClientInterface
             return ['error' => 'Could not send the transaction'];
         }
 
-        // If the transaction was ok and we did a transaction, we move the satoshi from accountFrom to default
-        if ($accountFrom) {
-            $this->move($accountFrom, '', self::SATOSHI);
+        return ['txid' => $result];
+    }
+
+
+    // PUBLIC METHODS
+
+    /**
+     * Store data in the blockchain as OP_RETURN data (nulldata transaction)
+     *
+     * @param string $data
+     *
+     * @return array
+     */
+    public function storeData($data)
+    {
+        // Check data is valid
+        $result = $this->checkData($data);
+
+        if (isset($result['error'])) {
+            return $result;
         }
 
-        return ['txid' => $result];
-    }
-
-    /**
-     * Store data in blockchain signed by one account
-     *
-     * @param $data
-     * @param $account
-     *
-     * @return array
-     */
-    public function signdata($data, $account)
-    {
-        return ['txid' => $result];
-    }
-
-    /**
-     * Transfer some coins from one account to another
-     *
-     * @param float  $amount
-     * @param string $accountTo
-     * @param string $accountFrom [optional]
-     *
-     * @return array
-     */
-    public function transferCoins($amount, $accountTo, $accountFrom = null)
-    {
-        $totalAmount = $amount + self::TRANSACTION_FEE;
+        // Check correct types and set the minimum amount
+        $amount = self::STAMP_FEE;
 
         // Get the change address to return coins
-        $changeAddress = $this->bitcoin->getaddressesbyaccount($accountFrom ? $accountFrom : '')[0];
+        $changeAddress = $this->bitcoin->getaddressesbyaccount("")[0];
 
-        $inputs = $this->selectInputs($amount, $accountFrom);
+        $inputs = $this->selectInputs($amount);
         if (isset($inputs['error'])) {
             return $inputs;
         }
 
         // Build the transaction
-        $totalAmount = $inputs['total'] - $totalAmount;
+        $amount = $inputs['total'] - $amount;
 
+        $outputs = ['data' => $data];
+
+        if ($amount > self::SATOSHI) {
+            $outputs[$changeAddress] = $amount;
+        }
+
+        // Create the new transaction
+        $result = $this->createTransaction($inputs['input'], $outputs);
+
+        return $result;
+    }
+
+    /**
+     * Store and transfer property using colored coins
+     *
+     * @param string $data
+     * @param string $type        Type of transfer - G: Genesis, T: Transfer
+     * @param string $accountTo   [optional]
+     * @param string $accountFrom [optional]
+     * @param string $txid        [optional]
+     *
+     * @return array
+     */
+    public function storeProperty($data, $type, $accountTo, $accountFrom = null, $txid = null)
+    {
+        // Check data is valid
+        $result = $this->checkData($data);
+
+        if (isset($result['error'])) {
+            return $result;
+        }
+
+        // Check correct types and set the minimum amount
+        if ($type == 'G' and $accountTo) {
+            $accountFrom = null;
+            $txid = null;
+            $amount = self::STAMP_FEE + self::SATOSHI;
+        } elseif ($type == 'T' and $accountTo and $accountFrom and $txid) {
+            $amount = self::TRANSACTION_FEE + self::SATOSHI;
+        } else {
+            return ['error' => 'Incorrect type or account data'];
+        }
+
+        // Get the change address to return coins
+        $changeAddress = $this->bitcoin->getaddressesbyaccount("")[0];
+
+        $inputs = $this->selectInputs($amount, $accountFrom, $txid);
+        if (isset($inputs['error'])) {
+            return $inputs;
+        }
+
+        // Build the transaction
+        $amount = $inputs['total'] - $amount;
+
+        $outputs = ['data' => $data];
+        //$outputs = [];
+        if ($amount > 0) {
+            $outputs[$changeAddress] = $amount;
+
+            // Set the account target to send him the colored coin
+            $userAccount = $this->getAccountAddress($accountTo);
+            $outputs[$userAccount] = self::SATOSHI;
+        }
+
+        // Create the new transaction
+        $result = $this->createTransaction($inputs['input'], $outputs);
+
+        // If the transaction was ok and we did a transaction, we move the satoshi from accountFrom to default
+        if (!isset($result['error']) and $accountFrom) {
+            $this->move($accountFrom, '', self::SATOSHI);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Store data in blockchain signed by the account. Final address is selected from a group composed by first n
+     * accounts defined by $number
+     *
+     * @param string $data
+     * @param string $account
+     * @param int    $number [optional] Number of account addresses used to select origin input
+     *
+     * @return array
+     */
+    public function storeDataFromAccount($data, $account, $number = 1)
+    {
+        // Check data is valid
+        $result = $this->checkData($data);
+
+        if (isset($result['error'])) {
+            return $result;
+        }
+
+        // Amount to transfer
+        $amount = self::BULK_STAMP_FEE;
+
+        // Select input to spend
+        $inputs = $this->selectPreparedInputs($amount, $account, $number);
+        if (isset($inputs['error'])) {
+            return $inputs;
+        }
+
+        // Create the new transaction
+        $result = $this->createTransaction($inputs['input'], ['data' => $data]);
+
+        return $result;
+    }
+
+    /**
+     * Transfer some coins from one account to another
+     *
+     * @param float        $amount
+     * @param string|array $accountTo     Account name or array of addresses to transfer coins
+     * @param int          $numberOutputs [optional] Number of outputs per address
+     * @param string       $accountFrom   [optional]
+     *
+     * @return array
+     */
+    public function transferCoins($amount, $accountTo, $numberOutputs = 1, $accountFrom = null)
+    {
+        // Get the change address to return coins
+        $changeAddress = $this->bitcoin->getaddressesbyaccount($accountFrom ? $accountFrom : '')[0];
+
+        // Build the transaction
         $outputs = [];
 
+        $totalOutputs = $numberOutputs;
+
         // Set the account target to send him the coins
-        $outputs[$this->getAccountAddress($accountTo)] = $amount;
+        if (is_array($accountTo)) {
+            foreach ($accountTo as $account) {
+                $outputs[$account] = $amount;
+            }
+            $totalOutputs *= count($accountTo);
+        } else {
+            $addresses = $this->bitcoin->getaddressesbyaccount($accountTo);
+            if (count($addresses) == 0) {
+                $outputs[$this->getAccountAddress($accountTo)] = $amount;
+            } else {
+                $outputs[$addresses[0]] = $amount;
+            }
+        }
+
+        // Calculate amount to spend and select necessary unspent inputs to do it
+        $totalAmount = $amount * $totalOutputs + self::TRANSACTION_FEE * ceil($totalOutputs / 20);
+        $inputs = $this->selectInputs($totalAmount, $accountFrom);
+        if (isset($inputs['error'])) {
+            return $inputs;
+        }
+
+        // Amount to transfer
+        $totalAmount = $inputs['total'] - $totalAmount;
 
         // Change
-        if ($totalAmount > 0) {
-            $outputs[$changeAddress] = (isset($outputs[$changeAddress]) ? $outputs[$changeAddress] : 0) + $totalAmount;
-        };
+        if ($totalAmount > self::SATOSHI) {
+            $finalOutputs = array_merge([
+                $changeAddress => (isset($outputs[$changeAddress]) ? $outputs[$changeAddress] : 0) + $totalAmount
+            ], $outputs);
+        } else {
+            $finalOutputs = $outputs;
+        }
 
         // Create a raw transaction with all the information
-        $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
+        $txn = $this->createRawTransaction($inputs['inputs'], $finalOutputs);
+
+        // We need to repeat the outputs
+        if ($totalOutputs > 1) {
+            // Decode transaction to manipulate its outputs directly
+            $decoded = $this->decodeRawTransaction($txn);
+
+            for ($initial = ($totalAmount > self::SATOSHI ? 1 : 0), $i = $initial, $n = count($decoded['vout']);
+                 $i < count($accountTo) + $initial; $i++) {
+                $output = $decoded['vout'][$i];
+
+                for ($j = 0; $j < $numberOutputs; $j++, $n++) {
+                    $output['n'] = $n;
+                    $decoded['vout'][] = $output;
+                }
+            }
+
+            // Increase transaction size in 34 bytes per output
+            $decoded['size'] += 34 * ($totalOutputs - 1);
+
+            // Encode transaction
+            $txn = $this->encodeTransaction($decoded);
+        }
 
         // Sign the transaction
         $txn = $this->signRawTransaction($txn);

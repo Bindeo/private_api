@@ -65,4 +65,4 @@ $app->group('/advanced/blockchain', function () {
     $this->get('', 'Api\Controller\StoreData:getBlockchainData');
 });
 
-//$app->get('/tests', 'Api\Controller\StoreData:tests');
+$app->get('/tests', 'Api\Controller\StoreData:tests');

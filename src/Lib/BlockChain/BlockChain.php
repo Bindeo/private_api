@@ -163,34 +163,62 @@ class BlockChain
 
     // Complex functionality
     /**
-     * Store data in the blockchain, we can store a Stamp, a Genesis operation or a Transfer operation
+     * Store data in the blockchain
      *
      * @param string $data
-     * @param string $type        Type of seal - S: Stamp, G: Genesis, T: Transfer
+     *
+     * @return array
+     */
+    public function storeData($data)
+    {
+        return $this->client->storeData($data);
+    }
+
+    /**
+     * Store and transfer property
+     *
+     * @param string $data
+     * @param string $type        Type of transfer - G: Genesis, T: Transfer
      * @param string $accountTo   [optional]
      * @param string $accountFrom [optional]
      * @param string $txid        [optional]
      *
      * @return array
      */
-    public function storeData($data, $type, $accountTo = null, $accountFrom = null, $txid = null)
+    public function storeProperty($data, $type, $accountTo, $accountFrom = null, $txid = null)
     {
-        return $this->client->storeData($data, $type, $accountTo, $accountFrom, $txid);
+        return $this->client->storeProperty($data, $type, $accountTo, $accountFrom, $txid);
+    }
+
+    /**
+     * Store data in blockchain signed by the account. Final address is selected from a group composed by first n
+     * accounts defined by $number
+     *
+     * @param string $data
+     * @param string $account
+     * @param int    $number [optional] Number of account addresses used to select origin input
+     *
+     * @return array
+     */
+    public function storeDataFromAccount($data, $account, $number = 1)
+    {
+        return $this->client->storeDataFromAccount($data, $account, $number);
     }
 
     // Complex functionality
     /**
-     * Store data in the blockchain, we can store a Stamp, a Genesis operation or a Transfer operation
+     * Transfer some coins from one account to another
      *
-     * @param float  $amount
-     * @param string $accountTo
-     * @param string $accountFrom [optional]
+     * @param float        $amount
+     * @param string|array $accountTo     Account name or array of addresses to transfer coins
+     * @param int          $numberOutputs [optional] Number of outputs per address
+     * @param string       $accountFrom   [optional]
      *
      * @return array
      */
-    public function transferCoins($amount, $accountTo, $accountFrom = null)
+    public function transferCoins($amount, $accountTo, $numberOutputs = 1, $accountFrom = null)
     {
-        return $this->client->transferCoins($amount, $accountTo, $accountFrom);
+        return $this->client->transferCoins($amount, $accountTo, $numberOutputs, $accountFrom);
     }
 
     /**

@@ -49,8 +49,13 @@ interface BlockChainClientInterface
     public function signRawTransaction($tx, $output, $key, $sig_hash = null);
 
     // Complex functionality
-    public function storeData($data, $type, $accountTo = null, $accountFrom = null, $txid = null);
-    public function transferCoins($amount, $accountTo, $accountFrom = null);
+    public function storeData($data);
+
+    public function storeProperty($data, $type, $accountTo, $accountFrom = null, $txid = null);
+
+    public function storeDataFromAccount($data, $account, $number = 1);
+
+    public function transferCoins($amount, $accountTo, $numberOutputs = 1, $accountFrom = null);
 
     public function getDecodedData($txid);
 
