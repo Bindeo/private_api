@@ -6,6 +6,7 @@ DROP TABLE EMAILS_DELETED;
 DROP TABLE EMAILS;
 DROP TABLE FILES_DELETED;
 DROP TABLE FILES;
+DROP TABLE BLOCKCHAIN_INFO;
 DROP TABLE BLOCKCHAIN;
 DROP TABLE USERS_TYPES;
 DROP TABLE USERS_IDENTITIES;
@@ -41,6 +42,7 @@ source ../tables/USERS_VALIDATIONS.sql;
 source ../tables/USERS_TYPES.sql;
 source ../tables/USERS_IDENTITIES.sql;
 source ../tables/BLOCKCHAIN.sql;
+source ../tables/BLOCKCHAIN_INFO.sql;
 source ../tables/FILES.sql;
 source ../tables/FILES_DELETED.sql;
 source ../tables/EMAILS.sql;
@@ -64,5 +66,8 @@ source ../sqls/media_extensions.sql;
 
 # OAuth Clients
 source ../sqls/oauth_clients.sql;
+
+#Blockchain info
+source ../sqls/blockchain.sql;
 
 COMMIT;

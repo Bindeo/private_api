@@ -49,14 +49,20 @@ $app->group('/data', function () {
     $this->get('/blockchain/test', 'Api\Controller\StoreData:testAsset');
 });
 
-// Edu routes
+// Bulk transaction routes
 $app->group('/bulk', function () {
     $this->post('', 'Api\Controller\BulkTransactions:createBulk');
-    $this->put('', 'Api\Controller\BulkTransactions:closeBulk');
-    $this->delete('', 'Api\Controller\BulkTransactions:deleteBulk');
-    $this->post('/{id}', 'Api\Controller\BulkTransactions:addItem');
     $this->get('/verify', 'Api\Controller\BulkTransactions:verifyFile');
     $this->get('/types', 'Api\Controller\BulkTransactions:bulkTypes');
+    $this->put('/{id}', 'Api\Controller\BulkTransactions:closeBulk');
+    $this->delete('/{id}', 'Api\Controller\BulkTransactions:deleteBulk');
+    $this->post('/{id}', 'Api\Controller\BulkTransactions:addItem');
+    $this->get('/{id}', 'Api\Controller\BulkTransactions:getBulk');
+});
+
+// System tasks
+$app->group('/system', function () {
+    $this->get('/blockchain/confirmations', 'Api\Controller\System:blockchainConfirmations');
 });
 
 // Direct access to blockchain
@@ -65,4 +71,4 @@ $app->group('/advanced/blockchain', function () {
     $this->get('', 'Api\Controller\StoreData:getBlockchainData');
 });
 
-$app->get('/tests', 'Api\Controller\StoreData:tests');
+//$app->get('/tests', 'Api\Controller\StoreData:tests');

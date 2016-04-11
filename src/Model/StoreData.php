@@ -328,7 +328,7 @@ class StoreData
         if (!$net) {
             $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
             throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
-        };
+        }
         // Obtain decoded data from blockchain
         $res = $net->getDecodedData($blockchain->getTransaction());
         if (isset($res['data'])) {

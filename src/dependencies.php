@@ -122,6 +122,13 @@ $container['Api\Model\BulkTransactions'] = function ($c) {
         $c->get('Api\Repository\StoreData'), $c->get('Api\Model\General\FilesStorage'), $c->get('logger'));
 };
 
+$container['Api\Model\System'] = function ($c) {
+    $c->get('Api\Lib\BlockChain\BlockChain');
+
+    return new Api\Model\System($c->get('Api\Repository\BulkTransactions'), $c->get('Api\Repository\StoreData'),
+        $c->get('Api\Model\Email\Email'), $c->get('view'), $c->get('logger'));
+};
+
 // Controllers
 $container['Api\Controller\OAuth'] = function ($c) {
     return new Api\Controller\OAuth($c->get('Api\Repository\OAuth'));
@@ -145,4 +152,8 @@ $container['Api\Controller\StoreData'] = function ($c) {
 
 $container['Api\Controller\BulkTransactions'] = function ($c) {
     return new Api\Controller\BulkTransactions($c->get('Api\Model\BulkTransactions'));
+};
+
+$container['Api\Controller\System'] = function ($c) {
+    return new Api\Controller\System($c->get('Api\Model\System'));
 };

@@ -12,12 +12,14 @@ use Api\Entity\BlockChain;
 
 class StoreData extends RepositoryLocatableAbstract
 {
+    // BLOCKCHAIN METHODS
+
     /**
      * Find a transaction by id
      *
      * @param BlockChain $blockchain
      *
-     * @return \Api\Entity\BlockChain
+     * @return BlockChain
      * @throws \Exception
      */
     public function findTransaction(BlockChain $blockchain)
@@ -26,7 +28,7 @@ class StoreData extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT TRANSACTION, NET, CONFIRMED, FK_ID_USER, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE, CTRL_IP,
+        $sql = 'SELECT TRANSACTION, NET, CONFIRMED, CLIENT_TYPE, FK_ID_CLIENT, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE, CTRL_IP,
                   TYPE, FK_ID_ELEMENT, STATUS_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE FROM BLOCKCHAIN WHERE TRANSACTION = :id';
         $params = [':id' => $blockchain->getTransaction()];
 
@@ -40,11 +42,140 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
+     * Store a transaction from a signed asset
+     *
+     * @param BlockChain $blockchain
+     *
+     * @return BlockChain
+     * @throws \Exception
+     */
+    public function signAsset(BlockChain $blockchain)
+    {
+        if (!$blockchain->getIdElement() or !$blockchain->getIdClient() or !$blockchain->getIp() or
+            !$blockchain->getNet() or !$blockchain->getTransaction() or !$blockchain->getHash() or
+            !$blockchain->getJsonData() or !in_array($blockchain->getType(), ['F', 'T', 'B'])
+        ) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Geolocalize the $blockChain
+        $this->geolocalize($blockchain);
+
+        $this->db->beginTransaction();
+        // Insert the transaction
+        $sql = "INSERT INTO BLOCKCHAIN(TRANSACTION, NET, CLIENT_TYPE, FK_ID_CLIENT, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE,
+                  CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE)
+                VALUES (:txid, :net, :client_type, :id_client, :id_identity, :hash, :json_data, SYSDATE(), :ip, :type, :id_element,
+                  :id_geonames, :latitude, :longitude)";
+        $data = [
+            ':txid'        => $blockchain->getTransaction(),
+            ':net'         => $blockchain->getNet(),
+            ':client_type' => $blockchain->getClientType(),
+            ':id_client'   => $blockchain->getIdClient(),
+            ':id_identity' => $blockchain->getIdIdentity(),
+            ':hash'        => $blockchain->getHash(),
+            ':json_data'   => $blockchain->getJsonData(),
+            ':ip'          => $blockchain->getIp(),
+            ':type'        => $blockchain->getType(),
+            ':id_element'  => $blockchain->getIdElement(),
+            ':id_geonames' => $blockchain->getIdGeonames() ? $blockchain->getIdGeonames() : null,
+            ':latitude'    => $blockchain->getLatitude() ? $blockchain->getLatitude() : null,
+            ':longitude'   => $blockchain->getLongitude() ? $blockchain->getLongitude() : null
+        ];
+
+        if ($this->db->action($sql, $data)) {
+            if ($blockchain->getType() == 'F') {
+                // Update the file
+                $sql = 'UPDATE FILES SET HASH = :hash, TRANSACTION = :txid WHERE ID_FILE = :id';
+            } elseif ($blockchain->getType() == 'F') {
+                $sql = 'UPDATE EMAILS SET HASH = :hash, TRANSACTION = :txid WHERE ID_EMAIL = :id';
+            } elseif ($blockchain->getType() == 'B') {
+                $sql = 'UPDATE BULK_TRANSACTIONS SET HASH = :hash, TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
+            }
+            $data = [
+                ':id'   => $blockchain->getIdElement(),
+                ':hash' => $blockchain->getHash(),
+                ':txid' => $blockchain->getTransaction()
+            ];
+
+            if (!$this->db->action($sql, $data)) {
+                $this->db->rollBack();
+                throw $this->dbException();
+            }
+        } else {
+            $this->db->rollBack();
+            throw $this->dbException();
+        }
+
+        $this->db->commit();
+
+        return $blockchain;
+    }
+
+    /**
+     * Get a list of unconfirmed blockchain transactions
+     *
+     * @param string $net [optional]
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function unconfirmedTransactions($net = 'bitcoin')
+    {
+        $sql = "SELECT TRANSACTION, NET, CONFIRMED, CLIENT_TYPE, FK_ID_CLIENT, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE, CTRL_IP,
+                  TYPE, FK_ID_ELEMENT, STATUS_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE
+                FROM BLOCKCHAIN WHERE CONFIRMED = 0 AND STATUS_ELEMENT = 'A' AND NET = :net";
+
+        $data = $this->db->query($sql, [':net' => $net], 'Api\Entity\BlockChain');
+
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Confirm blockchain transaction and associated element
+     *
+     * @param BlockChain $blockchain
+     *
+     * @throws \Exception
+     */
+    public function confirmTransaction(BlockChain $blockchain)
+    {
+        if (!$blockchain->getTransaction() or !$blockchain->getType() or !$blockchain->getIdElement()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Update blockchain registry
+        $sql = 'UPDATE BLOCKCHAIN SET CONFIRMED = 1 WHERE TRANSACTION = :txid;';
+        $params = [':txid' => $blockchain->getTransaction(), ':id' => $blockchain->getIdElement()];
+
+        // Update associated element registry
+        if ($blockchain->getType() == 'B') {
+            $sql .= 'UPDATE BULK_TRANSACTIONS SET CONFIRMED = 1 WHERE ID_BULK_TRANSACTION = :id AND TRANSACTION = :txid;';
+        } elseif ($blockchain->getType() == 'F') {
+            $sql .= 'UPDATE FILES SET CONFIRMED = 1 WHERE ID_FILE = :id AND TRANSACTION = :txid;';
+        } elseif ($blockchain->getType() == 'E') {
+            $sql .= 'UPDATE EMAILS SET CONFIRMED = 1 WHERE ID_EMAIL = :id AND TRANSACTION = :txid;';
+        }
+
+        if (!$this->db->action($sql, $params)) {
+            throw $this->dbException();
+        }
+
+        $blockchain->setConfirmed(1);
+    }
+
+    // FILE METHODS
+
+    /**
      * Find a file by id
      *
      * @param SignableInterface $file
      *
-     * @return \Api\Entity\File
+     * @return File
      * @throws \Exception
      */
     public function findFile(SignableInterface $file)
@@ -259,77 +390,6 @@ class StoreData extends RepositoryLocatableAbstract
                 FROM " . $from . " WHERE FK_ID_USER = :id_user" . $where . " AND STATUS = :status ORDER BY " . $order;
 
         return $this->db->query($sql, $data, 'Api\Entity\File', $filter->getPage(), $filter->getNumRows());
-    }
-
-    /**
-     * Store a transaction from a signed asset
-     *
-     * @param BlockChain $blockchain
-     *
-     * @return BlockChain
-     * @throws \Exception
-     */
-    public function signAsset(BlockChain $blockchain)
-    {
-        if (!$blockchain->getIdElement() or !$blockchain->getIdClient() or !$blockchain->getIp() or
-            !$blockchain->getNet() or !$blockchain->getTransaction() or !$blockchain->getHash() or
-            !$blockchain->getJsonData() or !in_array($blockchain->getType(), ['F', 'T', 'B'])
-        ) {
-            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        }
-
-        // Geolocalize the $blockChain
-        $this->geolocalize($blockchain);
-
-        $this->db->beginTransaction();
-        // Insert the transaction
-        $sql = "INSERT INTO BLOCKCHAIN(TRANSACTION, NET, CLIENT_TYPE, FK_ID_CLIENT, FK_ID_IDENTITY, HASH, JSON_DATA, CTRL_DATE,
-                  CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE)
-                VALUES (:txid, :net, :client_type, :id_client, :id_identity, :hash, :json_data, SYSDATE(), :ip, :type, :id_element,
-                  :id_geonames, :latitude, :longitude)";
-        $data = [
-            ':txid'        => $blockchain->getTransaction(),
-            ':net'         => $blockchain->getNet(),
-            ':client_type' => $blockchain->getClientType(),
-            ':id_client'   => $blockchain->getIdClient(),
-            ':id_identity' => $blockchain->getIdIdentity(),
-            ':hash'        => $blockchain->getHash(),
-            ':json_data'   => $blockchain->getJsonData(),
-            ':ip'          => $blockchain->getIp(),
-            ':type'        => $blockchain->getType(),
-            ':id_element'  => $blockchain->getIdElement(),
-            ':id_geonames' => $blockchain->getIdGeonames() ? $blockchain->getIdGeonames() : null,
-            ':latitude'    => $blockchain->getLatitude() ? $blockchain->getLatitude() : null,
-            ':longitude'   => $blockchain->getLongitude() ? $blockchain->getLongitude() : null
-        ];
-
-        if ($this->db->action($sql, $data)) {
-            if ($blockchain->getType() == 'F') {
-                // Update the file
-                $sql = 'UPDATE FILES SET HASH = :hash, TRANSACTION = :txid WHERE ID_FILE = :id';
-            } elseif ($blockchain->getType() == 'F') {
-                $sql = 'UPDATE EMAILS SET HASH = :hash, TRANSACTION = :txid WHERE ID_EMAIL = :id';
-            } elseif ($blockchain->getType() == 'B') {
-                $sql = 'UPDATE BULK_TRANSACTIONS SET HASH = :hash, TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
-            }
-            $data = [
-                ':id'   => $blockchain->getIdElement(),
-                ':hash' => $blockchain->getHash(),
-                ':txid' => $blockchain->getTransaction()
-            ];
-
-            if (!$this->db->action($sql, $data)) {
-                $this->db->rollBack();
-                throw $this->dbException();
-            }
-        } else {
-            $this->db->rollBack();
-            throw $this->dbException();
-        }
-
-        $this->db->commit();
-
-        return $blockchain;
     }
 
     /**

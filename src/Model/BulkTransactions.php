@@ -3,6 +3,7 @@
 namespace Api\Model;
 
 use Api\Entity\BlockChain;
+use Api\Entity\BlockchainInfo;
 use Api\Entity\BulkEvent;
 use Api\Entity\BulkFile;
 use Api\Entity\BulkTransaction;
@@ -70,19 +71,19 @@ class BulkTransactions
         }
 
         // Check if client is able to use this type of bulk transaction
-        $res = $this->bulkRepo->checkType((new BulkType())->setClientType($bulk->getClientType())
-                                                          ->setIdClient($bulk->getIdClient())
-                                                          ->setType($bulk->getType()));
-        if ($res->getNumRows() != 1) {
+        $bulkType = $this->bulkRepo->getType((new BulkType())->setClientType($bulk->getClientType())
+                                                             ->setIdClient($bulk->getIdClient())
+                                                             ->setType($bulk->getType()));
+        if (!$bulkType) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // Set type object
-        $bulk->setTypeObject($res->getRows()[0])->setElementsType($bulk->getTypeObject()->getElementsType());
+        $bulk->setTypeObject($bulkType)->setElementsType($bulkType->getElementsType());
 
         // Build extra info attribute with Bulk Type structure
-        $bulkInfo = $bulk->getTypeObject()->getBulkInfo(true);
-        $defaultInfo = $bulk->getTypeObject()->getDefaultInfo(true);
+        $bulkInfo = $bulkType->getBulkInfo(true);
+        $defaultInfo = $bulkType->getDefaultInfo(true);
         $extraInfo = [];
         // Fill extra info with given params or default info
         foreach ($bulkInfo['fields'] as $field) {
@@ -152,7 +153,7 @@ class BulkTransactions
         $bulk = $this->bulkRepo->closeBulk($bulk);
 
         // Sign transaction in blockchain
-        $res = $this->signBulkTransaction($bulk->setClosed(1)->hash());
+        $res = $this->signBulkTransaction($bulk->hash());
 
         return $bulk->toArray();
     }
@@ -171,6 +172,22 @@ class BulkTransactions
     }
 
     /**
+     * Get a bulk transaction
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return BulkTransaction
+     * @throws \Exception
+     */
+    public function getBulk(BulkTransaction $bulk)
+    {
+        // Open the bulk transaction
+        $bulk = $this->bulkRepo->getBulk($bulk);
+
+        return $bulk ? $bulk->toArray() : [];
+    }
+
+    /**
      * Open a new bulk transaction
      *
      * @param BulkEvent $event
@@ -184,8 +201,12 @@ class BulkTransactions
         $bulk = $this->bulkRepo->getBulk((new BulkTransaction())->setExternalId($event->getBulkExternalId())
                                                                 ->setClientType($event->getClientType())
                                                                 ->setIdClient($event->getIdClient()));
-        if ($bulk->getClosed() == 0) {
-            throw new \Exception(409, Exceptions::ALREADY_CLOSED);
+        if (!$bulk) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        if ($bulk->getClosed() != 0) {
+            throw new \Exception(Exceptions::ALREADY_CLOSED, 409);
         }
 
         // Create bulk event
@@ -237,7 +258,7 @@ class BulkTransactions
     }
 
     /**
-     * Sign a file into the blockchain
+     * Sign a bulk transaction into the blockchain
      *
      * @param BulkTransaction $bulk
      *
@@ -283,13 +304,34 @@ class BulkTransactions
             'idElement'  => $bulk->getIdBulkTransaction()
         ]);
 
+        // Get account name
+        $accountName = '';
+        $num = 1;
+        if ($bulk->getClientType() == 'C') {
+
+            $info = $this->bulkRepo->getBCInfo(new BlockchainInfo(['idClient' => $bulk->getIdClient()]));
+
+            if (!$info) {
+                throw new \Exception(Exceptions::NON_EXISTENT, 409);
+            }
+
+            // Get client account name and number of addresses
+            $accountName = $info->getAccount();
+            $num = $info->getNumberAddresses();
+        }
+
         // Sign
-        $res = $blockchain->storeData($blockchainObj->getHash(), 'S');
+        $res = $blockchain->storeDataFromAccount($blockchainObj->getHash(), $accountName, $num);
 
         // Check if the transaction was ok
         if (!$res['txid']) {
-            $this->logger->addError('Error signing a file', $bulk->toArray());
+            $this->logger->addError('Error signing a bulk', $bulk->toArray());
             throw new \Exception('', 500);
+        }
+
+        if ($bulk->getClientType() == 'C') {
+            // Spend the prepared transaction
+            $this->bulkRepo->spendTransaction(new BlockchainInfo(['idClient' => $bulk->getIdClient()]));
         }
 
         // Save the transaction information

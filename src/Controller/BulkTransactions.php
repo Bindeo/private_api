@@ -115,7 +115,7 @@ class BulkTransactions
      */
     public function closeBulk(Request $request, Response $response, $args)
     {
-        $res = $this->model->closeBulk(new BulkTransaction($request->getParams()));
+        $res = $this->model->closeBulk((new BulkTransaction($request->getParams()))->setExternalId($args['id']));
         $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -133,9 +133,27 @@ class BulkTransactions
      */
     public function deleteBulk(Request $request, Response $response, $args)
     {
-        $this->model->deleteBulk(new BulkTransaction($request->getParams()));
+        $this->model->deleteBulk((new BulkTransaction($request->getParams()))->setExternalId($args['id']));
 
         return $response->withJson('', 204);
+    }
+
+    /**
+     * Get information about bulk transaction
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     * @throws \Exception
+     */
+    public function getBulk(Request $request, Response $response, $args)
+    {
+        $res = $this->model->getBulk((new BulkTransaction($request->getParams()))->setExternalId($args['id']));
+        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
+
+        return $response->withJson($res, 200);
     }
 
     /**

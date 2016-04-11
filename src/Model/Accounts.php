@@ -9,7 +9,6 @@ use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
 use Api\Model\General\OAuthRegistry;
 use Api\Repository\RepositoryAbstract;
-use Bindeo\DataModel\Exceptions;
 use \Psr\Log\LoggerInterface;
 use Slim\Http\Response;
 use Slim\Views\Twig;

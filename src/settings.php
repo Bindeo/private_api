@@ -29,6 +29,12 @@ return [
                 'appId'     => '2',
                 'appName'   => 'mobile app',
                 'appRole'   => 'all'
+            ],
+            'ce42585fd8ab9272455bca6db8ef84eeef8989ab70c21529125c944ee1c93bed' => [
+                'grantType' => 'client_credentials',
+                'appId'     => '3',
+                'appName'   => 'system',
+                'appRole'   => 'system'
             ]
         ],
 
