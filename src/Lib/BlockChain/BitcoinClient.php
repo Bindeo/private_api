@@ -177,7 +177,7 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return array
      */
-    private function selectInputs($amount, $account = null, $txid = null)
+    private function selectInputs($amount, $account = '', $txid = null)
     {
         // Select unspent transactions
         $unspentInputs = $this->listUnspent();
@@ -251,7 +251,7 @@ class BitcoinClient implements BlockChainClientInterface
             $addresses = array_slice($addresses, 0, $number);
         } elseif ($total < $number) {
             // Generate necessary addresses
-            for ($i = $number - $total; $i < $number; $i++) {
+            for ($i = $number - $total; $i > 0; $i--) {
                 $this->bitcoin->getnewaddress($account);
             }
 
@@ -263,34 +263,25 @@ class BitcoinClient implements BlockChainClientInterface
 
         if (!is_array($unspentInputs)) {
             return ['error' => 'Could not retrieve list of unspent inputs'];
+        } elseif(count($unspentInputs) == 0) {
+            // We need to transfer coins
+            $this->transferCoins($amount, $addresses, round(30 / $number));
+            $unspentInputs = $this->listUnspent($addresses);
         }
 
-        // Order inputs array
-        $this->orderInputs($unspentInputs);
+        // Pickup a random entry
+        $key = array_rand($unspentInputs);
 
         // Spend inputs
-        $selectedInputs = [];
-        $inputAmount = 0;
-        foreach ($unspentInputs as $unspentInput) {
-            if ($unspentInput['amount'] > 0) {
-                $selectedInputs[] = $unspentInput;
-                $inputAmount += $unspentInput['amount'];
+        $selectedInputs = [$unspentInputs[$key]];
 
-                // Stop when we have enough coins
-                if ($inputAmount >= $amount) {
-                    break;
-                }
-            }
-        }
-
-        // We need to transfer coins
-        if ($inputAmount < $amount) {
-
-            return ['error' => 'Not enough funds are available to cover the amount and fee'];
+        // We still are without coins
+        if ($selectedInputs[0]['amount'] > $amount + self::SATOSHI or $selectedInputs[0]['amount'] < self::BULK_STAMP_FEE - self::SATOSHI) {
+            return ['error' => 'Bad prepared inputs'];
         }
 
         // Return the inputs
-        return ['inputs' => $selectedInputs, 'total' => $inputAmount];
+        return ['inputs' => $selectedInputs, 'total' => $selectedInputs[0]['amount']];
     }
 
     /**
@@ -697,7 +688,7 @@ class BitcoinClient implements BlockChainClientInterface
         }
 
         // Create the new transaction
-        $result = $this->createTransaction($inputs['input'], ['data' => $data]);
+        $result = $this->createTransaction($inputs['inputs'], ['data' => $data]);
 
         return $result;
     }
@@ -712,10 +703,10 @@ class BitcoinClient implements BlockChainClientInterface
      *
      * @return array
      */
-    public function transferCoins($amount, $accountTo, $numberOutputs = 1, $accountFrom = null)
+    public function transferCoins($amount, $accountTo, $numberOutputs = 1, $accountFrom = '')
     {
         // Get the change address to return coins
-        $changeAddress = $this->bitcoin->getaddressesbyaccount($accountFrom ? $accountFrom : '')[0];
+        $changeAddress = $this->bitcoin->getaddressesbyaccount($accountFrom)[0];
 
         // Build the transaction
         $outputs = [];
@@ -738,7 +729,7 @@ class BitcoinClient implements BlockChainClientInterface
         }
 
         // Calculate amount to spend and select necessary unspent inputs to do it
-        $totalAmount = $amount * $totalOutputs + self::TRANSACTION_FEE * ceil($totalOutputs / 20);
+        $totalAmount = $amount * $totalOutputs + self::TRANSACTION_FEE * ceil($totalOutputs / 30);
         $inputs = $this->selectInputs($totalAmount, $accountFrom);
         if (isset($inputs['error'])) {
             return $inputs;
@@ -768,7 +759,7 @@ class BitcoinClient implements BlockChainClientInterface
                  $i < count($accountTo) + $initial; $i++) {
                 $output = $decoded['vout'][$i];
 
-                for ($j = 0; $j < $numberOutputs; $j++, $n++) {
+                for ($j = 1; $j < $numberOutputs; $j++, $n++) {
                     $output['n'] = $n;
                     $decoded['vout'][] = $output;
                 }

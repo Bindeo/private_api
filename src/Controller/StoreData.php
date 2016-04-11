@@ -169,12 +169,7 @@ class StoreData
      * @throws \Exception
      */
     public function getOnlineTransaction(Request $request, Response $response, $args)
-    {/*
-        $date = (new \DateTime())->setTimestamp(1458216533);
-        //$date = \DateTime::createFromFormat('U', 1458216533);
-        echo $date->format('d-m-Y H:i:s');
-        exit;*/
-
+    {
         if ($request->getParam('mode') == 'hash') {
             $type = 'hash';
             $res = $this->model->getTransactionHash(new BlockChain($request->getParams()));

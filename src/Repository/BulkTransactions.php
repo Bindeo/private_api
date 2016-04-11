@@ -6,6 +6,7 @@ use Api\Entity\BulkEvent;
 use Api\Entity\BulkFile;
 use Api\Entity\BulkTransaction;
 use Api\Entity\BulkType;
+use Api\Entity\OAuthClient;
 use Api\Entity\ResultSet;
 use Bindeo\DataModel\Exceptions;
 use \MaxMind\Db\Reader;
@@ -74,7 +75,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
             $sql .= ' AND ID_BULK_TRANSACTION = :id';
             $params = [':id' => $bulk->getIdBulkTransaction()];
         } else {
-            $sql .= ' AND CLIENT_TYPE = :type AND ID_CLIENT = :id_client AND EXTERNAL_ID = :id';
+            $sql .= ' AND CLIENT_TYPE = :type AND FK_ID_CLIENT = :id_client AND EXTERNAL_ID = :id';
             $params = [
                 ':type'      => $bulk->getClientType(),
                 ':id_client' => $bulk->getIdClient(),
@@ -86,7 +87,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
         $res = $this->db->query($sql, $params, 'Api\Entity\BulkTransaction');
 
         if (!$res or $this->db->getError()) {
-            throw new \Exception($this->db->getError(), 400);
+            throw $this->dbException();
         }
 
         return $res->getNumRows() ? $res->getRows()[0] : null;
@@ -148,12 +149,16 @@ class BulkTransactions extends RepositoryLocatableAbstract
      */
     public function updateBulk(BulkTransaction $bulk)
     {
+        // Prepare bulk
         $bulk->clean();
+        $bulk->hash();
+
         // Check remain data
         if (!$bulk->getIdBulkTransaction() or !$bulk->getStructure() or !$bulk->getHash() or !$bulk->getNumItems()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
+        // Update bulk
         $sql = 'UPDATE BULK_TRANSACTIONS SET STRUCTURE = :structure, HASH = :hash, NUM_ITEMS = :num_items
                 WHERE ID_BULK_TRANSACTION = :id AND CLOSED = 0';
         $data = [
@@ -217,7 +222,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
                 throw new \Exception(409, Exceptions::ALREADY_CLOSED);
             }
         } else {
-            return $bulk;
+            return $bulk->setClosed(1);
         }
     }
 
@@ -244,7 +249,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
             $sql .= ' AND ID_BULK_TRANSACTION = :id';
             $params = [':id' => $bulk->getIdBulkTransaction()];
         } else {
-            $sql .= ' AND CLIENT_TYPE = :type AND ID_CLIENT = :id_client AND EXTERNAL_ID = :id';
+            $sql .= ' AND CLIENT_TYPE = :type AND FK_ID_CLIENT = :id_client AND EXTERNAL_ID = :id';
             $params = [
                 ':type'      => $bulk->getClientType(),
                 ':id_client' => $bulk->getIdClient(),
@@ -257,7 +262,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
             if ($this->db->getError()) {
                 throw $this->dbException();
             } else {
-                throw new \Exception(409, Exceptions::ALREADY_CLOSED);
+                throw new \Exception(Exceptions::ALREADY_CLOSED, 409);
             }
         }
     }
@@ -452,9 +457,9 @@ class BulkTransactions extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = "SELECT CLIENT_TYPE, FK_ID_CLIENT, TYPE, BULK_INFO, DEFAULT_INFO FROM BULK_TYPES
+        $sql = "SELECT CLIENT_TYPE, FK_ID_CLIENT, TYPE, ELEMENTS_TYPE, BULK_INFO, DEFAULT_INFO FROM BULK_TYPES
                 WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id AND TYPE = :name";
-        $params = [':type' => $bulk->getType(), ':id' => $bulk->getIdClient(), ':name' => $bulk->getType()];
+        $params = [':type' => $bulk->getClientType(), ':id' => $bulk->getIdClient(), ':name' => $bulk->getType()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\BulkType');
 
@@ -463,5 +468,59 @@ class BulkTransactions extends RepositoryLocatableAbstract
         }
 
         return $data;
+    }
+
+    /**
+     * Get blockchain info about a client
+     *
+     * @param OAuthClient $client
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function getBCInfo(OAuthClient $client)
+    {
+        $client->clean();
+
+        if (!$client->getIdClient()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $sql = "SELECT FK_ID_CLIENT, ACCOUNT, NUMBER_ADDRESSES, TOTAL_UNSPENTS, AVAILABLE_UNSPENTS
+                FROM BLOCKCHAIN_INFO WHERE FK_ID_CLIENT = :id";
+        $params = [':id' => $client->getIdClient()];
+
+        $data = $this->db->query($sql, $params, 'Api\Entity\BlockchainInfo');
+
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Get blockchain info about a client
+     *
+     * @param OAuthClient $client
+     *
+     * @throws \Exception
+     */
+    public function spendTransaction(OAuthClient $client)
+    {
+        $client->clean();
+
+        if (!$client->getIdClient()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $sql = "UPDATE BLOCKCHAIN_INFO SET AVAILABLE_UNSPENTS = AVAILABLE_UNSPENTS - 1 WHERE FK_ID_CLIENT = :id";
+        $params = [':id' => $client->getIdClient()];
+
+        // Execute query
+        $this->db->action($sql, $params);
+        if ($this->db->getError()) {
+            throw $this->dbException();
+        }
     }
 }
