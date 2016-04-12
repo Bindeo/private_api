@@ -23,6 +23,25 @@ class BulkTransactions
     }
 
     /**
+     * Get the bulk type requested
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     * @throws \Exception
+     */
+    public function bulkType(Request $request, Response $response, $args)
+    {
+        $data = $this->model->bulkType(new BulkType($request->getParams()));
+
+        $res = ['data' => ['type' => 'bulk_type', 'attributes' => $data]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
      * Get the bulk types list of a client
      *
      * @param Request|\Slim\Http\Request   $request
@@ -73,7 +92,7 @@ class BulkTransactions
      * @return \Slim\Http\Response
      * @throws \Exception
      */
-    public function openBulk(Request $request, Response $response, $args)
+    private function openBulk(Request $request, Response $response, $args)
     {
         $res = $this->model->openBulk($request->getParams());
         $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
@@ -91,7 +110,7 @@ class BulkTransactions
      * @return \Slim\Http\Response
      * @throws \Exception
      */
-    public function oneStepBulk(Request $request, Response $response, $args)
+    private function oneStepBulk(Request $request, Response $response, $args)
     {
         // New bulk transaction
         $bulk = new BulkTransaction($request->getParams());
@@ -115,7 +134,7 @@ class BulkTransactions
      */
     public function closeBulk(Request $request, Response $response, $args)
     {
-        $res = $this->model->closeBulk((new BulkTransaction($request->getParams()))->setExternalId($args['id']));
+        $res = $this->model->closeBulk(new BulkTransaction($request->getParams()));
         $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -133,7 +152,7 @@ class BulkTransactions
      */
     public function deleteBulk(Request $request, Response $response, $args)
     {
-        $this->model->deleteBulk((new BulkTransaction($request->getParams()))->setExternalId($args['id']));
+        $this->model->deleteBulk(new BulkTransaction($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -150,7 +169,7 @@ class BulkTransactions
      */
     public function getBulk(Request $request, Response $response, $args)
     {
-        $res = $this->model->getBulk((new BulkTransaction($request->getParams()))->setExternalId($args['id']));
+        $res = $this->model->getBulk(new BulkTransaction($request->getParams()));
         $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -190,7 +209,7 @@ class BulkTransactions
      */
     public function addEvent(Request $request, Response $response, $args)
     {
-        $res = $this->model->addEvent((new BulkEvent($request->getParams()))->setBulkExternalId($args['id']));
+        $res = $this->model->addEvent(new BulkEvent($request->getParams()));
         $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
 
         return $response->withJson($res, 201);

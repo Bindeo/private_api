@@ -53,11 +53,12 @@ $app->group('/data', function () {
 $app->group('/bulk', function () {
     $this->post('', 'Api\Controller\BulkTransactions:createBulk');
     $this->get('/verify', 'Api\Controller\BulkTransactions:verifyFile');
+    $this->get('/type', 'Api\Controller\BulkTransactions:bulkType');
     $this->get('/types', 'Api\Controller\BulkTransactions:bulkTypes');
-    $this->put('/{id}', 'Api\Controller\BulkTransactions:closeBulk');
-    $this->delete('/{id}', 'Api\Controller\BulkTransactions:deleteBulk');
-    $this->post('/{id}', 'Api\Controller\BulkTransactions:addItem');
-    $this->get('/{id}', 'Api\Controller\BulkTransactions:getBulk');
+    $this->put('', 'Api\Controller\BulkTransactions:closeBulk');
+    $this->delete('', 'Api\Controller\BulkTransactions:deleteBulk');
+    $this->post('/item', 'Api\Controller\BulkTransactions:addItem');
+    $this->get('', 'Api\Controller\BulkTransactions:getBulk');
 });
 
 // System tasks

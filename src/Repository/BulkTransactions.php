@@ -431,7 +431,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
         }
 
         $sql = "SELECT TYPE, BULK_INFO FROM BULK_TYPES WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id";
-        $params = [':type' => $bulk->getType(), ':id' => $bulk->getIdClient()];
+        $params = [':type' => $bulk->getClientType(), ':id' => $bulk->getIdClient()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\BulkType');
 

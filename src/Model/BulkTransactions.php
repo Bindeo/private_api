@@ -14,7 +14,7 @@ use Api\Repository\RepositoryAbstract;
 use \Psr\Log\LoggerInterface;
 
 /**
- * Class StoreData to manage StoreData controller functionality
+ * Class BulkTransactions to manage BulkTransactions controller functionality
  * @package Api\Model
  */
 class BulkTransactions
@@ -105,6 +105,21 @@ class BulkTransactions
         $bulk->setStructure(json_encode($structure));
 
         return $bulk;
+    }
+
+    /**
+     * Get the bulk type requested
+     *
+     * @param BulkType $bulk
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function bulkType(BulkType $bulk)
+    {
+        $bulk = $this->bulkRepo->getType($bulk);
+
+        return $bulk ? $bulk->toArray() : [];
     }
 
     /**
