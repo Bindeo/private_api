@@ -21,7 +21,11 @@ DROP TABLE FILE_TYPES;
 DROP TABLE TRANSLATIONS;
 DROP TABLE BULK_FILES;
 DROP TABLE BULK_EVENTS;
+DROP TABLE BULK_TYPES;
 DROP TABLE BULK_TRANSACTIONS;
+DROP TABLE OAUTH_TOKENS;
+DROP TABLE OAUTH_CLIENTS;
+
 */
 
 # CREATION
@@ -49,6 +53,7 @@ source ../tables/EMAILS.sql;
 source ../tables/EMAILS_DELETED.sql;
 source ../tables/EMAILS_TO.sql;
 source ../tables/BULK_TRANSACTIONS.sql;
+source ../tables/BULK_TYPES.sql;
 source ../tables/BULK_FILES.sql;
 source ../tables/BULK_EVENTS.sql;
 
