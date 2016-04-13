@@ -188,10 +188,10 @@ class BulkTransactions
     public function addItem(Request $request, Response $response, $args)
     {
         $mode = $request->getParam('type');
-        if ($mode == 'event' and isset($args['id'])) {
-            return $this->addEvent($request, $response, $args);
-        } elseif ($mode == 'file' and isset($args['id'])) {
-            return $this->oneStepBulk($request, $response, $args);
+        if ($mode == 'event') {
+            return $this->addEvent($request, $response);
+        } elseif ($mode == 'file') {
+            return $this->oneStepBulk($request, $response);
         } else {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -202,12 +202,11 @@ class BulkTransactions
      *
      * @param Request|\Slim\Http\Request   $request
      * @param Response|\Slim\Http\Response $response
-     * @param array                        $args [optional]
      *
      * @return \Slim\Http\Response
      * @throws \Exception
      */
-    public function addEvent(Request $request, Response $response, $args)
+    private function addEvent(Request $request, Response $response)
     {
         $res = $this->model->addEvent(new BulkEvent($request->getParams()));
         $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];

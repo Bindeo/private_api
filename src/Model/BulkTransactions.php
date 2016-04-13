@@ -168,7 +168,7 @@ class BulkTransactions
         $bulk = $this->bulkRepo->closeBulk($bulk);
 
         // Sign transaction in blockchain
-        $res = $this->signBulkTransaction($bulk->hash());
+        $this->signBulkTransaction($bulk->hash());
 
         return $bulk->toArray();
     }
