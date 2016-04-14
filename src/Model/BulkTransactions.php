@@ -341,7 +341,7 @@ class BulkTransactions
         // Check if the transaction was ok
         if (!$res['txid']) {
             $this->logger->addError('Error signing a bulk', $bulk->toArray());
-            throw new \Exception('', 500);
+            throw new \Exception($res['error'], 500);
         }
 
         if ($bulk->getClientType() == 'C') {

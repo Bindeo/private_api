@@ -17,7 +17,7 @@ $c['errorHandler'] = function ($c) {
                 $error['error']['message'] = 'Unauthorized access';
                 break;
             case 500:
-                $error['error']['message'] = 'Something went wrong!';
+                $error['error']['message'] = $exception->getMessage();
                 // Write it into monolog
                 $c->get('logger')
                   ->error($exception->getCode() . ' ' . $exception->getMessage(), $exception->getTrace());
