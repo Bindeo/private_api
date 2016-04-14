@@ -265,7 +265,7 @@ class BitcoinClient implements BlockChainClientInterface
 
         if (!is_array($unspentInputs)) {
             return ['error' => 'Could not retrieve list of unspent inputs'];
-        } elseif(count($unspentInputs) == 0) {
+        } elseif (count($unspentInputs) == 0) {
             // We need to transfer coins
             $this->transferCoins($amount, $addresses, round(30 / $number));
             $unspentInputs = $this->listUnspent($addresses);
@@ -279,7 +279,9 @@ class BitcoinClient implements BlockChainClientInterface
 
         // We still are without coins
 
-        if ($selectedInputs[0]['amount'] > $amount + self::SATOSHI or $selectedInputs[0]['amount'] < self::BULK_STAMP_FEE - self::SATOSHI) {
+        if ($selectedInputs[0]['amount'] > $amount + self::SATOSHI or
+            $selectedInputs[0]['amount'] < self::BULK_STAMP_FEE - self::SATOSHI
+        ) {
             return ['error' => 'Bad prepared inputs'];
         }
 
@@ -696,31 +698,39 @@ class BitcoinClient implements BlockChainClientInterface
         return $result;
     }
 
+    /**
+     * Auxiliary method to transfer all coins from one account to another
+     *
+     * @param $accountTo
+     * @param $accountFrom
+     *
+     * @return array
+     */
     private function transferAll($accountTo, $accountFrom)
     {
-        $inputs = $this->listUnspent($accountFrom);
+        // Select all the unspent outputs
+        $unspents = $this->listUnspent($accountFrom);
 
-        $outputs = [];
+        $inputs = ['total' => 0, 'inputs' => []];
 
-        if (count($inputs) > 0 and $inputs['total'] > self::TRANSACTION_FEE * ceil(count($inputs) / 5)) {
-            $outputs[$this->getAccountAddress($accountTo)] = $inputs['total'] - self::TRANSACTION_FEE * ceil(count($inputs) / 5);
+        foreach ($unspents as $unspent) {
+            $inputs['inputs'][] = $unspent;
+            $inputs['total'] += $unspent['amount'];
         }
 
+        // Build output if there are enough money
+        $outputs = [];
+        if (count($inputs['inputs']) > 0 and
+            $inputs['total'] > self::TRANSACTION_FEE * ceil(count($inputs['inputs']) / 5)
+        ) {
+            $outputs[$this->getAccountAddress($accountTo)] = $inputs['total'] -
+                                                             self::TRANSACTION_FEE * ceil(count($inputs['inputs']) / 5);
+        }
+
+        // Create raw transaction
         $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
 
-        // Sign the transaction
-        $txn = $this->signRawTransaction($txn);
-        if (!$txn['complete']) {
-            return ['error' => 'Could not sign the transaction'];
-        }
-
-        // Send the transaction
-        $result = $this->sendRawTransaction($txn['hex']);
-        if (strlen($result) != 64) {
-            return ['error' => 'Could not send the transaction'];
-        }
-
-        return ['txid' => $result];
+        return $txn;
     }
 
     /**
@@ -735,75 +745,76 @@ class BitcoinClient implements BlockChainClientInterface
      */
     public function transferCoins($amount, $accountTo, $numberOutputs = 1, $accountFrom = '')
     {
+        // Amount 0 means that we need to transfer all coins from one account to another
         if ($amount == 0) {
-            return $this->transferAll($accountTo, $accountFrom);
-        }
-
-        // Get the change address to return coins
-        $changeAddress = $this->bitcoin->getaddressesbyaccount($accountFrom)[0];
-
-        // Build the transaction
-        $outputs = [];
-
-        $totalOutputs = $numberOutputs;
-
-        // Set the account target to send him the coins
-        if (is_array($accountTo)) {
-            foreach ($accountTo as $account) {
-                $outputs[$account] = $amount;
-            }
-            $totalOutputs *= count($accountTo);
+            $txn = $this->transferAll($accountTo, $accountFrom);
         } else {
-            $addresses = $this->bitcoin->getaddressesbyaccount($accountTo);
-            if (count($addresses) == 0) {
-                $outputs[$this->getAccountAddress($accountTo)] = $amount;
+            // Get the change address to return coins
+            $changeAddress = $this->bitcoin->getaddressesbyaccount($accountFrom)[0];
+
+            // Build the transaction
+            $outputs = [];
+
+            $totalOutputs = $numberOutputs;
+
+            // Set the account target to send him the coins
+            if (is_array($accountTo)) {
+                foreach ($accountTo as $account) {
+                    $outputs[$account] = $amount;
+                }
+                $totalOutputs *= count($accountTo);
             } else {
-                $outputs[$addresses[0]] = $amount;
-            }
-        }
-
-        // Calculate amount to spend and select necessary unspent inputs to do it
-        $totalAmount = $amount * $totalOutputs + self::TRANSACTION_FEE * ceil($totalOutputs / 30);
-        $inputs = $this->selectInputs($totalAmount, $accountFrom);
-        if (isset($inputs['error'])) {
-            return $inputs;
-        }
-
-        // Amount to transfer
-        $totalAmount = $inputs['total'] - $totalAmount;
-
-        // Change
-        if ($totalAmount > self::SATOSHI) {
-            $finalOutputs = array_merge([
-                $changeAddress => (isset($outputs[$changeAddress]) ? $outputs[$changeAddress] : 0) + $totalAmount
-            ], $outputs);
-        } else {
-            $finalOutputs = $outputs;
-        }
-
-        // Create a raw transaction with all the information
-        $txn = $this->createRawTransaction($inputs['inputs'], $finalOutputs);
-
-        // We need to repeat the outputs
-        if ($totalOutputs > 1) {
-            // Decode transaction to manipulate its outputs directly
-            $decoded = $this->decodeRawTransaction($txn);
-
-            for ($initial = ($totalAmount > self::SATOSHI ? 1 : 0), $i = $initial, $n = count($decoded['vout']);
-                 $i < count($accountTo) + $initial; $i++) {
-                $output = $decoded['vout'][$i];
-
-                for ($j = 1; $j < $numberOutputs; $j++, $n++) {
-                    $output['n'] = $n;
-                    $decoded['vout'][] = $output;
+                $addresses = $this->bitcoin->getaddressesbyaccount($accountTo);
+                if (count($addresses) == 0) {
+                    $outputs[$this->getAccountAddress($accountTo)] = $amount;
+                } else {
+                    $outputs[$addresses[0]] = $amount;
                 }
             }
 
-            // Increase transaction size in 34 bytes per output
-            $decoded['size'] += 34 * ($totalOutputs - 1);
+            // Calculate amount to spend and select necessary unspent inputs to do it
+            $totalAmount = $amount * $totalOutputs + self::TRANSACTION_FEE * ceil($totalOutputs / 30);
+            $inputs = $this->selectInputs($totalAmount, $accountFrom);
+            if (isset($inputs['error'])) {
+                return $inputs;
+            }
 
-            // Encode transaction
-            $txn = $this->encodeTransaction($decoded);
+            // Amount to transfer
+            $totalAmount = $inputs['total'] - $totalAmount;
+
+            // Change
+            if ($totalAmount > self::SATOSHI) {
+                $finalOutputs = array_merge([
+                    $changeAddress => (isset($outputs[$changeAddress]) ? $outputs[$changeAddress] : 0) + $totalAmount
+                ], $outputs);
+            } else {
+                $finalOutputs = $outputs;
+            }
+
+            // Create a raw transaction with all the information
+            $txn = $this->createRawTransaction($inputs['inputs'], $finalOutputs);
+
+            // We need to repeat the outputs
+            if ($totalOutputs > 1) {
+                // Decode transaction to manipulate its outputs directly
+                $decoded = $this->decodeRawTransaction($txn);
+
+                for ($initial = ($totalAmount > self::SATOSHI ? 1 : 0), $i = $initial, $n = count($decoded['vout']);
+                     $i < count($accountTo) + $initial; $i++) {
+                    $output = $decoded['vout'][$i];
+
+                    for ($j = 1; $j < $numberOutputs; $j++, $n++) {
+                        $output['n'] = $n;
+                        $decoded['vout'][] = $output;
+                    }
+                }
+
+                // Increase transaction size in 34 bytes per output
+                $decoded['size'] += 34 * ($totalOutputs - 1);
+
+                // Encode transaction
+                $txn = $this->encodeTransaction($decoded);
+            }
         }
 
         // Sign the transaction
