@@ -4,7 +4,7 @@ if [ -n "$1" ];
 then
 url='http://'$1'.'
 else
-url='https://'
+url='http://'
 fi
 
 curl --request GET \
