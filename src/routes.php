@@ -64,6 +64,7 @@ $app->group('/bulk', function () {
 // System tasks
 $app->group('/system', function () {
     $this->get('/blockchain/confirmations', 'Api\Controller\System:blockchainConfirmations');
+    $this->post('/blockchain/transfer', 'Api\Controller\System:transferCoins');
 });
 
 // Direct access to blockchain

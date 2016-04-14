@@ -9,7 +9,7 @@ class BitcoinClient implements BlockChainClientInterface
     const MAX_DATA_LENGTH = 128; // 80 bytes in hex characters
     const STAMP_FEE       = (ENV == 'development') ? 0.000013 * 10 : 0.000013; // 1300 satoshis
     const TRANSACTION_FEE = (ENV == 'development') ? 0.000023 * 10 : 0.000023; // 2300 satoshis
-    const BULK_STAMP_FEE  = self::STAMP_FEE * 2;
+    const BULK_STAMP_FEE  = self::TRANSACTION_FEE;
     const SATOSHI         = 0.00000001; // 1 satoshi
 
     private $bitcoin;
@@ -46,10 +46,12 @@ class BitcoinClient implements BlockChainClientInterface
 
     public function getAccountAddress($account)
     {
-        $address = $this->bitcoin->getaddressesbyaccount($account)[0];
+        $address = $this->bitcoin->getaddressesbyaccount($account);
 
-        if (!$address) {
+        if (!isset($address[0])) {
             $address = $this->bitcoin->getaccountaddress($account);
+        } else {
+            $address = $address[0];
         }
 
         return $address;
@@ -276,6 +278,7 @@ class BitcoinClient implements BlockChainClientInterface
         $selectedInputs = [$unspentInputs[$key]];
 
         // We still are without coins
+        
         if ($selectedInputs[0]['amount'] > $amount + self::SATOSHI or $selectedInputs[0]['amount'] < self::BULK_STAMP_FEE - self::SATOSHI) {
             return ['error' => 'Bad prepared inputs'];
         }

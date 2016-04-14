@@ -238,6 +238,38 @@ class StoreData
     }
 
     /**
+     * Post data into blockchain
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function postBlockchainData(Request $request, Response $response, $args)
+    {
+        $res = $this->model->postBlockchainData($request->getParam('data'));
+
+        return $response->withJson(['array' => $res], 201);
+    }
+
+    /**
+     * Get data from blockchain
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function getBlockchainData(Request $request, Response $response, $args)
+    {
+        $res = $this->model->getBlockchainData($request->getParam('mode'), $request->getParam('txid'));
+
+        return $response->withJson(['array' => $res], 200);
+    }
+
+    /**
      * Development blockchain tests
      *
      * @param Request|\Slim\Http\Request   $request
@@ -269,37 +301,5 @@ class StoreData
         */
 
         exit;
-    }
-
-    /**
-     * Post data into blockchain
-     *
-     * @param Request|\Slim\Http\Request   $request
-     * @param Response|\Slim\Http\Response $response
-     * @param array                        $args [optional]
-     *
-     * @return \Slim\Http\Response
-     */
-    public function postBlockchainData(Request $request, Response $response, $args)
-    {
-        $res = $this->model->postBlockchainData($request->getParam('data'));
-
-        return $response->withJson(['array' => $res], 201);
-    }
-
-    /**
-     * Get data from blockchain
-     *
-     * @param Request|\Slim\Http\Request   $request
-     * @param Response|\Slim\Http\Response $response
-     * @param array                        $args [optional]
-     *
-     * @return \Slim\Http\Response
-     */
-    public function getBlockchainData(Request $request, Response $response, $args)
-    {
-        $res = $this->model->getBlockchainData($request->getParam('mode'), $request->getParam('txid'));
-
-        return $response->withJson(['array' => $res], 200);
     }
 }

@@ -430,7 +430,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = "SELECT TYPE, BULK_INFO FROM BULK_TYPES WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id";
+        $sql = "SELECT TYPE, BULK_INFO, ELEMENTS_TYPE FROM BULK_TYPES WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id";
         $params = [':type' => $bulk->getClientType(), ':id' => $bulk->getIdClient()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\BulkType');

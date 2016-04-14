@@ -41,4 +41,29 @@ class System
 
         return $response->withJson('', 204);
     }
+
+    /**
+     * Transfer coins between accounts
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @throws \Exception
+     */
+    public function transferCoins(Request $request, Response $response, $args)
+    {
+        // Check grants
+        if (OAuthRegistry::getInstance()->getAppRole() != 'system') {
+            throw new \Exception(Exceptions::UNAUTHORIZED, 401);
+        }
+
+        if (!$request->getParam('accountTo')) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Transfer coins
+        $this->model->transferCoins($request->getParam('net', 'bitcoin'), $request->getParam('amount', 0),
+            $request->getParam('accountTo'), $request->getParam('number', 1), $request->getParam('accountFrom', ''));
+    }
 }
