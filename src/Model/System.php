@@ -146,26 +146,6 @@ class System
             throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
         }
 
-        // If amount is 0 we need to transfer all the coins
-        if ($amount == 0) {
-            // Get unspents coins
-            $unspents = $blockchain->listUnspent($accountFrom);
-
-            if (count($unspents) > 0) {
-                // Take the first unspent for fees
-                $fees = array_pop($unspents);
-
-                // If fees are too much, we take some money to send
-                if ($fees['amount'] > 0.005) {
-                    $amount += $fees['amount'] - 0.005;
-                }
-
-                foreach ($unspents as $unspent) {
-                    $amount += $unspent['amount'];
-                }
-            }
-        }
-
         $blockchain->transferCoins($amount, $accountTo, $numberOutputs, $accountFrom);
     }
 }

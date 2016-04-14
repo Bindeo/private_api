@@ -278,7 +278,7 @@ class BitcoinClient implements BlockChainClientInterface
         $selectedInputs = [$unspentInputs[$key]];
 
         // We still are without coins
-        
+
         if ($selectedInputs[0]['amount'] > $amount + self::SATOSHI or $selectedInputs[0]['amount'] < self::BULK_STAMP_FEE - self::SATOSHI) {
             return ['error' => 'Bad prepared inputs'];
         }
@@ -696,6 +696,33 @@ class BitcoinClient implements BlockChainClientInterface
         return $result;
     }
 
+    private function transferAll($accountTo, $accountFrom)
+    {
+        $inputs = $this->listUnspent($accountFrom);
+
+        $outputs = [];
+
+        if (count($inputs) > 0 and $inputs['total'] > self::TRANSACTION_FEE * ceil(count($inputs) / 5)) {
+            $outputs[$this->getAccountAddress($accountTo)] = $inputs['total'] - self::TRANSACTION_FEE * ceil(count($inputs) / 5);
+        }
+
+        $txn = $this->createRawTransaction($inputs['inputs'], $outputs);
+
+        // Sign the transaction
+        $txn = $this->signRawTransaction($txn);
+        if (!$txn['complete']) {
+            return ['error' => 'Could not sign the transaction'];
+        }
+
+        // Send the transaction
+        $result = $this->sendRawTransaction($txn['hex']);
+        if (strlen($result) != 64) {
+            return ['error' => 'Could not send the transaction'];
+        }
+
+        return ['txid' => $result];
+    }
+
     /**
      * Transfer some coins from one account to another
      *
@@ -708,6 +735,10 @@ class BitcoinClient implements BlockChainClientInterface
      */
     public function transferCoins($amount, $accountTo, $numberOutputs = 1, $accountFrom = '')
     {
+        if ($amount == 0) {
+            return $this->transferAll($accountTo, $accountFrom);
+        }
+
         // Get the change address to return coins
         $changeAddress = $this->bitcoin->getaddressesbyaccount($accountFrom)[0];
 
