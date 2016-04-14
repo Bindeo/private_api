@@ -58,7 +58,7 @@ class System
             throw new \Exception(Exceptions::UNAUTHORIZED, 401);
         }
 
-        if (!$request->getParam('accountTo')) {
+        if ($request->getParam('accountTo') === null) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
