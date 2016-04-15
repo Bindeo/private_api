@@ -24,13 +24,13 @@ class OAuth extends RepositoryAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = "SELECT ID_CLIENT, NAME, SECRET, ROLE, ALLOWED_IPS FROM OAUTH_CLIENTS WHERE STATUS = 'A' AND ";
+        $sql = "SELECT ID_CLIENT, NAME, SECRET, ROLE, ALLOWED_IPS FROM OAUTH_CLIENTS WHERE STATUS = 'A'";
 
         if ($client->getIdClient()) {
-            $sql .= 'ID_CLIENT = :id';
+            $sql .= ' AND ID_CLIENT = :id';
             $params = [':id' => $client->getIdClient()];
         } else {
-            $sql .= 'NAME = :name AND SECRET = :secret';
+            $sql .= ' AND NAME = :name AND SECRET = :secret';
             $params = [':name' => mb_strtoupper($client->getName()), ':secret' => $client->getSecret()];
         }
 

@@ -53,12 +53,12 @@ class FilesStorage implements FilesInterface
         // Generate a file name with the uploaded extension
         $ext = [];
         $ext = preg_match('/\.[a-zA-Z]+$/', $file->getFileOrigName(), $ext) ? strtolower($ext[0]) : '';
-        $name = md5($file->getIdClient() . $file->getFileOrigName() . time()) . $ext;
+        $name = md5($file->getClientType() . $file->getIdClient() . $file->getFileOrigName() . time()) . $ext;
 
         // Move to the final folder
         if (!rename($file->getPath(), $path . '/' . $name)) {
             $this->logger->addError('Error moving uploaded file', [$file->getPath(), $path . '/' . $name]);
-            throw new \RuntimeException(Exceptions::CANNOT_MOVE, 503);
+            throw new \Exception(Exceptions::CANNOT_MOVE, 503);
         }
 
         $file->setFileName($name);

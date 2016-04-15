@@ -101,8 +101,9 @@ class BulkTransactions
             $structure['events'] = [];
         } elseif ($bulk->getElementsType() == 'F') {
             $structure['docs'] = [];
+            $bulk->transformFiles();
         }
-        $bulk->setStructure(json_encode($structure));
+        $bulk->setStructure(json_encode($structure))->setHash('PENDING');
 
         return $bulk;
     }
@@ -165,10 +166,10 @@ class BulkTransactions
     public function closeBulk(BulkTransaction $bulk)
     {
         // Open the bulk transaction
-        $bulk = $this->bulkRepo->closeBulk($bulk);
+        $bulk = $this->bulkRepo->closeBulk($bulk)->hash();
 
         // Sign transaction in blockchain
-        $this->signBulkTransaction($bulk->hash());
+        $this->signBulkTransaction($bulk);
 
         return $bulk->toArray();
     }
@@ -256,7 +257,11 @@ class BulkTransactions
         try {
             $this->storage->save($file);
         } catch (\Exception $e) {
-            throw new \Exception('', 500);
+            if ($e->getCode() == 503) {
+                throw $e;
+            } else {
+                throw new \Exception('Cannot store file', 500);
+            }
         }
 
         // Hash the file
@@ -357,58 +362,61 @@ class BulkTransactions
     }
 
     /**
-     * Create a new bulk transaction
+     * Create a new bulk transaction in one step
      *
-     * @param BulkTransaction $bulk
+     * @param array $params
      *
      * @return string
      * @throws \Exception
      */
-    public function createBulk(BulkTransaction $bulk)
+    public function oneStepBulk(array $params)
     {
+        // New bulk transaction with factory method
+        $bulk = $this->bulkFactory($params);
+
         // First we will verify the whole transaction before move files or do anything
         $this->bulkRepo->verifyBulkTransaction($bulk);
-        /** @var BulkFile $file */
-        foreach ($bulk->getFiles() as $file) {
-            $this->bulkRepo->verifyBulkFile($file);
-            if (!$file->getPath() or !file_exists($file->getPath())) {
-                throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        if ($bulk->getElementsType() == 'F') {
+            /** @var BulkFile $file */
+            foreach ($bulk->getFiles() as $file) {
+                $this->bulkRepo->verifyBulkFile($file);
+                if (!$file->getPath() or !file_exists($file->getPath())) {
+                    throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+                }
             }
         }
 
-        // We know at this moment that the data is correct, we can continue the process
+        // We know at this moment data is correct, we can move on with the process
 
-        // Create bulk transaction registry
-        $this->bulkRepo->createBulk($bulk->setHash('PENDING')->setStructure('PENDING'));
+        // Open bulk transaction
+        $this->bulkRepo->openBulk($bulk);
 
-        // Create files associated to the bulk and generate the structure
-        // Emitter data, only for the example
-        $emitter = ['name' => 'ISDI', 'full_name' => 'Instituto Superior para el Desarrollo de Internet'];
+        if ($bulk->getElementsType() == 'F') {
+            // Create files associated to the bulk and add them to the structure
+            $structure = $bulk->getStructure(true);
 
-        $structure = ['owner' => $emitter];
-        /** @var BulkFile $file */
-        foreach ($bulk->getFiles() as $file) {
-            // Set bulk transaction data
-            $this->saveBulkFile($file->setIdBulk($bulk->getIdBulkTransaction())
-                                     ->setIdClient($bulk->getIdClient())
-                                     ->setIp($bulk->getIp()));
+            /** @var BulkFile $file */
+            foreach ($bulk->getFiles() as $file) {
+                // Set bulk transaction data
+                $this->saveBulkFile($file->setIdBulk($bulk->getIdBulkTransaction())
+                                         ->setIdClient($bulk->getIdClient())
+                                         ->setIp($bulk->getIp()));
 
-            // Add data to structure
-            $structure['docs'][$file->getUniqueId()] = [
-                'hash' => $file->getHash(),
-                'to'   => hash('sha256', $file->getFullName())
-            ];
+                // Add data to structure
+                $structure['docs'][$file->getUniqueId()] = $file->getStructure();
+            }
+            // Set structure and hash
+            $bulk->setStructure(json_encode($structure))->hash();
         }
-        // Set structure and hash
-        $bulk->setStructure(json_encode($structure))->setHash(hash('sha256', $bulk->getStructure()));
 
-        // Update bulk transaction
+        // Update bulk transaction with added elements
         $this->bulkRepo->updateBulk($bulk);
+        $this->bulkRepo->closeBulk($bulk);
 
         // Sign the bulk transaction in blockchain
-        $blockchain = $this->signBulkTransaction($bulk);
+        $this->signBulkTransaction($bulk);
 
-        return $blockchain->toArray();
+        return $bulk->toArray();
     }
 
     /**

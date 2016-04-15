@@ -116,7 +116,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
         // Prepare query and mandatory data
         $sql = "INSERT INTO BULK_TRANSACTIONS(EXTERNAL_ID, TYPE, ELEMENTS_TYPE, CLIENT_TYPE, FK_ID_CLIENT,
                   NUM_ITEMS, STRUCTURE, HASH, CTRL_DATE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
-                VALUES (:external_id, :type, :elements_type, :client_type, :id_client, 0, :structure, 'PENDING',
+                VALUES (:external_id, :type, :elements_type, :client_type, :id_client, 0, :structure, :hash,
                   SYSDATE(), :ip, :id_geonames, :latitude, :longitude)";
 
         $data = [
@@ -126,6 +126,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
             ':client_type'   => $bulk->getClientType(),
             ':id_client'     => $bulk->getIdClient(),
             ':structure'     => $bulk->getStructure(),
+            ':hash'          => $bulk->getHash(),
             ':ip'            => $bulk->getIp(),
             ':id_geonames'   => $bulk->getIdGeonames() ? $bulk->getIdGeonames() : null,
             ':latitude'      => $bulk->getLatitude() ? $bulk->getLatitude() : null,
@@ -319,8 +320,8 @@ class BulkTransactions extends RepositoryLocatableAbstract
     {
         $this->verifyBulkFile($file->clean());
         // Check remain data
-        if (!$file->getIdClient() or !$file->getIdBulk() or !$file->getFileName() or !$file->getSize() or
-            !$file->getHash() or !$file->getIp()
+        if (!$file->getClientType() or !$file->getIdClient() or !$file->getIdBulk() or !$file->getFileName() or
+            !$file->getSize() or !$file->getHash() or !$file->getIp()
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -337,19 +338,20 @@ class BulkTransactions extends RepositoryLocatableAbstract
         } elseif ($res->getRows()[0]['WARNING'] > 0) {
             // TODO Insert into the db logger
         }
-        */
+*/
 
         $this->db->beginTransaction();
         // Prepare query and mandatory data
-        $sql = 'INSERT INTO BULK_FILES(FK_ID_BULK, UNIQUE_ID, FK_ID_USER, FILE_NAME, FILE_ORIG_NAME, FILE_TYPE, ID_SIGN,
-                  FULL_NAME, FILE_DATE, FK_ID_CONTENT, QUALIFICATION, HASH, SIZE, CTRL_DATE, CTRL_IP)
-                VALUES (:id_bulk, :unique_id, :id_user, :file_name, :file_orig, :file_type, :id_sign, :full_name, :file_date,
-                 :id_content, :qualification, :hash, :size, SYSDATE(), :ip)';
+        $sql = 'INSERT INTO BULK_FILES(FK_ID_BULK, UNIQUE_ID, CLIENT_TYPE, FK_ID_CLIENT, FILE_NAME, FILE_ORIG_NAME,
+                  FILE_TYPE, ID_SIGN, FULL_NAME, FILE_DATE, FK_ID_CONTENT, QUALIFICATION, HASH, SIZE, CTRL_DATE, CTRL_IP)
+                VALUES (:id_bulk, :unique_id, :client_type, :id_client, :file_name, :file_orig, :file_type, :id_sign,
+                  :full_name, :file_date, :id_content, :qualification, :hash, :size, SYSDATE(), :ip)';
 
         $data = [
             ':id_bulk'       => $file->getIdBulk(),
             ':unique_id'     => $file->getUniqueId(),
-            ':id_user'       => $file->getIdClient(),
+            ':client_type'   => $file->getClientType(),
+            ':id_client'     => $file->getIdClient(),
             ':file_name'     => $file->getFileName(),
             ':file_orig'     => $file->getFileOrigName(),
             ':file_type'     => $file->getFileType(),
@@ -391,8 +393,8 @@ class BulkTransactions extends RepositoryLocatableAbstract
         }
 
         // Build the query
-        $sql = 'SELECT ID_BULK_FILE, FK_ID_BULK, UNIQUE_ID, FK_ID_USER, FILE_NAME, FILE_ORIG_NAME, FILE_TYPE, ID_SIGN,
-                  FULL_NAME, FILE_DATE, FK_ID_CONTENT, QUALIFICATION, HASH, SIZE, STATUS
+        $sql = 'SELECT ID_BULK_FILE, FK_ID_BULK, UNIQUE_ID, CLIENT_TYPE, FK_ID_CLIENT, FILE_NAME, FILE_ORIG_NAME,
+                  FILE_TYPE, ID_SIGN, FULL_NAME, FILE_DATE, FK_ID_CONTENT, QUALIFICATION, HASH, SIZE, STATUS
                 FROM BULK_FILES WHERE STATUS = :status';
         $data = [':status' => 'A'];
 

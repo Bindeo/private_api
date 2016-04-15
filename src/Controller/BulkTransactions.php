@@ -112,12 +112,8 @@ class BulkTransactions
      */
     private function oneStepBulk(Request $request, Response $response, $args)
     {
-        // New bulk transaction
-        $bulk = new BulkTransaction($request->getParams());
-        $bulk->transformFiles();
-
-        $res = $this->model->createBulk($bulk);
-        $res = ['data' => ['type' => 'blockchain', 'attributes' => $res]];
+        $res = $this->model->oneStepBulk($request->getParams());
+        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
 
         return $response->withJson($res, 201);
     }
