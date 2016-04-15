@@ -78,9 +78,9 @@ class System
 
                     // Send and email
                     try {
-                        $txt = 'Transaction has been confirmed!<br>' . '<br>Transaction id:' .
-                               $blockchain->getTransaction() . '<br>Collection type:' . $bulk->getType() .
-                               '<br>Collection id:' . $bulk->getExternalId();
+                        $txt = 'Transaction has been confirmed!<br>' . '<br>Transaction id: ' .
+                               $blockchain->getTransaction() . '<br>Collection type: ' . $bulk->getType() .
+                               '<br>Collection id: ' . $bulk->getExternalId();
                         $res = $this->email->sendEmail($to, 'Transaction confirmed', $txt);
 
                         if (!$res or $res->http_response_code != 200) {
