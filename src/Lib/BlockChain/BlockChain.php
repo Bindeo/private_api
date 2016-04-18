@@ -244,4 +244,22 @@ class BlockChain
     {
         return $this->client->getEncodedData($txid);
     }
+
+    /**
+     * Create a multisig account from array of accounts
+     *
+     * @param array  $accounts
+     * @param string $account
+     *
+     * @return string
+     */
+    public function createMultiSigAccount(array $accounts, $account)
+    {
+        return $this->client->createMultiSigAccount($accounts, $account);
+    }
+
+    public function tests()
+    {
+        return $this->client->tests();
+    }
 }

@@ -48,6 +48,8 @@ interface BlockChainClientInterface
 
     public function signRawTransaction($tx, $output, $key, $sig_hash = null);
 
+    public function createMultiSigAccount(array $accounts, $account);
+
     // Complex functionality
     public function storeData($data);
 

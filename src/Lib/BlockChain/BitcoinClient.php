@@ -865,4 +865,63 @@ class BitcoinClient implements BlockChainClientInterface
             return ['data' => substr(hex2bin($tx['vout'][0]['scriptPubKey']['hex']), 1)];
         }
     }
+
+    /**
+     * Create a multisig account from array of accounts
+     *
+     * @param array  $accounts
+     * @param string $account
+     *
+     * @return string
+     */
+    public function createMultiSigAccount(array $accounts, $account)
+    {
+        // Get addresses
+        $addresses = [];
+        foreach ($accounts as $from) {
+            $addresses[] = $this->getAccountAddress($from);
+        }
+
+        // Create multisig account
+        return count($addresses) > 1 ? $this->bitcoin->addmultisigaddress(count($addresses), $addresses, $account)
+            : null;
+    }
+
+    public function tests()
+    {
+        $addresses = [
+            $this->getAccountAddress('test'),
+            //$this->getAccountAddress('test2'),
+            $this->getAccountAddress('test3')
+        ];
+
+        $privKeys = [];
+        foreach ($addresses as $address) {
+            $privKeys[] = $this->dumpPrivKey($address);
+        }
+
+        //$res = $this->bitcoin->addmultisigaddress(2, $addresses, 'multi_test3');
+
+        //$res = $this->transferCoins(0.001, 'multi_test3', 1, '');
+
+        //$res = $this->transferCoins(0, 'test', 1, 'multi_test');
+
+        /*
+                $inputs = $this->listUnspent('multi_test3');
+                $outputs = ['data' => 'f9e6f2feda1c4713a23baaed5836e7fae4247f7089bcd3b173255cc1f29fed48'];
+                $txn = $this->createRawTransaction($inputs, $outputs);
+                $txn = $this->signRawTransaction($txn, $inputs, $privKeys);
+                //$txn = $this->signRawTransaction($txn);
+                $res = $this->sendRawTransaction($txn['hex']);
+        */
+
+        // Obtain multisig description from the transaction
+        $res = $this->getRawTransaction('28bff0c280063fd02efc90e7fdb289ec59b80aa12f4e5624a0c395739618091c', 1);
+        $scripts = explode('[ALL]', $res['vin'][0]['scriptSig']['asm']);
+        $res = $this->bitcoin->decodescript(trim(array_pop($scripts)));
+
+        print_r($res);
+
+        exit;
+    }
 }
