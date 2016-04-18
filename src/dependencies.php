@@ -108,18 +108,20 @@ $container['Api\Model\Accounts'] = function ($c) {
         $c->get('view'), $c->get('settings')['front_urls']);
 };
 
-$container['Api\Model\StoreData'] = function ($c) {
-    $c->get('Api\Lib\BlockChain\BlockChain');
-
-    return new Api\Model\StoreData($c->get('Api\Repository\StoreData'), $c->get('Api\Repository\Users'),
-        $c->get('Api\Model\General\FilesStorage'), $c->get('logger'));
-};
-
 $container['Api\Model\BulkTransactions'] = function ($c) {
     $c->get('Api\Lib\BlockChain\BlockChain');
 
     return new Api\Model\BulkTransactions($c->get('Api\Repository\BulkTransactions'),
         $c->get('Api\Repository\StoreData'), $c->get('Api\Model\General\FilesStorage'), $c->get('logger'));
+};
+
+$container['Api\Model\StoreData'] = function ($c) {
+    $c->get('Api\Lib\BlockChain\BlockChain');
+
+    return new Api\Model\StoreData($c->get('Api\Repository\StoreData'), $c->get('Api\Repository\Users'),
+        $c->get('Api\Repository\OAuth'), $c->get('Api\Model\BulkTransactions'),
+        $c->get('Api\Model\General\FilesStorage'), $c->get('logger'), $c->get('Api\Model\Email\Email'), $c->get('view'),
+        $c->get('settings')['front_urls']);
 };
 
 $container['Api\Model\System'] = function ($c) {

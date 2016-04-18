@@ -3,15 +3,19 @@
 namespace Api\Model;
 
 use Api\Entity\BlockChain;
-use Api\Entity\Signature;
+use Api\Entity\OAuthClient;
+use Api\Entity\SignatureGenerator;
 use Api\Entity\User;
 use Api\Entity\File;
+use Api\Model\Email\EmailInterface;
 use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
-use Bindeo\DataModel\SignableInterface;
+use Bindeo\DataModel\NotarizableInterface;
+use Bindeo\DataModel\SpendingStorageInterface;
 use Bindeo\Filter\FilesFilter;
 use \Psr\Log\LoggerInterface;
+use Slim\Views\Twig;
 
 /**
  * Class StoreData to manage StoreData controller functionality
@@ -30,6 +34,16 @@ class StoreData
     private $usersRepo;
 
     /**
+     * @var \Api\Repository\OAuth
+     */
+    private $oauthRepo;
+
+    /**
+     * @var BulkTransactions
+     */
+    private $bulkModel;
+
+    /**
      * @var \Api\Model\General\FilesStorage
      */
     private $storage;
@@ -39,16 +53,38 @@ class StoreData
      */
     private $logger;
 
+    /**
+     * @var EmailInterface
+     */
+    private $email;
+
+    /**
+     * @var Twig
+     */
+    private $view;
+
+    private $frontUrls;
+
     public function __construct(
         RepositoryAbstract $dataRepo,
         RepositoryAbstract $usersRepo,
+        RepositoryAbstract $oauthRepo,
+        BulkTransactions $bulkModel,
         FilesInterface $storage,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        EmailInterface $email,
+        Twig $view,
+        array $frontUrls
     ) {
         $this->dataRepo = $dataRepo;
         $this->usersRepo = $usersRepo;
+        $this->oauthRepo = $oauthRepo;
+        $this->bulkModel = $bulkModel;
         $this->storage = $storage;
         $this->logger = $logger;
+        $this->email = $email;
+        $this->view = $view;
+        $this->frontUrls = $frontUrls;
     }
 
     /**
@@ -87,12 +123,22 @@ class StoreData
     public function saveFile(File $file)
     {
         // We try to create file first
-        if (!$file->getIdClient() or !$file->getPath() or !file_exists($file->getPath()) or !$file->getFileOrigName()) {
+        if (!in_array($file->getClientType(), ['U', 'C']) or !$file->getIdClient() or !$file->getPath() or
+            !file_exists($file->getPath()) or !$file->getFileOrigName() or
+            ($file->getMode() == 'S' and !$file->getSigners())
+        ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // We need to check if the user has enough free space
-        if (!($user = $this->usersRepo->find(new User(['idUser' => $file->getIdClient()])))) {
+        // We need to check if the client exists and has enough free space
+        if ($file->getClientType() == 'U') {
+            $user = $this->usersRepo->find(new User(['idUser' => $file->getIdClient()]));
+        } else {
+            $user = $this->oauthRepo->oauthClient(new OAuthClient(['idClient' => $file->getIdClient()]));
+        }
+
+        /** @var SpendingStorageInterface $user */
+        if (!$user) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
@@ -122,6 +168,17 @@ class StoreData
             // Remove the uploaded file
             $this->storage->delete($file);
             throw $e;
+        }
+
+        // File has been created, if it has signers, associate them
+        if ($file->getMode() == 'S') {
+            $this->dataRepo->associateSigners($file);
+
+            // Create bulk transaction
+            $this->bulkModel->openBulk();
+
+            // TODO Send email to signers
+
         }
 
         return $this->getFile($file);
@@ -209,19 +266,22 @@ class StoreData
         }
 
         // Setup blockchain object
-        $blockchainObj = new BlockChain([
-            'ip'         => $file->getIp(),
-            'net'        => $blockchain->getNet(),
-            'idUser'     => $file->getIdClient(),
-            'idIdentity' => $signature->getAuxIdentity(),
-            'hash'       => $signature->getAssetHash(),
-            'jsonData'   => $signature->generate(true),
-            'type'       => $signature->getAssetType(),
-            'idElement'  => $file->getIdFile()
-        ]);
+        $blockchainObj = (new BlockChain())->setIp($file->getIp())
+                                           ->setNet($blockchain->getNet())
+                                           ->setClientType($file->getClientType())
+                                           ->setIdClient($file->getIdClient())
+                                           ->setIdIdentity($signature->getAuxIdentity())
+                                           ->setHash($signature->getAssetHash())
+                                           ->setJsonData($signature->generate(true))
+                                           ->setType($signature->getAssetType())
+                                           ->setIdElement($file->getIdFile());
 
         // Sign
-        $res = $blockchain->storeData($signature->generateHash(), 'S');
+        if ($file->getType() == 'S') {
+            // If file needs to be signed,
+        }
+
+        $res = $blockchain->storeData($signature->generateHash());
 
         // Check if the transaction was ok
         if (!$res['txid']) {
@@ -238,28 +298,45 @@ class StoreData
 
     /**
      * Generate the assert signature
-     *
-     * @param SignableInterface $assert
-     *
-     * @return Signature
+
+*
+*@param NotarizableInterface $assert
+
+
+*
+*@return SignatureGenerator
      * @throws \Exception
      */
-    private function signatureFactory(SignableInterface $assert)
+    private function signatureFactory(NotarizableInterface $assert)
     {
-        // Get owner data
-        $identity = $this->usersRepo->getIdentities(new User(['idUser' => $assert->getIdUser()]), true);
-        if ($identity->getNumRows() == 0) {
-            throw new \Exception(Exceptions::NON_EXISTENT, 409);
-        }
-
-        $signature = new Signature();
+        // Create signature
+        $signature = new SignatureGenerator();
         $signature->setAssetHash($assert->getHash())
                   ->setAssetSize($assert->getSize())
                   ->setAssetName($assert->getFileOrigName())
-                  ->setAssetType($assert->getType())
-                  ->setOwnerId($identity->getRows()[0]->getValue())
-                  ->setOwnerName($identity->getRows()[0]->getName())
-                  ->setAuxIdentity($identity->getRows()[0]->getIdIdentity());
+                  ->setAssetType($assert->getType());
+
+        // Get owner data
+        if ($assert->getClientType() == 'U') {
+            // Logged user type
+            $identity = $this->usersRepo->getIdentities(new User(['idUser' => $assert->getIdClient()]), true);
+            if ($identity->getNumRows() == 0) {
+                throw new \Exception(Exceptions::NON_EXISTENT, 409);
+            }
+
+            $signature->setOwnerId($identity->getRows()[0]->getValue())
+                      ->setOwnerName($identity->getRows()[0]->getName())
+                      ->setAuxIdentity($identity->getRows()[0]->getIdIdentity());
+        } else {
+            // OAuth client type
+            $client = $this->oauthRepo->oauthClient(new OAuthClient(['idClient' => $assert->getIdClient()]));
+
+            if ($client->getNumRows() == 0) {
+                throw new \Exception(Exceptions::NON_EXISTENT, 409);
+            }
+
+            $signature->setOwnerId($client->getRows()[0]->getName())->setOwnerName($client->getRows()[0]->getName());
+        }
 
         return $signature;
     }
@@ -448,13 +525,15 @@ class StoreData
 
     /**
      * Test an asset against the blockchain
+
      *
-     * @param SignableInterface $asset
+*@param NotarizableInterface $asset
+
      *
-     * @return array
+*@return array
      * @throws \Exception
      */
-    public function testAsset(SignableInterface $asset)
+    public function testAsset(NotarizableInterface $asset)
     {
         if ($asset->getType() == 'F') {
             $file = $this->dataRepo->findFile($asset);
@@ -471,7 +550,7 @@ class StoreData
         }
 
         // Generate fresh signature
-        $signature = new Signature(json_decode($blockchain->getJsonData(), true));
+        $signature = new SignatureGenerator(json_decode($blockchain->getJsonData(), true));
 
         if (!$signature->isValid()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);

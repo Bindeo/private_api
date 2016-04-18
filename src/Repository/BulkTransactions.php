@@ -460,8 +460,10 @@ class BulkTransactions extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
+        // Select requested bulk type looking for it first in client defined bulk types and later in all users bulk types
         $sql = "SELECT CLIENT_TYPE, FK_ID_CLIENT, TYPE, ELEMENTS_TYPE, BULK_INFO, DEFAULT_INFO, CALLBACK_TYPE, CALLBACK_VALUE
-                FROM BULK_TYPES WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id AND TYPE = :name";
+                FROM BULK_TYPES WHERE (CLIENT_TYPE = :type AND FK_ID_CLIENT = :id OR CLIENT_TYPE = 'A' AND FK_ID_CLIENT = 0) AND TYPE = :name
+                ORDER BY CASE WHEN CLIENT_TYPE = :type THEN 1 ELSE 2 END ASC LIMIT 1";
         $params = [':type' => $bulk->getClientType(), ':id' => $bulk->getIdClient(), ':name' => $bulk->getType()];
 
         $res = $this->db->query($sql, $params, 'Api\Entity\BulkType');

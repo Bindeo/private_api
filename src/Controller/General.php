@@ -39,25 +39,6 @@ class General
     }
 
     /**
-     * Get the file types list by language
-     *
-     * @param Request|\Slim\Http\Request   $request
-     * @param Response|\Slim\Http\Response $response
-     * @param array                        $args [optional]
-     *
-     * @return \Slim\Http\Response
-     * @throws \Exception
-     */
-    public function fileTypes(Request $request, Response $response, $args)
-    {
-        $data = $this->generalRepo->fileTypes($request->getParam('locale'));
-
-        $res = ['data' => $data->toArray('file_type'), 'total_pages' => 1];
-
-        return $response->withJson($res, 200);
-    }
-
-    /**
      * Get the media types list by language
      *
      * @param Request|\Slim\Http\Request   $request

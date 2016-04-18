@@ -15,11 +15,11 @@ class StoreData
     /**
      * @var \Api\Model\StoreData
      */
-    private $model;
+    private $modelData;
 
     public function __construct(\Api\Model\StoreData $model)
     {
-        $this->model = $model;
+        $this->modelData = $model;
     }
 
     /**
@@ -35,7 +35,7 @@ class StoreData
     public function getFile(Request $request, Response $response, $args)
     {
         // Get the file
-        $res = $this->model->getFile(new File($request->getParams()));
+        $res = $this->modelData->getFile(new File($request->getParams()));
         $res = ['data' => ['type' => 'files', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -52,7 +52,8 @@ class StoreData
      */
     public function createFile(Request $request, Response $response, $args)
     {
-        $res = $this->model->saveFile(new File($request->getParams()));
+        // Save file
+        $res = $this->modelData->saveFile(new File($request->getParams()));
         $res = ['data' => ['type' => 'files', 'attributes' => $res]];
 
         return $response->withJson($res, 201);
@@ -70,7 +71,7 @@ class StoreData
     public function deleteFile(Request $request, Response $response, $args)
     {
         // Delete an account
-        $this->model->deleteFile(new File($request->getParams()));
+        $this->modelData->deleteFile(new File($request->getParams()));
 
         return $response->withJson('', 204);
     }
@@ -88,7 +89,7 @@ class StoreData
     public function fileList(Request $request, Response $response, $args)
     {
         // Get the list
-        $res = $this->model->fileList(new FilesFilter($request->getParams()));
+        $res = $this->modelData->fileList(new FilesFilter($request->getParams()));
         $res = [
             'data'         => $res->toArray('files'),
             'total_pages'  => $res->getNumPages(),
@@ -111,7 +112,7 @@ class StoreData
     public function signFile(Request $request, Response $response, $args)
     {
         // Sign the file
-        $res = $this->model->signFile(new File($request->getParams()));
+        $res = $this->modelData->signFile(new File($request->getParams()));
 
         $res = ['data' => ['type' => 'blockchain', 'attributes' => $res]];
 
@@ -131,7 +132,7 @@ class StoreData
     public function getBalance(Request $request, Response $response, $args)
     {
         if ($request->getParam('net') == 'bitcoin') {
-            $res = $this->model->getBCBalance();
+            $res = $this->modelData->getBCBalance();
         } else {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -152,7 +153,7 @@ class StoreData
     public function getTransaction(Request $request, Response $response, $args)
     {
         // Get the transaction
-        $res = $this->model->getTransaction(new BlockChain($request->getParams()), $request->getParam('mode', 'light'));
+        $res = $this->modelData->getTransaction(new BlockChain($request->getParams()), $request->getParam('mode', 'light'));
         $res = ['data' => ['type' => 'blockchain', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -172,13 +173,13 @@ class StoreData
     {
         if ($request->getParam('mode') == 'hash') {
             $type = 'hash';
-            $res = $this->model->getTransactionHash(new BlockChain($request->getParams()));
+            $res = $this->modelData->getTransactionHash(new BlockChain($request->getParams()));
         } elseif ($request->getParam('mode') == 'info') {
             $type = 'transaction';
-            $res = $this->model->getTransactionInfo(new BlockChain($request->getParams()));
+            $res = $this->modelData->getTransactionInfo(new BlockChain($request->getParams()));
         } elseif ($request->getParam('mode') == 'extended') {
             $type = 'transaction';
-            $res = $this->model->getTransactionExtended(new BlockChain($request->getParams()));
+            $res = $this->modelData->getTransactionExtended(new BlockChain($request->getParams()));
         } else {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -207,7 +208,7 @@ class StoreData
         }
 
         // Get the result
-        $res = $this->model->testFile($file->file, $request->getParam('net'), $request->getParam('transaction'));
+        $res = $this->modelData->testFile($file->file, $request->getParam('net'), $request->getParam('transaction'));
         $res = ['data' => ['type' => 'hash_test', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -231,7 +232,7 @@ class StoreData
         } else {
             $asset = new Email($request->getParams());
         }
-        $res = $this->model->testAsset($asset);
+        $res = $this->modelData->testAsset($asset);
         $res = ['data' => ['type' => 'hash_test', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -248,7 +249,7 @@ class StoreData
      */
     public function postBlockchainData(Request $request, Response $response, $args)
     {
-        $res = $this->model->postBlockchainData($request->getParam('data'));
+        $res = $this->modelData->postBlockchainData($request->getParam('data'));
 
         return $response->withJson(['array' => $res], 201);
     }
@@ -264,7 +265,7 @@ class StoreData
      */
     public function getBlockchainData(Request $request, Response $response, $args)
     {
-        $res = $this->model->getBlockchainData($request->getParam('mode'), $request->getParam('txid'));
+        $res = $this->modelData->getBlockchainData($request->getParam('mode'), $request->getParam('txid'));
 
         return $response->withJson(['array' => $res], 200);
     }

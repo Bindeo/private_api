@@ -37,33 +37,6 @@ class General extends RepositoryAbstract
     }
 
     /**
-     * Get the file types list by language
-     *
-     * @param string $lang
-     *
-     * @return ResultSet
-     * @throws \Exception
-     */
-    public function fileTypes($lang)
-    {
-        if (!in_array($lang, ['es_ES', 'en_US'])) {
-            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        }
-
-        $sql = "SELECT A.ID_TYPE, T.VALUE NAME
-                FROM FILE_TYPES A, TRANSLATIONS T WHERE T.ID_TRANSLATION = A.FK_ID_TRANSLATION AND T.LANG = :lang";
-        $params = [':lang' => $lang];
-
-        $data = $this->db->query($sql, $params, 'Api\Entity\FileType');
-
-        if (!$data or $this->db->getError()) {
-            throw new \Exception($this->db->getError(), 400);
-        }
-
-        return $data;
-    }
-
-    /**
      * Get the media types list by language
      *
      * @param string $lang

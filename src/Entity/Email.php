@@ -3,9 +3,9 @@
 namespace Api\Entity;
 
 use Bindeo\DataModel\EmailAbstract;
-use Bindeo\DataModel\SignableInterface;
+use Bindeo\DataModel\NotarizableInterface;
 
-class Email extends EmailAbstract implements SignableInterface
+class Email extends EmailAbstract implements NotarizableInterface
 {
     // ADITIONAL METHODS
 

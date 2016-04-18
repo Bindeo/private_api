@@ -35,7 +35,6 @@ DROP TABLE OAUTH_CLIENTS;
 source ../tables/TRANSLATIONS.sql;
 source ../tables/OAUTH_CLIENTS.sql;
 source ../tables/OAUTH_TOKENS.sql;
-source ../tables/FILE_TYPES.sql;
 source ../tables/MEDIA_TYPES.sql;
 source ../tables/MEDIA_EXTENSIONS.sql;
 source ../tables/ACCOUNT_TYPES.sql;
@@ -65,7 +64,6 @@ source ../triggers/TGR_BD_EMAILS.sql;
 # Translates
 source ../sqls/translations.sql;
 source ../sqls/account_types.sql;
-source ../sqls/file_types.sql;
 source ../sqls/media_types.sql;
 source ../sqls/media_extensions.sql;
 

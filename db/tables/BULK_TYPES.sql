@@ -1,6 +1,6 @@
 CREATE TABLE BULK_TYPES
 (
-  CLIENT_TYPE ENUM('U','C') NOT NULL COMMENT 'U - Logged user, C - Client',
+  CLIENT_TYPE ENUM('U','C', 'A') NOT NULL COMMENT 'U - Logged user, C - Client, A - All users',
   FK_ID_CLIENT INT NOT NULL,
   TYPE VARCHAR(32) NOT NULL,
   ELEMENTS_TYPE ENUM ('F','E') NOT NULL COMMENT 'F - File, E - Event',

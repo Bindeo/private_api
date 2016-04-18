@@ -579,7 +579,7 @@ class BitcoinClient implements BlockChainClientInterface
         $amount = self::STAMP_FEE;
 
         // Get the change address to return coins
-        $changeAddress = $this->bitcoin->getaddressesbyaccount("")[0];
+        $changeAddress = $this->getAccountAddress('');
 
         $inputs = $this->selectInputs($amount);
         if (isset($inputs['error'])) {

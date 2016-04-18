@@ -3,9 +3,9 @@
 namespace Api\Entity;
 
 use Bindeo\DataModel\FileAbstract;
-use Bindeo\DataModel\SignableInterface;
+use Bindeo\DataModel\NotarizableInterface;
 
-class File extends FileAbstract implements SignableInterface
+class File extends FileAbstract implements NotarizableInterface
 {
     // ADITIONAL METHODS
 

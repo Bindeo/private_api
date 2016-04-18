@@ -4,6 +4,8 @@ namespace Api\Repository;
 
 use Api\Entity\File;
 use Api\Entity\ResultSet;
+use Api\Entity\Signature;
+use Bindeo\DataModel\NotarizableInterface;
 use Bindeo\DataModel\SignableInterface;
 use Bindeo\Filter\FilesFilter;
 use Bindeo\DataModel\Exceptions;
@@ -12,8 +14,6 @@ use Api\Entity\BlockChain;
 
 class StoreData extends RepositoryLocatableAbstract
 {
-    // BLOCKCHAIN METHODS
-
     /**
      * Find a transaction by id
      *
@@ -173,18 +173,18 @@ class StoreData extends RepositoryLocatableAbstract
     /**
      * Find a file by id
      *
-     * @param SignableInterface $file
+     * @param NotarizableInterface $file
      *
      * @return File
      * @throws \Exception
      */
-    public function findFile(SignableInterface $file)
+    public function findFile(NotarizableInterface $file)
     {
         if (!($file instanceof File) or !$file->getIdElement()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
+        $sql = 'SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
                   CTRL_DATE, TAG, DESCRIPTION, TRANSACTION, CONFIRMED, STATUS, ID_GEONAMES, LATITUDE, LONGITUDE
                 FROM FILES WHERE ID_FILE = :id';
         $params = [':id' => $file->getIdElement()];
@@ -209,17 +209,22 @@ class StoreData extends RepositoryLocatableAbstract
     {
         $file->clean();
         // Check the received data
-        if (!$file->getIdClient() or !$file->getIdType() or !$file->getIdMedia() or !$file->getName() or
-            !$file->getFileName() or !$file->getFileOrigName() or !$file->getIp() or !$file->getHash()
+        if (!in_array($file->getClientType(), ['U', 'C']) or !$file->getIdClient() or !$file->getIdMedia() or
+            !$file->getName() or !$file->getFileName() or !$file->getFileOrigName() or !$file->getIp() or
+            !$file->getHash() or !$file->getMode()
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // Look for another file with the same hash and same user
         $sql = "SELECT A.NUM FORBIDDEN, B.NUM WARNING FROM
-                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND FK_ID_USER = :id_user) A,
-                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND FK_ID_USER != :id_user) B";
-        $res = $this->db->query($sql, ['id_user' => $file->getIdClient(), ':hash' => $file->getHash()]);
+                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND CLIENT_TYPE = :client_type AND FK_ID_CLIENT = :id_client) A,
+                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND CLIENT_TYPE = :client_type AND FK_ID_CLIENT != :id_client) B";
+        $res = $this->db->query($sql, [
+            ':client_type' => $file->getClientType(),
+            ':id_client'   => $file->getIdClient(),
+            ':hash'        => $file->getHash()
+        ]);
 
         if ($res->getRows()[0]['FORBIDDEN'] > 0) {
             throw new \Exception(Exceptions::DUPLICATED_FILE, 409);
@@ -232,15 +237,21 @@ class StoreData extends RepositoryLocatableAbstract
 
         $this->db->beginTransaction();
         // Prepare query and mandatory data
-        $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT - :size ELSE 0 END WHERE ID_USER = :id_user;
-                INSERT INTO FILES(FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
-                  CTRL_DATE, CTRL_IP, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE)
-                VALUES (:id_user, :id_type, :id_media, :name, :file_name, :file_orig, :hash, :size, SYSDATE(), :ip, :tag,
-                  :description, :id_geonames, :latitude, :longitude);';
+        if ($file->getClientType() == 'U') {
+            $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT - :size ELSE 0 END WHERE ID_USER = :id_client;';
+        } else {
+            $sql = 'UPDATE OAUTH_CLIENTS SET STORAGE_LEFT = STORAGE_LEFT - :size WHERE ID_CLIENT = :id_client;';
+        }
+
+        $sql .= 'INSERT INTO FILES(CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
+                   CTRL_DATE, CTRL_IP, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE)
+                 VALUES (:client_type, :id_client, :mode, :id_media, :name, :file_name, :file_orig, :hash, :size, SYSDATE(), :ip, :tag,
+                   :description, :id_geonames, :latitude, :longitude);';
 
         $data = [
-            ':id_user'     => $file->getIdClient(),
-            ':id_type'     => $file->getIdType(),
+            ':client_type' => $file->getClientType(),
+            ':id_client'   => $file->getIdClient(),
+            ':mode'        => $file->getMode(),
             ':id_media'    => $file->getIdMedia(),
             ':name'        => $file->getName(),
             ':file_name'   => $file->getFileName(),
@@ -281,7 +292,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Fetch the file to delete
-        $sql = 'SELECT ID_FILE, FILE_NAME, FK_ID_USER, SIZE, STATUS FROM FILES WHERE ID_FILE = :id';
+        $sql = 'SELECT ID_FILE, FILE_NAME, CLIENT_TYPE, FK_ID_CLIENT, SIZE, STATUS FROM FILES WHERE ID_FILE = :id';
         $res = $this->db->query($sql, [':id' => $file->getIdFile()], 'Api\Entity\File');
         if ($res->getNumRows() != 1) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
@@ -301,9 +312,14 @@ class StoreData extends RepositoryLocatableAbstract
 
         // If the file has been permanently deleted, we free the space
         if ($file->getStatus() == 'D') {
-            $sql = 'DELETE FROM FILES WHERE ID_FILE = :id;
-                    UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_USER = :id_user;';
-            $data = [':id' => $file->getIdFile(), ':id_user' => $res->getIdClient(), ':size' => $res->getSize()];
+            if ($file->getClientType() == 'U') {
+                $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_USER = :id_client;';
+            } else {
+                $sql = 'UPDATE OAUTH_CLIENTS SET STORAGE_LEFT = STORAGE_LEFT + :size WHERE ID_CLIENT = :id_client;';
+            }
+
+            $sql .= 'DELETE FROM FILES WHERE ID_FILE = :id;';
+            $data = [':id' => $file->getIdFile(), ':id_client' => $res->getIdClient(), ':size' => $res->getSize()];
             if (!$this->db->action($sql, $data)) {
                 throw $this->dbException();
             }
@@ -322,14 +338,18 @@ class StoreData extends RepositoryLocatableAbstract
      */
     public function fileList(FilesFilter $filter)
     {
-        if (!is_numeric($filter->getIdUser()) or !is_numeric($filter->getPage())) {
+        if (!$filter->getClientType() or !is_numeric($filter->getIdClient()) or !is_numeric($filter->getPage())) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         $filter->clean();
 
         // Build the query
-        $data = [':id_user' => $filter->getIdUser(), ':status' => $filter->getStatus()];
+        $data = [
+            'client_type' => $filter->getClientType(),
+            ':id_client'  => $filter->getIdClient(),
+            ':status'     => $filter->getStatus()
+        ];
         $where = '';
 
         // Media filter
@@ -385,9 +405,10 @@ class StoreData extends RepositoryLocatableAbstract
         // Get the paginated list
         $from = $filter->getStatus() != 'D' ? 'FILES' : 'FILES_DELETED';
 
-        $sql = "SELECT ID_FILE, FK_ID_USER, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE, CTRL_DATE,
-                  TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE
-                FROM " . $from . " WHERE FK_ID_USER = :id_user" . $where . " AND STATUS = :status ORDER BY " . $order;
+        $sql = "SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME,
+                  HASH, SIZE, CTRL_DATE, TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE
+                FROM " . $from . " WHERE CLIENT_TYPE = :client_type AND FK_ID_CLIENT = :id_client" . $where .
+               " AND STATUS = :status ORDER BY " . $order;
 
         return $this->db->query($sql, $data, 'Api\Entity\File', $filter->getPage(), $filter->getNumRows());
     }
@@ -421,6 +442,70 @@ class StoreData extends RepositoryLocatableAbstract
             return General::MEDIA_TYPE_OTHERS;
         } else {
             return $res->getRows()[0]['ID_TYPE'];
+        }
+    }
+
+    /**
+     * Associate signers to the signable element
+     *
+     * @param SignableInterface $element
+     *
+     * @throws \Exception
+     */
+    public function associateSigners(SignableInterface $element)
+    {
+        // Check data
+        if (!is_array($element->getSigners()) or count($element->getSigners()) == 0 or !$element->getElementId() or
+            !$element->getElementType()
+        ) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Create new signers
+        foreach ($element->getSigners() as $signer) {
+            // Instantiate new signature object
+            $signature = new Signature($signer);
+            $signature->clean();
+            if (!$signature->getEmail() or !$signature->getName()) {
+                throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+            }
+
+            // Look for signer and user
+            $sql = "SELECT S.NUM, U.FK_ID_USER, U.ID_IDENTITY
+                    FROM (SELECT COUNT(*) NUM FROM SIGNERS WHERE EMAIL = :email) S
+                    LEFT JOIN (SELECT VALUE, FK_ID_USER, ID_IDENTITY FROM USERS_IDENTITIES WHERE TYPE = 'E') U ON (VALUE = :email)";
+            $params = [':email' => $signature->getEmail()];
+            $res = $this->db->query($sql, $params);
+
+            if ($res->getRows()[0]['NUM'] == 0) {
+                // Insert new signer
+                $sql = 'INSERT INTO SIGNERS(EMAIL, FK_ID_USER, FK_ID_IDENTITY, CTRL_DATE, CTRL_IP)
+                        VALUES (:email, :id_user, :id_identity, SYSDATE(), :ip)';
+
+                $params[':id_user'] = $res->getRows()[0]['FK_ID_USER'] ? $res->getRows()[0]['FK_ID_USER'] : null;
+                $params[':id_identity'] = $res->getRows()[0]['ID_IDENTITY'] ? $res->getRows()[0]['ID_IDENTITY'] : null;
+                $params[':ip'] = trim($element->getIp());
+
+                if (!$this->db->action($sql, $params)) {
+                    throw $this->dbException();
+                }
+            }
+
+            // Insert signatures
+            $sql = 'INSERT INTO SIGNATURES(ELEMENT_TYPE, ELEMENT_ID, EMAIL, NAME, ACCOUNT)
+                    VALUES (:element_type, :element_id, :email, :name, :account)';
+
+            $params = [
+                ':element_type' => $element->getElementType(),
+                ':element_id'   => $element->getElementId(),
+                ':email'        => $signature->getEmail(),
+                ':name'         => $signature->getName(),
+                ':account'      => hash('sha256', $signature->getEmail())
+            ];
+
+            if (!$this->db->action($sql, $params)) {
+                throw $this->dbException();
+            }
         }
     }
 }
