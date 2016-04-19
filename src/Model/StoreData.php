@@ -3,6 +3,7 @@
 namespace Api\Model;
 
 use Api\Entity\BlockChain;
+use Api\Entity\BulkTransaction;
 use Api\Entity\OAuthClient;
 use Api\Entity\SignatureGenerator;
 use Api\Entity\User;
@@ -130,6 +131,13 @@ class StoreData
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
+        // Convert signers into array if it needed
+        if (!is_array($file->getSigners()) and
+            !$file->setSigners(json_decode($file->getSigners(), true))->getSigners()
+        ) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
         // We need to check if the client exists and has enough free space
         if ($file->getClientType() == 'U') {
             $user = $this->usersRepo->find(new User(['idUser' => $file->getIdClient()]));
@@ -172,10 +180,41 @@ class StoreData
 
         // File has been created, if it has signers, associate them
         if ($file->getMode() == 'S') {
-            $this->dataRepo->associateSigners($file);
+            $signers = $this->dataRepo->associateSigners($file);
 
-            // Create bulk transaction
-            $this->bulkModel->openBulk();
+            // Generate params array
+            $params = (new BulkTransaction())->setType('Sign Document')
+                                             ->setClientType($file->getClientType())
+                                             ->setIdClient($file->getIdClient())
+                                             ->setExternalId('Sign_Document' . '_' . $file->getIdFile())
+                                             ->setIp($file->getIp())
+                                             ->toArray();
+
+            // Generate signature
+            $signature = $this->signatureFactory($file);
+
+            // Signature hash
+            $params['hash'] = $signature->generateHash();
+            // Size in bytes
+            $params['size'] = $file->getSize() * 1024;
+
+            // Calculate account name depending on signers
+            if (count($signers) == 1) {
+                $params['account'] = $signers[0]->getAccount();
+            } else {
+                // Concatenate signers accounts to generate multisig account name
+                $account = '';
+                foreach ($signers as $signer) {
+                    $account .= $signer->getAccount();
+                }
+                $params['account'] = hash('sha256', $account);
+            }
+
+            // Open bulk transaction
+            $bulk = $this->bulkModel->openBulk($params);
+
+            // Update file registry with bulk transaction
+            $this->dataRepo->updateFile($file->setIdBulk($bulk['idBulkTransaction']));
 
             // TODO Send email to signers
 
@@ -246,7 +285,7 @@ class StoreData
         // Check if the stored hash is correct
         $hash = $this->storage->getHash($file);
         if ($hash != $file->getHash()) {
-            // We need to store the new hash after sign the file
+            // We need to store the new hash after signing the file
             $this->logger->addNotice('Hash Incongruence', $file->toArray());
             $file->setHash($hash);
         }
@@ -271,17 +310,34 @@ class StoreData
                                            ->setClientType($file->getClientType())
                                            ->setIdClient($file->getIdClient())
                                            ->setIdIdentity($signature->getAuxIdentity())
-                                           ->setHash($signature->getAssetHash())
+                                           ->setHash($signature->generateHash())
                                            ->setJsonData($signature->generate(true))
                                            ->setType($signature->getAssetType())
                                            ->setIdElement($file->getIdFile());
 
         // Sign
-        if ($file->getType() == 'S') {
-            // If file needs to be signed,
-        }
+        if ($file->getMode() == 'S') {
+            // If file needs to be signed, we need the list of signers
+            $signers = $this->dataRepo->signersList($file);
+            if ($signers->getNumRows() == 0) {
+                throw new \Exception(Exceptions::NON_EXISTENT, 409);
+            }
 
-        $res = $blockchain->storeData($signature->generateHash());
+            // Get accounts list
+            $accounts = [];
+            foreach ($signers->getRows() as $signer) {
+                $accounts[] = $signer->getAccount();
+            }
+
+            // Get bulk transaction associated
+            $bulk = $this->bulkModel->getBulk((new BulkTransaction())->setIdBulkTransaction($file->getIdBulk()));
+
+            // Notarize and create signable content in blockchain
+            $res = $blockchain->storeSignableData($blockchainObj->getHash(), $accounts, $bulk['account']);
+        } else {
+            // Notarize data
+            $res = $blockchain->storeData($blockchainObj->getHash());
+        }
 
         // Check if the transaction was ok
         if (!$res['txid']) {
@@ -298,13 +354,10 @@ class StoreData
 
     /**
      * Generate the assert signature
-
-*
-*@param NotarizableInterface $assert
-
-
-*
-*@return SignatureGenerator
+     *
+     * @param NotarizableInterface $assert
+     *
+     * @return SignatureGenerator
      * @throws \Exception
      */
     private function signatureFactory(NotarizableInterface $assert)
@@ -525,12 +578,10 @@ class StoreData
 
     /**
      * Test an asset against the blockchain
-
      *
-*@param NotarizableInterface $asset
-
+     * @param NotarizableInterface $asset
      *
-*@return array
+     * @return array
      * @throws \Exception
      */
     public function testAsset(NotarizableInterface $asset)

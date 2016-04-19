@@ -175,6 +175,20 @@ class BlockChain
     }
 
     /**
+     * Store signable data creating a colored coin in sigAccount
+     *
+     * @param string $data
+     * @param array  $signers
+     * @param string $sigAccount
+     *
+     * @return array
+     */
+    public function storeSignableData($data, array $signers, $sigAccount)
+    {
+        return $this->client->storeSignableData($data, $signers, $sigAccount);
+    }
+
+    /**
      * Store and transfer property
      *
      * @param string $data
@@ -197,12 +211,13 @@ class BlockChain
      * @param string $data
      * @param string $account
      * @param int    $number [optional] Number of account addresses used to select origin input
+     * @param string $txid   [optional]
      *
      * @return array
      */
-    public function storeDataFromAccount($data, $account, $number = 1)
+    public function storeDataFromAccount($data, $account, $number = 1, $txid = null)
     {
-        return $this->client->storeDataFromAccount($data, $account, $number);
+        return $this->client->storeDataFromAccount($data, $account, $number, $txid);
     }
 
     // Complex functionality
@@ -243,19 +258,6 @@ class BlockChain
     public function getEncodedData($txid)
     {
         return $this->client->getEncodedData($txid);
-    }
-
-    /**
-     * Create a multisig account from array of accounts
-     *
-     * @param array  $accounts
-     * @param string $account
-     *
-     * @return string
-     */
-    public function createMultiSigAccount(array $accounts, $account)
-    {
-        return $this->client->createMultiSigAccount($accounts, $account);
     }
 
     public function tests()

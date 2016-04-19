@@ -13,7 +13,14 @@ class SignatureGenerator
 
     // Aux
     private $auxIdentity;
-    private $translate = ['F' => 'File', 'E' => 'Email', 'File' => 'F', 'Email' => 'E'];
+    private $translate = [
+        'F'          => 'File',
+        'E'          => 'Email',
+        'File'       => 'F',
+        'Email'      => 'E',
+        'B'          => 'Collection',
+        'Collection' => 'B'
+    ];
 
     public function __construct(array $data = null)
     {
@@ -205,12 +212,12 @@ class SignatureGenerator
                 'asset' => [
                     'type' => $this->translate[$this->assetType],
                     'hash' => $this->assetHash,
-                    'size' => $this->assetSize,
+                    'size' => '' . $this->assetSize,
                     'name' => $this->assetName
                 ],
                 'owner' => [
                     'name' => $this->ownerName,
-                    'id'   => $this->ownerId
+                    'id'   => '' . $this->ownerId
                 ]
             ];
 

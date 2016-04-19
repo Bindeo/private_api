@@ -69,7 +69,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
 
         // Build the query
         $sql = "SELECT ID_BULK_TRANSACTION, EXTERNAL_ID, TYPE, ELEMENTS_TYPE, CLIENT_TYPE, FK_ID_CLIENT, NUM_ITEMS, CLOSED,
-                  STRUCTURE, HASH, STATUS, TRANSACTION, CONFIRMED
+                  STRUCTURE, HASH, STATUS, TRANSACTION, ACCOUNT, CONFIRMED
                 FROM BULK_TRANSACTIONS WHERE STATUS = 'A'";
 
         if ($bulk->getIdBulkTransaction()) {
@@ -113,11 +113,23 @@ class BulkTransactions extends RepositoryLocatableAbstract
         // Geolocalize the bulk transaction
         $this->geolocalize($bulk);
 
+        // If we don't have account name and client type is Client we can get it from BLOCKCHAIN_INFO
+        if ($bulk->getClientType() == 'C' AND !$bulk->getAccount()) {
+            $sql = 'SELECT ACCOUNT FROM BLOCKCHAIN_INFO WHERE FK_ID_CLIENT = :id';
+            $res = $this->db->query($sql, [':id' => $bulk->getIdClient()]);
+
+            if ($res->getNumRows() == 0) {
+                throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+            } else {
+                $bulk->setAccount($res->getRows()[0]['ACCOUNT']);
+            }
+        }
+
         // Prepare query and mandatory data
         $sql = "INSERT INTO BULK_TRANSACTIONS(EXTERNAL_ID, TYPE, ELEMENTS_TYPE, CLIENT_TYPE, FK_ID_CLIENT,
-                  NUM_ITEMS, STRUCTURE, HASH, CTRL_DATE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
+                  NUM_ITEMS, STRUCTURE, HASH, CTRL_DATE, CTRL_IP, ACCOUNT, ID_GEONAMES, LATITUDE, LONGITUDE)
                 VALUES (:external_id, :type, :elements_type, :client_type, :id_client, 0, :structure, :hash,
-                  SYSDATE(), :ip, :id_geonames, :latitude, :longitude)";
+                  SYSDATE(), :ip, :account, :id_geonames, :latitude, :longitude)";
 
         $data = [
             ':external_id'   => $bulk->getExternalId(),
@@ -128,6 +140,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
             ':structure'     => $bulk->getStructure(),
             ':hash'          => $bulk->getHash(),
             ':ip'            => $bulk->getIp(),
+            ':account'       => $bulk->getAccount(),
             ':id_geonames'   => $bulk->getIdGeonames() ? $bulk->getIdGeonames() : null,
             ':latitude'      => $bulk->getLatitude() ? $bulk->getLatitude() : null,
             ':longitude'     => $bulk->getLongitude() ? $bulk->getLongitude() : null

@@ -13,9 +13,11 @@ source ../tables/FILES_DELETED.sql;
 source ../triggers/TGR_BD_FILES.sql;
 
 source ../tables/SIGNERS.sql;
-source ../tables/SIGNATURES.sql;
 
 
 ALTER TABLE BULK_TYPES CHANGE CLIENT_TYPE CLIENT_TYPE ENUM('U','C', 'A') NOT NULL COMMENT 'U - Logged user, C - Client, A - All users';
 INSERT INTO BULK_TYPES(CLIENT_TYPE, FK_ID_CLIENT, TYPE, ELEMENTS_TYPE, BULK_INFO, CALLBACK_TYPE, CALLBACK_VALUE)
 VALUES ('A', 0, 'Sign Document', 'E', '{"title":"document","fields":["hash","size"]}', 'C', 'SignDocument');
+
+
+ALTER TABLE BULK_TRANSACTIONS ADD (ACCOUNT VARCHAR(64) NOT NULL);

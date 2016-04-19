@@ -4,7 +4,7 @@ namespace Api\Repository;
 
 use Api\Entity\File;
 use Api\Entity\ResultSet;
-use Api\Entity\Signature;
+use Api\Entity\Signer;
 use Bindeo\DataModel\NotarizableInterface;
 use Bindeo\DataModel\SignableInterface;
 use Bindeo\Filter\FilesFilter;
@@ -86,15 +86,14 @@ class StoreData extends RepositoryLocatableAbstract
         if ($this->db->action($sql, $data)) {
             if ($blockchain->getType() == 'F') {
                 // Update the file
-                $sql = 'UPDATE FILES SET HASH = :hash, TRANSACTION = :txid WHERE ID_FILE = :id';
+                $sql = 'UPDATE FILES SET TRANSACTION = :txid WHERE ID_FILE = :id';
             } elseif ($blockchain->getType() == 'F') {
-                $sql = 'UPDATE EMAILS SET HASH = :hash, TRANSACTION = :txid WHERE ID_EMAIL = :id';
+                $sql = 'UPDATE EMAILS SET TRANSACTION = :txid WHERE ID_EMAIL = :id';
             } elseif ($blockchain->getType() == 'B') {
-                $sql = 'UPDATE BULK_TRANSACTIONS SET HASH = :hash, TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
+                $sql = 'UPDATE BULK_TRANSACTIONS SET TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
             }
             $data = [
                 ':id'   => $blockchain->getIdElement(),
-                ':hash' => $blockchain->getHash(),
                 ':txid' => $blockchain->getTransaction()
             ];
 
@@ -185,7 +184,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         $sql = 'SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
-                  CTRL_DATE, TAG, DESCRIPTION, TRANSACTION, CONFIRMED, STATUS, ID_GEONAMES, LATITUDE, LONGITUDE
+                  CTRL_DATE, TAG, DESCRIPTION, FK_ID_BULK, TRANSACTION, CONFIRMED, STATUS, ID_GEONAMES, LATITUDE, LONGITUDE
                 FROM FILES WHERE ID_FILE = :id';
         $params = [':id' => $file->getIdElement()];
 
@@ -406,7 +405,7 @@ class StoreData extends RepositoryLocatableAbstract
         $from = $filter->getStatus() != 'D' ? 'FILES' : 'FILES_DELETED';
 
         $sql = "SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME,
-                  HASH, SIZE, CTRL_DATE, TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE
+                  HASH, SIZE, CTRL_DATE, FK_ID_BULK, TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE
                 FROM " . $from . " WHERE CLIENT_TYPE = :client_type AND FK_ID_CLIENT = :id_client" . $where .
                " AND STATUS = :status ORDER BY " . $order;
 
@@ -446,10 +445,32 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
+     * Update some file data
+     *
+     * @param File $file
+     *
+     * @throws \Exception
+     */
+    public function updateFile(File $file)
+    {
+        if (!$file->getIdFile() or !$file->getIdBulk()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $sql = 'UPDATE FILES SET FK_ID_BULK = :id_bulk WHERE ID_FILE = :id';
+        $params = [':id' => $file->getIdFile(), ':id_bulk' => $file->getIdBulk()];
+
+        if (!$this->db->action($sql, $params)) {
+            throw $this->dbException();
+        }
+    }
+
+    /**
      * Associate signers to the signable element
      *
      * @param SignableInterface $element
      *
+     * @return array
      * @throws \Exception
      */
     public function associateSigners(SignableInterface $element)
@@ -462,50 +483,67 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Create new signers
+        $signers = [];
         foreach ($element->getSigners() as $signer) {
             // Instantiate new signature object
-            $signature = new Signature($signer);
-            $signature->clean();
-            if (!$signature->getEmail() or !$signature->getName()) {
+            $signer = new Signer($signer);
+            $signer->clean();
+            if (!$signer->getEmail() or !$signer->getName()) {
                 throw new \Exception(Exceptions::MISSING_FIELDS, 400);
             }
 
-            // Look for signer and user
-            $sql = "SELECT S.NUM, U.FK_ID_USER, U.ID_IDENTITY
-                    FROM (SELECT COUNT(*) NUM FROM SIGNERS WHERE EMAIL = :email) S
-                    LEFT JOIN (SELECT VALUE, FK_ID_USER, ID_IDENTITY FROM USERS_IDENTITIES WHERE TYPE = 'E') U ON (VALUE = :email)";
-            $params = [':email' => $signature->getEmail()];
+            // Add signer to the final list
+            $signers[] = $signer;
+
+            // Look for user identity
+            $sql = "SELECT FK_ID_USER, ID_IDENTITY FROM USERS_IDENTITIES WHERE TYPE = 'E' AND VALUE = :email";
+            $params = [':email' => $signer->getEmail()];
             $res = $this->db->query($sql, $params);
 
-            if ($res->getRows()[0]['NUM'] == 0) {
-                // Insert new signer
-                $sql = 'INSERT INTO SIGNERS(EMAIL, FK_ID_USER, FK_ID_IDENTITY, CTRL_DATE, CTRL_IP)
-                        VALUES (:email, :id_user, :id_identity, SYSDATE(), :ip)';
-
-                $params[':id_user'] = $res->getRows()[0]['FK_ID_USER'] ? $res->getRows()[0]['FK_ID_USER'] : null;
-                $params[':id_identity'] = $res->getRows()[0]['ID_IDENTITY'] ? $res->getRows()[0]['ID_IDENTITY'] : null;
-                $params[':ip'] = trim($element->getIp());
-
-                if (!$this->db->action($sql, $params)) {
-                    throw $this->dbException();
-                }
-            }
-
             // Insert signatures
-            $sql = 'INSERT INTO SIGNATURES(ELEMENT_TYPE, ELEMENT_ID, EMAIL, NAME, ACCOUNT)
-                    VALUES (:element_type, :element_id, :email, :name, :account)';
+            $sql = 'INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, ACCOUNT, FK_ID_USER, FK_ID_IDENTITY, PHONE)
+                    VALUES (:element_type, :element_id, :creator, :email, :name, :account, :id_user, :id_identity, :phone)';
 
             $params = [
                 ':element_type' => $element->getElementType(),
                 ':element_id'   => $element->getElementId(),
-                ':email'        => $signature->getEmail(),
-                ':name'         => $signature->getName(),
-                ':account'      => hash('sha256', $signature->getEmail())
+                ':creator'      => $signer->getCreator() ? 1 : 0,
+                ':email'        => $signer->getEmail(),
+                ':name'         => $signer->getName(),
+                ':account'      => $signer->setAccount(hash('sha256', $signer->getEmail()))->getAccount(),
+                ':id_user'      => isset($res->getRows()[0]['FK_ID_USER']) ? $res->getRows()[0]['FK_ID_USER'] : null,
+                ':id_identity'  => isset($res->getRows()[0]['ID_IDENTITY']) ? $res->getRows()[0]['ID_IDENTITY'] : null,
+                ':phone'        => $signer->getPhone() ? $signer->getPhone() : null
             ];
 
             if (!$this->db->action($sql, $params)) {
                 throw $this->dbException();
             }
         }
+
+        return $signers;
+    }
+
+    /**
+     * Get the signers list of a signable element
+     *
+     * @param SignableInterface $element
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function signersList(SignableInterface $element)
+    {
+        // Check data
+        if (!$element->getElementId() or !$element->getElementType()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Get signers list
+        $sql = 'SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, ACCOUNT FROM SIGNERS
+                WHERE ELEMENT_TYPE = :type AND ELEMENT_ID = :id ORDER BY EMAIL ASC';
+        $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
+
+        return $this->db->query($sql, $params, 'Api\Entity\Signer');
     }
 }

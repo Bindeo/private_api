@@ -8,6 +8,7 @@ class BitcoinClient implements BlockChainClientInterface
 {
     const MAX_DATA_LENGTH = 128; // 80 bytes in hex characters
     const STAMP_FEE       = (ENV == 'development') ? 0.000013 * 10 : 0.000013; // 1300 satoshis
+    const SIGNABLE_FEE    = (ENV == 'development') ? 0.000015 * 10 : 0.000015; // 1300 satoshis
     const TRANSACTION_FEE = (ENV == 'development') ? 0.000023 * 10 : 0.000023; // 2300 satoshis
     const BULK_STAMP_FEE  = self::TRANSACTION_FEE;
     const SATOSHI         = 0.00000001; // 1 satoshi
@@ -236,24 +237,28 @@ class BitcoinClient implements BlockChainClientInterface
     }
 
     /**
+     * Select previously prepared inputs without take more money, if an account and txid are given, we choose that
+     * transaction
+     *
      * @param float  $amount
      * @param string $account
-     * @param int    $number
+     * @param int    $addressesNumber
+     * @param string $txid [optional] Transaction id
      *
      * @return array
      */
-    private function selectPreparedInputs($amount, $account, $number)
+    private function selectPreparedInputs($amount, $account, $addressesNumber, $txid = null)
     {
         // Select account addresses
         $addresses = $this->bitcoin->getaddressesbyaccount($account);
 
         // Select first N addresses or generate them if the account doesn't have them
         $total = count($addresses);
-        if ($total > $number) {
-            $addresses = array_slice($addresses, 0, $number);
-        } elseif ($total < $number) {
+        if ($total > $addressesNumber) {
+            $addresses = array_slice($addresses, 0, $addressesNumber);
+        } elseif ($total < $addressesNumber) {
             // Generate necessary addresses
-            for ($i = $number - $total; $i > 0; $i--) {
+            for ($i = $addressesNumber - $total; $i > 0; $i--) {
                 $this->bitcoin->getnewaddress($account);
             }
 
@@ -261,14 +266,32 @@ class BitcoinClient implements BlockChainClientInterface
         }
 
         // Select addresses unspent inputs
-        $unspentInputs = $this->listUnspent($addresses);
+        $baseUnspents = $this->listUnspent($addresses);
 
-        if (!is_array($unspentInputs)) {
+        if (!is_array($baseUnspents)) {
             return ['error' => 'Could not retrieve list of unspent inputs'];
-        } elseif (count($unspentInputs) == 0) {
-            // We need to transfer coins
-            $this->transferCoins($amount, $addresses, round(30 / $number));
-            $unspentInputs = $this->listUnspent($addresses);
+        }
+
+        // Select only unspent inputs with requested amount
+        $unspentInputs = [];
+        foreach ($baseUnspents as $unspent) {
+            if (($txid == null or $txid == $unspent['txid']) and
+                $unspent['amount'] <= $amount + self::SATOSHI and $unspent['amount'] >= $amount - self::SATOSHI
+            ) {
+                $unspentInputs[] = $unspent;
+            }
+        }
+
+        // If we want any unspent input from given account, we transfer new coins
+        if (count($unspentInputs) == 0) {
+            if ($txid == null) {
+                // We need to transfer coins
+                $this->transferCoins($amount, $addresses, round(30 / $addressesNumber));
+                $unspentInputs = $this->listUnspent($addresses);
+            } else {
+                // If we want a colored coin and we didn't find it is error
+                return ['error' => 'Bad prepared inputs'];
+            }
         }
 
         // Pickup a random entry
@@ -277,10 +300,9 @@ class BitcoinClient implements BlockChainClientInterface
         // Spend inputs
         $selectedInputs = [$unspentInputs[$key]];
 
-        // We still are without coins
-
+        // Check if the selected input is ok
         if ($selectedInputs[0]['amount'] > $amount + self::SATOSHI or
-            $selectedInputs[0]['amount'] < self::BULK_STAMP_FEE - self::SATOSHI
+            $selectedInputs[0]['amount'] < $amount - self::SATOSHI
         ) {
             return ['error' => 'Bad prepared inputs'];
         }
@@ -510,12 +532,12 @@ class BitcoinClient implements BlockChainClientInterface
     /**
      * Create and send a blockchain transaction from given input and output arrays
      *
-     * @param $inputs
-     * @param $outputs
+     * @param array $inputs
+     * @param array $outputs
      *
      * @return array
      */
-    private function createTransaction($inputs, $outputs)
+    private function createTransaction(array $inputs, array $outputs)
     {
         // Create a raw transaction with all the information
         try {
@@ -568,6 +590,9 @@ class BitcoinClient implements BlockChainClientInterface
      */
     public function storeData($data)
     {
+        // Check correct types and set the minimum amount
+        $amount = self::STAMP_FEE;
+
         // Check data is valid
         $result = $this->checkData($data);
 
@@ -575,12 +600,10 @@ class BitcoinClient implements BlockChainClientInterface
             return $result;
         }
 
-        // Check correct types and set the minimum amount
-        $amount = self::STAMP_FEE;
-
         // Get the change address to return coins
         $changeAddress = $this->getAccountAddress('');
 
+        // Select inputs with enough coins
         $inputs = $this->selectInputs($amount);
         if (isset($inputs['error'])) {
             return $inputs;
@@ -591,12 +614,103 @@ class BitcoinClient implements BlockChainClientInterface
 
         $outputs = ['data' => $data];
 
-        if ($amount > self::SATOSHI) {
+        if ($amount > self::SATOSHI * 10) {
             $outputs[$changeAddress] = $amount;
         }
 
         // Create the new transaction
         $result = $this->createTransaction($inputs['input'], $outputs);
+
+        return $result;
+    }
+
+    /**
+     * Create a multisig account from array of accounts
+     *
+     * @param array  $accounts
+     * @param string $multiAccount
+     *
+     * @return string
+     */
+    private function createMultiSigAccount(array $accounts, $multiAccount)
+    {
+        // Get addresses
+        $addresses = [];
+        foreach ($accounts as $from) {
+            $addresses[] = $this->getAccountAddress($from);
+        }
+
+        // Create multisig account
+        return count($addresses) > 1 ? $this->bitcoin->addmultisigaddress(count($addresses), $addresses, $multiAccount)
+            : null;
+    }
+
+    /**
+     * Store signable data creating a colored coin in sigAccount
+     *
+     * @param string $data
+     * @param array  $signers
+     * @param string $sigAccount
+     *
+     * @return array
+     */
+    public function storeSignableData($data, array $signers, $sigAccount)
+    {
+        // Check correct types and set the minimum amount
+        $fee = self::SIGNABLE_FEE;
+        $colored = self::STAMP_FEE;
+        $amount = $fee + $colored;
+
+        // Check data is valid
+        $result = $this->checkData($data);
+
+        if (isset($result['error'])) {
+            return $result;
+        }
+
+        // Get the change address to return coins
+        $changeAddress = $this->getAccountAddress('');
+
+        // Select inputs with enough coins
+        $inputs = $this->selectInputs($amount);
+        if (isset($inputs['error'])) {
+            return $inputs;
+        }
+
+        // If we have more than one signer we need to create a multisig account
+        if (count($signers) > 1) {
+            // Check if multisig account already exists
+            $res = $this->bitcoin->getaddressesbyaccount($sigAccount);
+
+            // Get existent account or generate a new one
+            if (count($res) > 0) {
+                $address = $res[0];
+            } else {
+                $address = $this->createMultiSigAccount($signers, $sigAccount);
+            }
+        } elseif ($sigAccount == $signers[0]) {
+            // Address will be the signer address
+            $address = $this->getAccountAddress($sigAccount);
+        } else {
+            return ['error' => 'Only one signer and wrong sigAccount'];
+        }
+
+        if ($changeAddress == $address) {
+            return ['error' => 'Signing with default account'];
+        }
+
+        // Build the transaction
+        $amount = $inputs['total'] - $amount;
+
+        // Prepare outputs with notarized data and colored coin
+        $outputs = ['data' => $data, $address => $colored];
+
+        if ($amount > self::SATOSHI * 10) {
+            $outputs[$changeAddress] = $amount;
+        }
+
+        // Create the new transaction
+        $result = $this->createTransaction($inputs['inputs'], $outputs);
 
         return $result;
     }
@@ -671,10 +785,11 @@ class BitcoinClient implements BlockChainClientInterface
      * @param string $data
      * @param string $account
      * @param int    $number [optional] Number of account addresses used to select origin input
+     * @param string $txid   [optional]
      *
      * @return array
      */
-    public function storeDataFromAccount($data, $account, $number = 1)
+    public function storeDataFromAccount($data, $account, $number = 1, $txid = null)
     {
         // Check data is valid
         $result = $this->checkData($data);
@@ -687,7 +802,7 @@ class BitcoinClient implements BlockChainClientInterface
         $amount = self::BULK_STAMP_FEE;
 
         // Select input to spend
-        $inputs = $this->selectPreparedInputs($amount, $account, $number);
+        $inputs = $this->selectPreparedInputs($amount, $account, $number, $txid);
         if (isset($inputs['error'])) {
             return $inputs;
         }
@@ -864,27 +979,6 @@ class BitcoinClient implements BlockChainClientInterface
         } else {
             return ['data' => substr(hex2bin($tx['vout'][0]['scriptPubKey']['hex']), 1)];
         }
-    }
-
-    /**
-     * Create a multisig account from array of accounts
-     *
-     * @param array  $accounts
-     * @param string $account
-     *
-     * @return string
-     */
-    public function createMultiSigAccount(array $accounts, $account)
-    {
-        // Get addresses
-        $addresses = [];
-        foreach ($accounts as $from) {
-            $addresses[] = $this->getAccountAddress($from);
-        }
-
-        // Create multisig account
-        return count($addresses) > 1 ? $this->bitcoin->addmultisigaddress(count($addresses), $addresses, $account)
-            : null;
     }
 
     public function tests()
