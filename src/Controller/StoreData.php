@@ -5,6 +5,7 @@ namespace Api\Controller;
 use Api\Entity\BlockChain;
 use Api\Entity\Email;
 use Api\Entity\File;
+use Api\Entity\SignCode;
 use Bindeo\DataModel\Exceptions;
 use Bindeo\Filter\FilesFilter;
 use \Psr\Http\Message\ServerRequestInterface as Request;
@@ -268,6 +269,56 @@ class StoreData
         $res = $this->modelData->getBlockchainData($request->getParam('mode'), $request->getParam('txid'));
 
         return $response->withJson(['array' => $res], 200);
+    }
+
+    /**
+     * Get a signable document by sending a signer token
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function getDocSignable(Request $request, Response $response, $args)
+    {
+        $res = $this->modelData->getSignableElement($request->getParam('token'));
+
+        $res = ['data' => ['type' => 'files', 'attributes' => $res]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
+     * Get a pin code to sign a document by sending a signer token
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function getSignCode(Request $request, Response $response, $args)
+    {
+        $this->modelData->getSignCode(new SignCode($request->getParams()));
+
+        return $response->withJson('', 204);
+    }
+
+    /**
+     * Sign a document with valid token and pin code
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function signDocument(Request $request, Response $response, $args)
+    {
+        $this->modelData->signDocument(new SignCode($request->getParams()));
+
+        return $response->withJson('', 204);
     }
 
     /**

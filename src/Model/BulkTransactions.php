@@ -216,7 +216,8 @@ class BulkTransactions
         // Get opened bulk transaction
         $bulk = $this->bulkRepo->getBulk((new BulkTransaction())->setExternalId($event->getBulkExternalId())
                                                                 ->setClientType($event->getClientType())
-                                                                ->setIdClient($event->getIdClient()));
+                                                                ->setIdClient($event->getIdClient())
+                                                                ->setIdBulkTransaction($event->getIdBulk()));
         if (!$bulk) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }

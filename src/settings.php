@@ -79,7 +79,7 @@ return [
         'front_urls'          => [
             'host'             => 'https://',
             'validation_token' => 'www.bindeo.com/user/validate',
-            'preview_contract' => 'www.bindeo.com/contracts/preview'
+            'review_contract'  => 'www.bindeo.com/contracts/review'
         ]
     ]
 ];

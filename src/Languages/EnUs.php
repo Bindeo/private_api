@@ -23,8 +23,13 @@ class EnUs extends TranslateAbstract
             'password_notifyus'         => 'If you haven\'t requested to reset your password, please, %snotify us%s',
             'sign_request_subject'      => '%s sent you a document to sign',
             'sign_request_explanation'  => '%s sent you the following document to review and sign',
-            'sign_request_button'       => 'Review document',
-            'sign_request_replyto'      => 'Please, do not share this email, if you need to modify the document or have questions, email directly to %s by replying this email'
+            'sign_review_button'        => 'Review document',
+            'sign_request_replyto'      => 'Please, do not share this email, if you need to modify the document or have questions, email directly to %s by replying this email',
+            'sign_viewed_subject'       => '%s viewed your document',
+            'sign_viewed_explanation'   => 'At %s, %s opened and viewed you document',
+            'sign_code_subject'         => 'Your verification code',
+            'sign_code_title'           => 'Your verification code to sign document',
+            'sign_code_explanation'     => 'This code is valid during following 10 minutes'
         ];
     }
 }

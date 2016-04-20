@@ -2,9 +2,9 @@
 
 namespace Api\Entity;
 
-use Bindeo\DataModel\SignerAbstract;
+use Bindeo\DataModel\SignCodeAbstract;
 
-class Signer extends SignerAbstract
+class SignCode extends SignCodeAbstract
 {
     protected $lang;
 

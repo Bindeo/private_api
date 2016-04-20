@@ -3,9 +3,12 @@
 namespace Api\Model;
 
 use Api\Entity\BlockChain;
+use Api\Entity\BulkEvent;
 use Api\Entity\BulkTransaction;
 use Api\Entity\OAuthClient;
 use Api\Entity\SignatureGenerator;
+use Api\Entity\SignCode;
+use Api\Entity\Signer;
 use Api\Entity\User;
 use Api\Entity\File;
 use Api\Languages\TranslateFactory;
@@ -167,7 +170,7 @@ class StoreData
             $translate = TranslateFactory::factory($lang);
 
             $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                   $this->frontUrls['preview_contract'];
+                   $this->frontUrls['review_contract'];
 
             // Send an email by each signer distinct from creator
             for ($i = 1, $count = count($signers); $i < $count; $i++) {
@@ -714,5 +717,172 @@ class StoreData
         } else {
             return $blockchain->getRawTransaction($txid, 1);
         }
+    }
+
+    /**
+     * Use an existent and valid token to get a signable element
+     *
+     * @param $token
+     *
+     * @return array
+     * @throws \Exception
+     */
+    public function getSignableElement($token)
+    {
+        if (!$token) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Get the signable element
+        $element = $this->dataRepo->getSignableElement($token);
+
+        if (!$element) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        // Save current signer in JSON field
+        $element->setSignerJson($element->getSigners()[0]->toArray());
+
+        // If signer is the first time that he viewed document, we need to send a email to the creator
+        $res = $this->dataRepo->getSignatureCreator($element);
+
+        if ($res->getNumRows() == 1) {
+            /** @var Signer $creator */
+            $creator = $res->getRows()[0];
+
+            if ($element->getSigners()[0]->getViewed() == 0 and
+                $element->getSigners()[0]->getEmail() != $creator->getEmail()
+            ) {
+                // Send email to the creator
+                $translate = TranslateFactory::factory($creator->getLang());
+
+                $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
+                       $this->frontUrls['review_contract'];
+
+                // Send an email to the creator
+                $response = $this->view->render(new Response(), 'email/sign_viewed.html.twig', [
+                    'translate'    => $translate,
+                    'element_name' => $element->getElementName(),
+                    'datetime'     => (new \DateTime())->format('Y-m-d H:i:s T'),
+                    'user'         => $creator,
+                    'viewer'       => $element->getSigners()[0],
+                    'url'          => $url
+                ]);
+
+                // Send and email
+                try {
+                    $res = $this->email->sendEmail($creator->getEmail(),
+                        $translate->translate('sign_viewed_subject', $element->getSigners()[0]->getName()),
+                        $response->getBody()->__toString());
+
+                    if (!$res or $res->http_response_code != 200) {
+                        $this->logger->addError('Error sending and email', $creator->toArray());
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->addError('Error sending and email', $creator->toArray());
+                }
+            }
+        }
+
+        return $element->toArray();
+    }
+
+    /**
+     * Get a pin code to sign a document by sending a signer token
+     *
+     * @param SignCode $code
+     *
+     * @throws \Exception
+     */
+    public function getSignCode(SignCode $code)
+    {
+        // Check data
+        if (!$code->getToken() or !in_array($code->getLang(), ['es_ES', 'en_US'])) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Get the signable element
+        $element = $this->dataRepo->getSignableElement($code->getToken());
+
+        if (!$element) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        // Get the sign code
+        $code = $this->dataRepo->getFreshSignCode($code);
+
+        // Send an email with the code
+        $translate = TranslateFactory::factory($code->getLang());
+
+        // Send an email to the creator
+        $response = $this->view->render(new Response(), 'email/sign_code.html.twig', [
+            'translate'    => $translate,
+            'element_name' => $element->getElementName(),
+            'user'         => $element->getSigners()[0],
+            'code'         => $code->getCode()
+        ]);
+
+        // Send and email
+        try {
+            $res = $this->email->sendEmail($element->getSigners()[0]->getEmail(),
+                $translate->translate('sign_code_subject'), $response->getBody()->__toString());
+
+            if (!$res or $res->http_response_code != 200) {
+                $this->logger->addError('Error sending and email', $element->getSigners()[0]->toArray());
+            }
+        } catch (\Exception $e) {
+            $this->logger->addError('Error sending and email', $element->getSigners()[0]->toArray());
+        }
+    }
+
+    /**
+     * Sign a document with valid token and pin code
+     *
+     * @param SignCode $code
+     *
+     * @throws \Exception
+     */
+    public function signDocument(SignCode $code)
+    {
+        // Check data
+        if (!$code->getToken() or !$code->getCode() or !$code->getIp()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Validate received code
+        $signer = $this->dataRepo->validateSignCode($code);
+
+        // Get the signable element
+        $element = $this->dataRepo->getSignableElement($code->getToken());
+
+        // Signature data
+        $data = ['name' => $signer->getName(), 'email' => $signer->getEmail(), 'ip' => $code->getIp()];
+
+        // Additional data if available
+        if ($code->getLatitude() and $code->getLongitude()) {
+            $data['latitude'] = $code->getLatitude();
+            $data['longitude'] = $code->getLongitude();
+        }
+
+        if ($signer->getPhone()) {
+            $data['phone'] = $signer->getPhone();
+        }
+
+        // Add the event to the bulk transaction
+        $event = (new BulkEvent())->setIdBulk($element->getIdBulk())
+                                  ->setIp($code->getIp())
+                                  ->setName('sign_' . $signer->getAccount())
+                                  ->setTimestamp(new \DateTime())
+                                  ->setData(json_encode($data));
+
+        // If user is registered and logged
+        if ($signer->getIdUser()) {
+            $event->setClientType('U')->setIdClient($signer->getIdUser());
+        } else {
+            // User is not registered
+            //TODO inventar algo para cuando el usuario no está registrado y quiere crear el evento
+        }
+
+        $this->bulkModel->addEvent($event);
     }
 }

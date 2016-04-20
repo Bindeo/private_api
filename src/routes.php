@@ -60,6 +60,12 @@ $app->group('/bulk', function () {
     $this->get('', 'Api\Controller\BulkTransactions:getBulk');
 });
 
+// Signature routes
+$app->group('/signature', function () {
+    $this->get('', 'Api\Controller\StoreData:getDocSignable');
+    $this->get('/code', 'Api\Controller\StoreData:getSignCode');
+});
+
 // System tasks
 $app->group('/system', function () {
     $this->get('/blockchain/confirmations', 'Api\Controller\System:blockchainConfirmations');

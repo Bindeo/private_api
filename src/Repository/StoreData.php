@@ -4,6 +4,7 @@ namespace Api\Repository;
 
 use Api\Entity\File;
 use Api\Entity\ResultSet;
+use Api\Entity\SignCode;
 use Api\Entity\Signer;
 use Api\Entity\UserIdentity;
 use Bindeo\DataModel\NotarizableInterface;
@@ -524,8 +525,8 @@ class StoreData extends RepositoryLocatableAbstract
                 ':account'      => $signer->setAccount($identity ? $identity->getAccount()
                     : hash('sha256', $signer->getEmail()))->getAccount(),
                 ':token'        => $signer->setToken(hash('sha256',
-                    $element->getElementType() . '_' . $element->getElementId() . '_' . $signer->getAccount()))
-                                          ->getToken(),
+                    $element->getElementType() . '_' . $element->getElementId() . '_' . $signer->getAccount() . '_' .
+                    time()))->getToken(),
                 ':id_user'      => $identity ? $identity->getIdUser() : null,
                 ':id_identity'  => $identity ? $identity->getIdIdentity() : null,
                 ':phone'        => $signer->getPhone() ? $signer->getPhone() : null
@@ -560,5 +561,167 @@ class StoreData extends RepositoryLocatableAbstract
         $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
 
         return $this->db->query($sql, $params, 'Api\Entity\Signer');
+    }
+
+    /**
+     * Get the signature creator
+     *
+     * @param SignableInterface $element
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function getSignatureCreator(SignableInterface $element)
+    {
+        // Check data
+        if (!$element->getElementId() or !$element->getElementType()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Get signature creator
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.ACCOUNT, U.LANG
+                FROM SIGNERS S, USERS U
+                WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id AND S.CREATOR = 1 AND U.ID_USER = S.FK_ID_USER';
+        $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
+
+        return $this->db->query($sql, $params, 'Api\Entity\Signer');
+    }
+
+    /**
+     * Get a signable element by a signer token
+     *
+     * @param $token
+     *
+     * @return SignableInterface
+     * @throws \Exception
+     */
+    public function getSignableElement($token)
+    {
+        // Get requested token
+        $sql = 'SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED
+                FROM SIGNERS WHERE TOKEN = :token AND TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0';
+        $res = $this->db->query($sql, [':token' => trim($token)], 'Api\Entity\Signer');
+
+        if ($res->getNumRows() == 0) {
+            // Token doesn't exists or it is expired
+            throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
+        }
+
+        // If token is correct, get associated element
+        /** @var Signer $signer */
+        $signer = $res->getRows()[0];
+
+        $sql = 'UPDATE SIGNERS SET VIEWED = 1 WHERE TOKEN = :token AND VIEWED = 0';
+        // Execute query
+        $this->db->action($sql, [':token' => trim($token)]);
+
+        if ($signer->getElementType() == 'F') {
+            $sql = 'SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
+                      CTRL_DATE, TAG, DESCRIPTION, FK_ID_BULK, TRANSACTION, CONFIRMED, STATUS
+                    FROM FILES WHERE ID_FILE = :id';
+            $class = 'Api\Entity\File';
+        } else {
+            return null;
+        }
+
+        // Get element
+        $res = $this->db->query($sql, [':id' => $signer->getElementId()], $class);
+
+        // If element exists, add current token signer
+        if ($res->getNumRows() == 0) {
+            return null;
+        } else {
+            return $res->getRows()[0]->setSigners([$signer]);
+        }
+    }
+
+    /**
+     * Get a pin code to sign a document by sending a signer token
+     *
+     * @param SignCode $code
+     *
+     * @return SignCode
+     * @throws \Exception
+     */
+    public function getFreshSignCode(SignCode $code)
+    {
+        $code->clean();
+
+        // Check data
+        if (!$code->getToken() or !$code->getIp()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Get requested token
+        $sql = 'SELECT COUNT(*) NUM FROM SIGNERS WHERE TOKEN = :token AND TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0';
+        $res = $this->db->query($sql, [':token' => $code->getToken()]);
+
+        if ($res->getRows()[0]['NUM'] != 1) {
+            // Token doesn't exists or it is expired
+            throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
+        }
+
+        // Fill rest of data
+        $code->setMethod('E')->generateCode();
+        $this->geolocalize($code);
+
+        // Generate new code and expire old one if exists
+        $sql = 'UPDATE SIGN_CODES SET CODE_EXPIRATION = SYSDATE() WHERE TOKEN = :token AND CODE_EXPIRATION > SYSDATE();
+                INSERT INTO SIGN_CODES(TOKEN, METHOD, CODE, CODE_EXPIRATION, CTRL_DATE, CTRL_IP, ID_GEONAMES, LATITUDE, LONGITUDE)
+                VALUES (:token, :method, :code, SYSDATE() + INTERVAL 10 MINUTE, SYSDATE(), :ip, :id_geonames, :latitude, :longitude);';
+
+        $params = [
+            ':token'       => $code->getToken(),
+            ':method'      => $code->getMethod(),
+            ':code'        => $code->getCode(),
+            ':ip'          => $code->getIp(),
+            ':id_geonames' => $code->getIdGeonames() ? $code->getIdGeonames() : null,
+            ':latitude'    => $code->getLatitude() ? $code->getLatitude() : null,
+            ':longitude'   => $code->getLongitude() ? $code->getLongitude() : null
+        ];
+
+        // Execute query
+        if (!$this->db->action($sql, $params)) {
+            throw $this->dbException();
+        }
+
+        // Return code
+        return $code->setIp(null)->setIdGeonames(null)->setLatitude(null)->setLongitude(null);
+    }
+
+    /**
+     * Validate a signature code
+     *
+     * @param SignCode $code
+     *
+     * @return Signer
+     * @throws \Exception
+     */
+    public function validateSignCode(SignCode $code)
+    {
+        $code->clean();
+
+        // Check data
+        if (!$code->getToken() or !$code->getCode() or !$code->getIp()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Geolocalize code
+        $this->geolocalize($code);
+
+        // Get signature associated to code
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.FK_ID_USER, S.FK_ID_IDENTITY, S.ACCOUNT
+                FROM SIGNERS S, SIGN_CODES C
+                WHERE C.TOKEN = :token AND C.CODE = :code AND C.CODE_EXPIRATION > SYSDATE() AND
+                  S.TOKEN = C.TOKEN AND S.TOKEN_EXPIRATION > SYSDATE() AND S.SIGNED = 0';
+        $params = [':token' => $code->getToken(), ':code' => $code->getCode()];
+        $res = $this->db->query($sql, $params, 'Api\Entity\Signer');
+
+        if ($res->getNumRows() != 1) {
+            // Code doesn't exists or it is expired
+            throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
+        }
+
+        return $res->getRows()[0];
     }
 }

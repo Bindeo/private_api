@@ -23,8 +23,13 @@ class EsEs extends TranslateAbstract
             'password_notifyus'         => 'Si no has solicitado restablecer tu contraseña, por favor, %snotifícanoslo%s',
             'sign_request_subject'      => '%s te envió un documento para firmar',
             'sign_request_explanation'  => '%s te envió el siguiente documento para revisar y firmar',
-            'sign_request_button'       => 'Revisa el documento',
-            'sign_request_replyto'      => 'Por favor, no compartas este e-mail, si necesitas modificar el documento o tienes preguntas, escribe directamente a %s respondiendo este e-mail'
+            'sign_review_button'        => 'Revisa el documento',
+            'sign_request_replyto'      => 'Por favor, no compartas este e-mail, si necesitas modificar el documento o tienes preguntas, escribe directamente a %s respondiendo este e-mail',
+            'sign_viewed_subject'       => '%s revisó tu documento',
+            'sign_viewed_explanation'   => 'El %s, %s abrió y revisó tu documento',
+            'sign_code_subject'         => 'Tu código de verificación',
+            'sign_code_title'           => 'Tu código de verificación para firmar el documento',
+            'sign_code_explanation'     => 'Este código es válido durante los próximos 10 minutos'
         ];
     }
 }

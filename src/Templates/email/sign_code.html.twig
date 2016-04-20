@@ -1,0 +1,19 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<td style="background-color: #fff;
+        border-radius: 2px;
+        -webkit-border-radius: 2px;
+        box-shadow: 0 0 1px #ccc;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 15px;
+        color: #333;
+        text-align: center;">
+    <p>{{ translate.translate('sign_code_title') }}<br></p>
+    <p style="font-weight: bold;">{{ element_name }}</p>
+    <p><span class="cta-button" style="background: #eee;color: #000;display: inline-block;border: 5px solid #000;border-radius: 2px;-webkit-border-radius: 2px;-webkit-text-size-adjust: none;font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size: 36px;font-weight: normal;letter-spacing: 10px;margin: 0 auto;padding: 20px 15px 20px 25px;text-align: center;text-decoration: none;width: auto !important">
+            {{ code }}
+    </span></p><br>
+    <p>{{ translate.translate('sign_code_explanation') }}.</p>
+</td>
+{% endblock %}

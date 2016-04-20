@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<td style="background-color: #fff;
+        border-radius: 2px;
+        -webkit-border-radius: 2px;
+        box-shadow: 0 0 1px #ccc;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 15px;
+        color: #333;
+        text-align: center;">
+    <p>{{ translate.translate('sign_viewed_subject', viewer.name~' ('~viewer.email~')<br>')|raw }}:</p>
+    <p style="font-weight: bold;">{{ element_name }}</p>
+    <p><a class="cta-button" href="#" style="background: #4183C4;
+                    color: #ffffff;
+                    display: inline-block;
+                    border-radius: 2px;
+                    -webkit-border-radius: 2px;
+                    -webkit-text-size-adjust: none;
+                    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                    font-size: 17px;
+                    font-weight: normal;
+                    margin: 0 auto;
+                    padding: 16px 24px;
+                    text-align: center;
+                    text-decoration: none;
+                    width: auto !important"> {{ translate.translate('sign_review_button') }} </a></p><br>
+    <p>{{ translate.translate('sign_viewed_explanation', datetime, viewer.name) }}.</p>
+</td>
+{% endblock %}
