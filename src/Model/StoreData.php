@@ -8,6 +8,7 @@ use Api\Entity\OAuthClient;
 use Api\Entity\SignatureGenerator;
 use Api\Entity\User;
 use Api\Entity\File;
+use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
 use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
@@ -17,6 +18,7 @@ use Bindeo\DataModel\SpendingStorageInterface;
 use Bindeo\Filter\FilesFilter;
 use \Psr\Log\LoggerInterface;
 use Slim\Views\Twig;
+use Slim\Http\Response;
 
 /**
  * Class StoreData to manage StoreData controller functionality
@@ -114,19 +116,100 @@ class StoreData
     }
 
     /**
+     * Auxiliary method to implement additional functionality in file creation for files that are going to be signed
+     *
+     * @param File   $file
+     * @param string $lang
+     *
+     * @throws \Exception
+     */
+    private function fileToSign(File $file, $lang)
+    {
+        // File is prepared to be signed
+        if ($file->getMode() == 'S') {
+            $signers = $this->dataRepo->associateSigners($file);
+
+            // Generate params array
+            $params = (new BulkTransaction())->setType('Sign Document')
+                                             ->setClientType($file->getClientType())
+                                             ->setIdClient($file->getIdClient())
+                                             ->setExternalId('Sign_Document' . '_' . $file->getIdFile())
+                                             ->setIp($file->getIp())
+                                             ->toArray();
+
+            // Generate signature
+            $signature = $this->signatureFactory($file);
+
+            // Signature hash
+            $params['hash'] = $signature->generateHash();
+            // Size in bytes
+            $params['size'] = $file->getSize() * 1024;
+
+            // Calculate account name depending on signers
+            if (count($signers) == 1) {
+                $params['account'] = $signers[0]->getAccount();
+            } else {
+                // Concatenate signers accounts to generate multisig account name
+                $account = '';
+                foreach ($signers as $signer) {
+                    $account .= $signer->getAccount();
+                }
+                $params['account'] = hash('sha256', $account);
+            }
+
+            // Open bulk transaction
+            $bulk = $this->bulkModel->openBulk($params);
+
+            // Update file registry with bulk transaction
+            $this->dataRepo->updateFile($file->setIdBulk($bulk['idBulkTransaction']));
+
+            // Send emails to signers
+            $translate = TranslateFactory::factory($lang);
+
+            $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
+                   $this->frontUrls['preview_contract'];
+
+            // Send an email by each signer distinct from creator
+            for ($i = 1, $count = count($signers); $i < $count; $i++) {
+                $response = $this->view->render(new Response(), 'email/sign_request.html.twig', [
+                    'translate' => $translate,
+                    'filename'  => $file->getFileOrigName(),
+                    'creator'   => $signers[0],
+                    'user'      => $signers[$i],
+                    'url'       => $url
+                ]);
+
+                // Send and email
+                try {
+                    $res = $this->email->sendEmail($signers[$i]->getEmail(),
+                        $translate->translate('sign_request_subject', $signers[0]->getName()),
+                        $response->getBody()->__toString(), [], null, $signers[0]->getEmail());
+
+                    if (!$res or $res->http_response_code != 200) {
+                        $this->logger->addError('Error sending and email', $signers[$i]->toArray());
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->addError('Error sending and email', $signers[$i]->toArray());
+                }
+            }
+        }
+    }
+
+    /**
      * Save the file in storage and database
      *
-     * @param File $file
+     * @param File   $file
+     * @param string $lang [optional]
      *
      * @return array
      * @throws \Exception
      */
-    public function saveFile(File $file)
+    public function saveFile(File $file, $lang = null)
     {
         // We try to create file first
         if (!in_array($file->getClientType(), ['U', 'C']) or !$file->getIdClient() or !$file->getPath() or
             !file_exists($file->getPath()) or !$file->getFileOrigName() or
-            ($file->getMode() == 'S' and !$file->getSigners())
+            ($file->getMode() == 'S' and (!$file->getSigners() or !$lang))
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
@@ -178,46 +261,9 @@ class StoreData
             throw $e;
         }
 
-        // File has been created, if it has signers, associate them
+        // File has been created in mode to be signed
         if ($file->getMode() == 'S') {
-            $signers = $this->dataRepo->associateSigners($file);
-
-            // Generate params array
-            $params = (new BulkTransaction())->setType('Sign Document')
-                                             ->setClientType($file->getClientType())
-                                             ->setIdClient($file->getIdClient())
-                                             ->setExternalId('Sign_Document' . '_' . $file->getIdFile())
-                                             ->setIp($file->getIp())
-                                             ->toArray();
-
-            // Generate signature
-            $signature = $this->signatureFactory($file);
-
-            // Signature hash
-            $params['hash'] = $signature->generateHash();
-            // Size in bytes
-            $params['size'] = $file->getSize() * 1024;
-
-            // Calculate account name depending on signers
-            if (count($signers) == 1) {
-                $params['account'] = $signers[0]->getAccount();
-            } else {
-                // Concatenate signers accounts to generate multisig account name
-                $account = '';
-                foreach ($signers as $signer) {
-                    $account .= $signer->getAccount();
-                }
-                $params['account'] = hash('sha256', $account);
-            }
-
-            // Open bulk transaction
-            $bulk = $this->bulkModel->openBulk($params);
-
-            // Update file registry with bulk transaction
-            $this->dataRepo->updateFile($file->setIdBulk($bulk['idBulkTransaction']));
-
-            // TODO Send email to signers
-
+            $this->fileToSign($file, $lang);
         }
 
         return $this->getFile($file);
@@ -273,7 +319,7 @@ class StoreData
         $ip = $file->getIp();
         $file = $this->dataRepo->findFile($file);
         if (!$file) {
-            throw new \Exception('', 500);
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
         $file->setIp($ip);
 

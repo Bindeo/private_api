@@ -53,7 +53,7 @@ class StoreData
     public function createFile(Request $request, Response $response, $args)
     {
         // Save file
-        $res = $this->modelData->saveFile(new File($request->getParams()));
+        $res = $this->modelData->saveFile(new File($request->getParams()), $request->getParam('lang'));
         $res = ['data' => ['type' => 'files', 'attributes' => $res]];
 
         return $response->withJson($res, 201);

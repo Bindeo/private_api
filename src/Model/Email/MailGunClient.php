@@ -24,13 +24,15 @@ class MailGunClient implements EmailInterface
      * @param string $to
      * @param string $subject
      * @param string $content
-     * @param array  $files [optional]
-     * @param string $from  [optional]
+     * @param array  $files   [optional]
+     * @param string $from    [optional]
+     * @param string $replyTo [optional]
      *
      * @return \stdClass
      * @throws \Mailgun\Messages\Exceptions\MissingRequiredMIMEParameters
+     * @throws \Mailgun\Messages\Exceptions\TooManyParameters
      */
-    public function sendEmail($to, $subject, $content, $files = [], $from = null)
+    public function sendEmail($to, $subject, $content, $files = [], $from = null, $replyTo = null)
     {
         // Build the message
         $message = new MessageBuilder();
@@ -38,6 +40,9 @@ class MailGunClient implements EmailInterface
         $message->addToRecipient($to);
         $message->setSubject($subject);
         $message->setHtmlBody($content);
+        if ($replyTo) {
+            $message->setReplyToAddress($replyTo);
+        }
 
         // Send the message
         return $this->client->sendMessage($this->domain, $message->getMessage(), $files);

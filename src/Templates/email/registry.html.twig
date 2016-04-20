@@ -1,48 +1,36 @@
 {% extends 'base.html.twig' %}
 
 {% block body %}
-<table cellpadding="25" cellspacing="0" border="0" align="center" width="560" style="padding: 0 25px 25px;">
-<tbody>
-    <tr>
-        <td align="center">
-            <img src="http://www.bindeo.com/images/mails/bindeo.png" alt="Bindeo" width="120">
-        </td>
-    </tr>
-    <tr>
-        <td style="background-color: #fff; border-radius: 2px; -webkit-border-radius: 2px;
-                box-shadow: 0 0 1px #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                font-size: 15px; color: #333">
+<td style="background-color: #fff; border-radius: 2px; -webkit-border-radius: 2px;
+        box-shadow: 0 0 1px #ccc; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 15px; color: #333">
+    <p style="margin-top: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 24px; line-height: 26px;">
+        {{ translate.translate('registry_subject', user.name) }}
+    </p>
 
-            <p style="margin-top: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 24px; line-height: 26px;">
-                {{ translate.translate('registry_subject', user.name) }}
-            </p>
+    <p>{{ translate.translate('general_hi_user', '<strong>'~user.name~'</strong>')|raw }},</p>
+    <p>{{ translate.translate('registry_explanation') }}
+        (<a href="mailto:{{ user.email }}" style="text-decoration: none; color: #333;">{{ user.email }}</a>):
 
-            <p>{{ translate.translate('general_hi_user', '<strong>'~user.name~'</strong>')|raw }},</p>
-            <p>{{ translate.translate('registry_explanation') }}
-                (<a href="mailto:{{ user.email }}" style="text-decoration: none; color: #333;">{{ user.email }}</a>):
-
-            </p>
-            <br>
-            <p style="text-align: center;">
-                <a class="cta-button" href="{{ url }}?m=V&t={{ token }}"
-                   style="background: #4183C4;
-                    color: #ffffff;
-                    display: inline-block;
-                    border-radius: 2px;
-                    -webkit-border-radius: 2px;
-                    -webkit-text-size-adjust: none;
-                    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                    font-size: 17px;
-                    font-weight: normal;
-                    margin: 0 auto;
-                    padding: 16px 24px;
-                    text-align: center;
-                    text-decoration: none;
-                    width: auto !important"> {{ translate.translate('registry_verify_button') }} </a>
-            </p>
-            <p style="text-align: center;">{{ translate.translate('general_thanks') }}.</p>
-        </td>
-    </tr>
-</tbody>
-</table>
+    </p>
+    <br>
+    <p style="text-align: center;">
+        <a class="cta-button" href="{{ url }}?m=V&t={{ token }}"
+           style="background: #4183C4;
+            color: #ffffff;
+            display: inline-block;
+            border-radius: 2px;
+            -webkit-border-radius: 2px;
+            -webkit-text-size-adjust: none;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 17px;
+            font-weight: normal;
+            margin: 0 auto;
+            padding: 16px 24px;
+            text-align: center;
+            text-decoration: none;
+            width: auto !important"> {{ translate.translate('registry_verify_button') }} </a>
+    </p>
+    <p style="text-align: center;">{{ translate.translate('general_thanks') }}.</p>
+</td>
 {% endblock %}

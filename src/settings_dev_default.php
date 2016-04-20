@@ -34,3 +34,6 @@ $settings['settings']['email']['mailgun'] = [
 
 // Maxmind db route
 $settings['settings']['maxmind'] = '/usr/local/share/geoIP/GeoLite2-City.mmdb';
+
+// Host and front urls for emails
+$settings['settings']['front_urls']['host'] = 'https://';

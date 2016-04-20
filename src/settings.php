@@ -78,7 +78,8 @@ return [
         // Host and front urls for emails
         'front_urls'          => [
             'host'             => 'https://',
-            'validation_token' => 'www.bindeo.com/user/validate'
+            'validation_token' => 'www.bindeo.com/user/validate',
+            'preview_contract' => 'www.bindeo.com/contracts/preview'
         ]
     ]
 ];

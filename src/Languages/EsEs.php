@@ -21,6 +21,10 @@ class EsEs extends TranslateAbstract
             'password_explanation'      => 'Has solicitado restablecer la contraseña de tu cuenta de Bindeo, pulsa en el botón siguiente para elegir una nueva, recuerda que este enlace expira en 24 horas',
             'password_button'           => 'Elegir nueva contraseña',
             'password_notifyus'         => 'Si no has solicitado restablecer tu contraseña, por favor, %snotifícanoslo%s',
+            'sign_request_subject'      => '%s te envió un documento para firmar',
+            'sign_request_explanation'  => '%s te envió el siguiente documento para revisar y firmar',
+            'sign_request_button'       => 'Revisa el documento',
+            'sign_request_replyto'      => 'Por favor, no compartas este e-mail, si necesitas modificar el documento o tienes preguntas, escribe directamente a %s respondiendo este e-mail'
         ];
     }
 }

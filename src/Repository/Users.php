@@ -257,14 +257,15 @@ class Users extends RepositoryLocatableAbstract
                 VALUES (:token, :type_val, :id, :email, SYSDATE(), :ip);
                 INSERT INTO USERS_TYPES(FK_ID_USER, FK_ID_TYPE, DATE_START, NEXT_PAYMENT, LAST_RESET)
                 VALUES (:id, :type, SYSDATE(), CASE WHEN :type > 2 THEN SYSDATE() + INTERVAL 1 MONTH ELSE NULL END, CASE WHEN :type > 2 THEN SYSDATE() ELSE NULL END);
-                INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, CTRL_IP, CTRL_DATE)
-                VALUES (:id, 1, 'E', :name, :email, :ip, SYSDATE());";
+                INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, ACCOUNT, CTRL_IP, CTRL_DATE)
+                VALUES (:id, 1, 'E', :name, :email, :account, :ip, SYSDATE());";
         $data = [
             ':token'    => $token,
             ':type_val' => 'V',
             ':id'       => $id,
             ':type'     => $user->getType(),
             ':email'    => $user->getEmail(),
+            ':account'  => hash('sha256', $user->getName() . $user->getEmail()),
             ':ip'       => $user->getIp(),
             ':name'     => $user->getName()
         ];
@@ -531,7 +532,7 @@ class Users extends RepositoryLocatableAbstract
 
         // If the user is not confirmed we can update the identity and user profile
         if (!$user->getConfirmed()) {
-            $sql = "UPDATE USERS_IDENTITIES SET NAME = :name, VALUE = :value, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+            $sql = "UPDATE USERS_IDENTITIES SET NAME = :name, VALUE = :value, ACCOUNT = :account, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
                     WHERE ID_IDENTITY = :id;
                     UPDATE USERS SET NAME = :name, EMAIL = :value, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
                     WHERE ID_USER = :id_user;
@@ -541,6 +542,7 @@ class Users extends RepositoryLocatableAbstract
                 ':id'      => $identity->getIdIdentity(),
                 ':name'    => $identity->getName(),
                 ':value'   => $identity->getValue(),
+                ':account' => hash('sha256', $identity->getName() . $identity->getValue()),
                 ':ip'      => $identity->getIp(),
                 ':id_user' => $user->getIdUser()
             ];
@@ -565,14 +567,15 @@ class Users extends RepositoryLocatableAbstract
                 // If the email didn't change we can create a new confirmed identity and deprecate the old one
                 $sql = "UPDATE USERS_IDENTITIES SET MAIN = 0, STATUS = 'D', CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
                         WHERE ID_IDENTITY = :id;
-                        INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, CTRL_IP, CTRL_DATE)
-                        VALUES (:id_user, 1, 'E', :name, :value, 1, :ip, SYSDATE());
+                        INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, ACCOUNT, CONFIRMED, CTRL_IP, CTRL_DATE)
+                        VALUES (:id_user, 1, 'E', :name, :value, :account, 1, :ip, SYSDATE());
                         UPDATE USERS SET NAME = :name, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
                         WHERE ID_USER = :id_user;";
                 $params = [
                     ':id'      => $identity->getIdIdentity(),
                     ':name'    => $identity->getName(),
                     ':value'   => $user->getEmail(),
+                    ':account' => hash('sha256', $identity->getName() . $user->getEmail()),
                     ':ip'      => $identity->getIp(),
                     ':id_user' => $user->getIdUser()
                 ];
@@ -623,11 +626,12 @@ class Users extends RepositoryLocatableAbstract
                     $response['token'] = md5($user->getIdUser() . $identity->getValue() . time());
 
                     // Create the identity
-                    $sql = "INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, CTRL_IP, CTRL_DATE)
-                            VALUES (:id_user, 0, 'E', :name, :value, 0, :ip, SYSDATE());";
+                    $sql = "INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, ACCOUNT, CONFIRMED, CTRL_IP, CTRL_DATE)
+                            VALUES (:id_user, 0, 'E', :name, :value, :account, 0, :ip, SYSDATE());";
                     $params = [
                         ':name'    => $identity->getName(),
                         ':value'   => $identity->getValue(),
+                        ':account' => hash('sha256', $identity->getName() . $identity->getValue()),
                         ':ip'      => $identity->getIp(),
                         ':id_user' => $user->getIdUser()
                     ];
@@ -694,8 +698,7 @@ class Users extends RepositoryLocatableAbstract
             $user->setEmail($res->getRows()[0]['EMAIL']);
         }
 
-        $user->setName($res->getRows()[0]['NAME'])
-             ->setLang($res->getRows()[0]['LANG']);
+        $user->setName($res->getRows()[0]['NAME'])->setLang($res->getRows()[0]['LANG']);
 
         // Check if we already have a non expired or confirmed token with the same change
         $sql = "SELECT TOKEN FROM USERS_VALIDATIONS
@@ -979,7 +982,7 @@ class Users extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
         // Create query
-        $sql = "SELECT ID_IDENTITY, FK_ID_USER, MAIN, TYPE, NAME, VALUE, CONFIRMED, STATUS
+        $sql = "SELECT ID_IDENTITY, FK_ID_USER, MAIN, TYPE, NAME, VALUE, ACCOUNT, CONFIRMED, STATUS
                 FROM USERS_IDENTITIES WHERE FK_ID_USER = :id AND STATUS = 'A'";
         if ($main) {
             $sql .= ' AND MAIN = 1';

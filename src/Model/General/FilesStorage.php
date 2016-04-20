@@ -114,7 +114,14 @@ class FilesStorage implements FilesInterface
      */
     private function getSubPath(StorableFileInterface $file)
     {
-        $path = ($file->getStorageType() == 'bulk' ? '/bulk' : '');
+        if ($file->getStorageType() == 'bulk') {
+            $path = '/bulk';
+        } elseif ($file->getStorageType() == 'sign') {
+            $path = '/sign';
+        } else {
+            $path = '/notarize';
+        }
+
         $id = $file->getIdClient();
         // Generate necessary folders
         do {

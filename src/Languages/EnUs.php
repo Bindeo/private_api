@@ -21,6 +21,10 @@ class EnUs extends TranslateAbstract
             'password_explanation'      => 'You have requested reset your Bindeo\'s account password, click the following button for choose a new one, remember that this link expires in 24 hours',
             'password_button'           => 'Choose new password',
             'password_notifyus'         => 'If you haven\'t requested to reset your password, please, %snotify us%s',
+            'sign_request_subject'      => '%s sent you a document to sign',
+            'sign_request_explanation'  => '%s sent you the following document to review and sign',
+            'sign_request_button'       => 'Review document',
+            'sign_request_replyto'      => 'Please, do not share this email, if you need to modify the document or have questions, email directly to %s by replying this email'
         ];
     }
 }

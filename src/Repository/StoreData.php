@@ -5,6 +5,7 @@ namespace Api\Repository;
 use Api\Entity\File;
 use Api\Entity\ResultSet;
 use Api\Entity\Signer;
+use Api\Entity\UserIdentity;
 use Bindeo\DataModel\NotarizableInterface;
 use Bindeo\DataModel\SignableInterface;
 use Bindeo\Filter\FilesFilter;
@@ -470,7 +471,7 @@ class StoreData extends RepositoryLocatableAbstract
      *
      * @param SignableInterface $element
      *
-     * @return array
+     * @return Signer[]
      * @throws \Exception
      */
     public function associateSigners(SignableInterface $element)
@@ -492,17 +493,27 @@ class StoreData extends RepositoryLocatableAbstract
                 throw new \Exception(Exceptions::MISSING_FIELDS, 400);
             }
 
-            // Add signer to the final list
-            $signers[] = $signer;
+            // Add signers
+            if ($signer->getCreator()) {
+                // Insert creator the first of the list
+                array_unshift($signers, $signer);
+            } else {
+                // Insert others at the end of the list
+                $signers[] = $signer;
+            }
 
             // Look for user identity
-            $sql = "SELECT FK_ID_USER, ID_IDENTITY FROM USERS_IDENTITIES WHERE TYPE = 'E' AND VALUE = :email";
+            $sql = "SELECT FK_ID_USER, ID_IDENTITY, ACCOUNT FROM USERS_IDENTITIES WHERE TYPE = 'E' AND VALUE = :email";
             $params = [':email' => $signer->getEmail()];
-            $res = $this->db->query($sql, $params);
+            $res = $this->db->query($sql, $params, 'Api\Entity\UserIdentity');
+            /** @var UserIdentity $identity */
+            $identity = $res->getNumRows() == 1 ? $res->getRows()[0] : null;
 
             // Insert signatures
-            $sql = 'INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, ACCOUNT, FK_ID_USER, FK_ID_IDENTITY, PHONE)
-                    VALUES (:element_type, :element_id, :creator, :email, :name, :account, :id_user, :id_identity, :phone)';
+            $sql = 'INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
+                      FK_ID_USER, FK_ID_IDENTITY, PHONE)
+                    VALUES (:element_type, :element_id, :creator, :email, :name, :account, :token, SYSDATE() + INTERVAL 15 DAY,
+                      :id_user, :id_identity, :phone)';
 
             $params = [
                 ':element_type' => $element->getElementType(),
@@ -510,9 +521,13 @@ class StoreData extends RepositoryLocatableAbstract
                 ':creator'      => $signer->getCreator() ? 1 : 0,
                 ':email'        => $signer->getEmail(),
                 ':name'         => $signer->getName(),
-                ':account'      => $signer->setAccount(hash('sha256', $signer->getEmail()))->getAccount(),
-                ':id_user'      => isset($res->getRows()[0]['FK_ID_USER']) ? $res->getRows()[0]['FK_ID_USER'] : null,
-                ':id_identity'  => isset($res->getRows()[0]['ID_IDENTITY']) ? $res->getRows()[0]['ID_IDENTITY'] : null,
+                ':account'      => $signer->setAccount($identity ? $identity->getAccount()
+                    : hash('sha256', $signer->getEmail()))->getAccount(),
+                ':token'        => $signer->setToken(hash('sha256',
+                    $element->getElementType() . '_' . $element->getElementId() . '_' . $signer->getAccount()))
+                                          ->getToken(),
+                ':id_user'      => $identity ? $identity->getIdUser() : null,
+                ':id_identity'  => $identity ? $identity->getIdIdentity() : null,
                 ':phone'        => $signer->getPhone() ? $signer->getPhone() : null
             ];
 

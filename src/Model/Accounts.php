@@ -86,7 +86,7 @@ class Accounts
         $translate = TranslateFactory::factory($user->getLang());
 
         $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-               'www.bindeo.com/user/validate';
+               $this->frontUrls['validation_token'];
 
         $response = $this->view->render(new Response(), 'email/registry.html.twig',
             ['translate' => $translate, 'user' => $user, 'token' => $data['token'], 'url' => $url]);
@@ -152,7 +152,7 @@ class Accounts
         $translate = TranslateFactory::factory($user->getLang());
 
         $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-               'www.bindeo.com/user/validate';
+               $this->frontUrls['validation_token'];
 
         $response = $this->view->render(new Response(), 'email/password-reset.html.twig',
             ['translate' => $translate, 'user' => $user, 'token' => $token, 'url' => $url]);
@@ -201,7 +201,7 @@ class Accounts
         $translate = TranslateFactory::factory($user->getLang());
 
         $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-               'www.bindeo.com/user/validate';
+               $this->frontUrls['validation_token'];
 
         $response = $this->view->render(new Response(), 'email/verification.html.twig',
             ['translate' => $translate, 'user' => $user, 'token' => $token, 'url' => $url]);
@@ -281,7 +281,7 @@ class Accounts
             $translate = TranslateFactory::factory($user->getLang());
 
             $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                   'www.bindeo.com/user/validate';
+                   $this->frontUrls['validation_token'];
 
             $response = $this->view->render(new Response(), 'email/verification.html.twig',
                 ['translate' => $translate, 'user' => $user, 'token' => $response['token'], 'url' => $url]);
