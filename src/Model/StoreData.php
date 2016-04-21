@@ -364,7 +364,7 @@ class StoreData
                                            ->setType($signature->getAssetType())
                                            ->setIdElement($file->getIdFile());
 
-        // Sign
+        // Signature
         if ($file->getMode() == 'S') {
             // If file needs to be signed, we need the list of signers
             $signers = $this->dataRepo->signersList($file);
@@ -382,7 +382,7 @@ class StoreData
             $bulk = $this->bulkModel->getBulk((new BulkTransaction())->setIdBulkTransaction($file->getIdBulk()));
 
             // Notarize and create signable content in blockchain
-            $res = $blockchain->storeSignableData($blockchainObj->getHash(), $accounts, $bulk['account']);
+            $res = $blockchain->storeSignableData($blockchainObj->getHash(), $accounts, $bulk->getAccount());
         } else {
             // Notarize data
             $res = $blockchain->storeData($blockchainObj->getHash());
@@ -840,6 +840,7 @@ class StoreData
      *
      * @param SignCode $code
      *
+     * @return BulkTransaction
      * @throws \Exception
      */
     public function signDocument(SignCode $code)
@@ -854,6 +855,9 @@ class StoreData
 
         // Get the signable element
         $element = $this->dataRepo->getSignableElement($code->getToken());
+
+        // Get creator
+        $creator = $this->dataRepo->getSignatureCreator($element);
 
         // Signature data
         $data = ['name' => $signer->getName(), 'email' => $signer->getEmail(), 'ip' => $code->getIp()];
@@ -878,11 +882,63 @@ class StoreData
         // If user is registered and logged
         if ($signer->getIdUser()) {
             $event->setClientType('U')->setIdClient($signer->getIdUser());
-        } else {
-            // User is not registered
-            //TODO inventar algo para cuando el usuario no está registrado y quiere crear el evento
         }
 
-        $this->bulkModel->addEvent($event);
+        // Obtain bulk transaction
+        $bulk = $this->bulkModel->getBulk((new BulkTransaction())->setIdBulkTransaction($event->getIdBulk()));
+
+        // Set linked transaction if bulk doesn't have it
+        if (!$bulk->getLinkedTransaction()) {
+            $structure = $bulk->setLinkedTransaction($element->getTransaction())->getStructure(true);
+
+            // Modify structure for Sign Document type of bulk transaction
+            $structure['document']['transaction'] = $element->getTransaction();
+            $bulk->setStructure(json_encode($structure));
+        }
+
+        // Add the event
+        $bulk = $this->bulkModel->addEvent($event->setBulkObj($bulk));
+
+        // Update signature
+        $this->dataRepo->updateSigner($signer->setDate($event->getDate())->setIp($code->getIp()));
+
+        if ($element->getSigners()[0]->getEmail() != $creator->getRows()[0]->getEmail()) {
+            // Send email to creator
+            $translate = TranslateFactory::factory($code->getLang());
+
+            $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
+                   $this->frontUrls['review_contract'];
+
+            // Send an email to the creator
+            $response = $this->view->render(new Response(), 'email/sign_signed.html.twig', [
+                'translate'    => $translate,
+                'element_name' => $element->getElementName(),
+                'datetime'     => $event->getDate()->format('Y-m-d H:i:s T'),
+                'signer'       => $element->getSigners()[0],
+                'user'         => $creator->getRows()[0],
+                'pending'      => $element->getPendingSigners(),
+                'url'          => $url
+            ]);
+
+            // Send and email
+            try {
+                $res = $this->email->sendEmail($creator->getRows()[0]->getEmail(),
+                    $translate->translate('sign_signed_subject', $element->getSigners()[0]->getName()),
+                    $response->getBody()->__toString());
+
+                if (!$res or $res->http_response_code != 200) {
+                    $this->logger->addError('Error sending and email', $creator->getRows()[0]->toArray());
+                }
+            } catch (\Exception $e) {
+                $this->logger->addError('Error sending and email', $creator->getRows()[0]->toArray());
+            }
+        }
+
+        // If everyone has signed the document, we close the bulk transaction
+        if ($element->getPendingSigners() == 0) {
+            $this->bulkModel->closeBulk($bulk->setIp($code->getIp()));
+        }
+
+        return $bulk->setIp(null);
     }
 }

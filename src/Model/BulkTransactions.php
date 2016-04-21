@@ -198,9 +198,7 @@ class BulkTransactions
     public function getBulk(BulkTransaction $bulk)
     {
         // Open the bulk transaction
-        $bulk = $this->bulkRepo->getBulk($bulk);
-
-        return $bulk ? $bulk->toArray() : [];
+        return $this->bulkRepo->getBulk($bulk);
     }
 
     /**
@@ -208,16 +206,18 @@ class BulkTransactions
      *
      * @param BulkEvent $event
      *
-     * @return array
+     * @return BulkTransaction
      * @throws \Exception
      */
     public function addEvent(BulkEvent $event)
     {
         // Get opened bulk transaction
-        $bulk = $this->bulkRepo->getBulk((new BulkTransaction())->setExternalId($event->getBulkExternalId())
-                                                                ->setClientType($event->getClientType())
-                                                                ->setIdClient($event->getIdClient())
-                                                                ->setIdBulkTransaction($event->getIdBulk()));
+        $bulk = $event->getBulkObj()
+            ? $event->getBulkObj()
+            : $this->bulkRepo->getBulk((new BulkTransaction())->setExternalId($event->getBulkExternalId())
+                                                              ->setClientType($event->getClientType())
+                                                              ->setIdClient($event->getIdClient())
+                                                              ->setIdBulkTransaction($event->getIdBulk()));
         if (!$bulk) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
@@ -238,7 +238,7 @@ class BulkTransactions
         // Update bulk transaction with new elements
         $this->bulkRepo->updateBulk($bulk);
 
-        return $bulk->toArray();
+        return $bulk;
     }
 
     /**
@@ -288,7 +288,9 @@ class BulkTransactions
      */
     private function signBulkTransaction(BulkTransaction $bulk)
     {
-        if (!$bulk->getIdBulkTransaction() or !$bulk->getIp() or !$bulk->getHash() or !$bulk->getStructure()) {
+        if (!$bulk->getIdBulkTransaction() or !$bulk->getIp() or !$bulk->getHash() or !$bulk->getStructure() or
+            !$bulk->getClientType() or !$bulk->getIdClient()
+        ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -325,24 +327,40 @@ class BulkTransactions
             'idElement'  => $bulk->getIdBulkTransaction()
         ]);
 
-        // Get account name
-        $accountName = '';
+        // Obtain bulk type
+        if (!$bulk->getTypeObject()) {
+            $bulk->setTypeObject($this->bulkRepo->getType((new BulkType())->setClientType($bulk->getClientType())
+                                                                          ->setIdClient($bulk->getIdClient())
+                                                                          ->setType($bulk->getType())));
+        }
+        if (!$bulk->getTypeObject()) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        // Get account name and info
         $num = 1;
-        if ($bulk->getClientType() == 'C') {
+        $accountName = $bulk->getAccount();
+        $linkedTransaction = $bulk->getLinkedTransaction() ? $bulk->getLinkedTransaction() : null;
 
-            $info = $this->bulkRepo->getBCInfo(new BlockchainInfo(['idClient' => $bulk->getIdClient()]));
+        // For transaction type of Notarization, it's possible to mask company address using several addresses, we look for them
+        if ($bulk->getTypeObject()->getAsset() == 'N') {
+            if ($bulk->getClientType() == 'C') {
+                // Look for client defined info
+                $info = $this->bulkRepo->getBCInfo((new BlockchainInfo())->setIdClient($bulk->getIdClient()));
 
-            if (!$info) {
+                if (!$info) {
+                    throw new \Exception(Exceptions::NON_EXISTENT, 409);
+                }
+
+                // Get client number of addresses
+                $num = $info->getNumberAddresses();
+            } else {
                 throw new \Exception(Exceptions::NON_EXISTENT, 409);
             }
-
-            // Get client account name and number of addresses
-            $accountName = $info->getAccount();
-            $num = $info->getNumberAddresses();
         }
 
         // Sign
-        $res = $blockchain->storeDataFromAccount($blockchainObj->getHash(), $accountName, $num);
+        $res = $blockchain->storeDataFromAccount($blockchainObj->getHash(), $accountName, $num, $linkedTransaction);
 
         // Check if the transaction was ok
         if (!$res['txid']) {
@@ -352,7 +370,7 @@ class BulkTransactions
 
         if ($bulk->getClientType() == 'C') {
             // Spend the prepared transaction
-            $this->bulkRepo->spendTransaction(new BlockchainInfo(['idClient' => $bulk->getIdClient()]));
+            $this->bulkRepo->spendTransaction((new BlockchainInfo())->setIdClient($bulk->getIdClient()));
         }
 
         // Save the transaction information

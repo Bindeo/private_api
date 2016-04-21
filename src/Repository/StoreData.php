@@ -556,8 +556,10 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get signers list
-        $sql = 'SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, ACCOUNT FROM SIGNERS
-                WHERE ELEMENT_TYPE = :type AND ELEMENT_ID = :id ORDER BY EMAIL ASC';
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.ACCOUNT, U.LANG
+                FROM SIGNERS S LEFT JOIN USERS U ON U.ID_USER = S.FK_ID_USER
+                WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id
+                ORDER BY S.CREATOR DESC, S.EMAIL ASC';
         $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
 
         return $this->db->query($sql, $params, 'Api\Entity\Signer');
@@ -579,7 +581,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get signature creator
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.ACCOUNT, U.LANG
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.ACCOUNT, S.TOKEN, U.LANG
                 FROM SIGNERS S, USERS U
                 WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id AND S.CREATOR = 1 AND U.ID_USER = S.FK_ID_USER';
         $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
@@ -598,8 +600,8 @@ class StoreData extends RepositoryLocatableAbstract
     public function getSignableElement($token)
     {
         // Get requested token
-        $sql = 'SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED
-                FROM SIGNERS WHERE TOKEN = :token AND TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0';
+        $sql = 'SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED
+                FROM SIGNERS WHERE TOKEN = :token AND (SIGNED = 1 OR TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0)';
         $res = $this->db->query($sql, [':token' => trim($token)], 'Api\Entity\Signer');
 
         if ($res->getNumRows() == 0) {
@@ -616,9 +618,11 @@ class StoreData extends RepositoryLocatableAbstract
         $this->db->action($sql, [':token' => trim($token)]);
 
         if ($signer->getElementType() == 'F') {
-            $sql = 'SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
-                      CTRL_DATE, TAG, DESCRIPTION, FK_ID_BULK, TRANSACTION, CONFIRMED, STATUS
-                    FROM FILES WHERE ID_FILE = :id';
+            $sql = "SELECT F.ID_FILE, F.CLIENT_TYPE, F.FK_ID_CLIENT, F.MODE, F.FK_ID_MEDIA, F.NAME, F.FILE_NAME,
+                      F.FILE_ORIG_NAME, F.HASH, F.SIZE, F.CTRL_DATE, F.TAG, F.DESCRIPTION, F.FK_ID_BULK, F.TRANSACTION,
+                      F.CONFIRMED, F.STATUS, COUNT(S.SIGNED) - SUM(S.SIGNED) - 1 PENDING_SIGNERS
+                    FROM FILES F, SIGNERS S
+                    WHERE F.ID_FILE = :id AND S.ELEMENT_TYPE = 'F' AND S.ELEMENT_ID = F.ID_FILE";
             $class = 'Api\Entity\File';
         } else {
             return null;
@@ -681,7 +685,7 @@ class StoreData extends RepositoryLocatableAbstract
         ];
 
         // Execute query
-        if (!$this->db->action($sql, $params)) {
+        if (!$this->db->action($sql, $params) and $this->db->getError()) {
             throw $this->dbException();
         }
 
@@ -723,5 +727,47 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         return $res->getRows()[0];
+    }
+
+    /**
+     * Update a signer when he signs
+     *
+     * @param Signer $signer
+     *
+     * @throws \Exception
+     */
+    public function updateSigner(Signer $signer)
+    {
+        $signer->clean();
+
+        // Check data
+        if (!$signer->getElementType() or !$signer->getElementId() or !$signer->getEmail() or !$signer->getIp() or
+            !($signer->getDate() instanceof \DateTime)
+        ) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Geolocalize signer
+        $this->geolocalize($signer);
+
+        // Set as signed
+        $sql = 'UPDATE SIGNERS SET SIGNED = 1, CTRL_DATE = :date, CTRL_IP = :ip, ID_GEONAMES = :id_geonames,
+                  LATITUDE = :latitude, LONGITUDE = :longitude
+                WHERE ELEMENT_TYPE = :element_type AND ELEMENT_ID = :element_id AND EMAIL = :email';
+        $params = [
+            ':element_type' => $signer->getElementType(),
+            ':element_id'   => $signer->getElementId(),
+            ':email'        => $signer->getEmail(),
+            ':date'         => $signer->getFormattedDate(),
+            ':ip'           => $signer->getIp(),
+            ':id_geonames'  => $signer->getIdGeonames() ? $signer->getIdGeonames() : null,
+            ':latitude'     => $signer->getLatitude() ? $signer->getLatitude() : null,
+            ':longitude'    => $signer->getLongitude() ? $signer->getLongitude() : null
+        ];
+
+        // Execute query
+        if (!$this->db->action($sql, $params)) {
+            throw $this->dbException();
+        }
     }
 }

@@ -60,7 +60,7 @@ class BulkTransaction extends BulkTransactionAbstract
     /**
      * @param BulkType $typeObject
      *
-     * @return BulkTransaction
+     * @return $this
      */
     public function setTypeObject($typeObject)
     {

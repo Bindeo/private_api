@@ -799,7 +799,7 @@ class BitcoinClient implements BlockChainClientInterface
         }
 
         // Amount to transfer
-        $amount = self::BULK_STAMP_FEE;
+        $amount = $txid ? self::STAMP_FEE : self::BULK_STAMP_FEE;
 
         // Select input to spend
         $inputs = $this->selectPreparedInputs($amount, $account, $number, $txid);
@@ -983,6 +983,10 @@ class BitcoinClient implements BlockChainClientInterface
 
     public function tests()
     {
+        $res = 'in';
+        //$res = $this->transferCoins(0, "", 1, 'd8cae0388b1f06d5e59630fdac4efb62165de822ffe44deda8b4a8dcc5b48328');
+
+        /*
         $addresses = [
             $this->getAccountAddress('test'),
             //$this->getAccountAddress('test2'),
@@ -992,7 +996,7 @@ class BitcoinClient implements BlockChainClientInterface
         $privKeys = [];
         foreach ($addresses as $address) {
             $privKeys[] = $this->dumpPrivKey($address);
-        }
+        }*/
 
         //$res = $this->bitcoin->addmultisigaddress(2, $addresses, 'multi_test3');
 
@@ -1010,10 +1014,11 @@ class BitcoinClient implements BlockChainClientInterface
         */
 
         // Obtain multisig description from the transaction
+        /*
         $res = $this->getRawTransaction('28bff0c280063fd02efc90e7fdb289ec59b80aa12f4e5624a0c395739618091c', 1);
         $scripts = explode('[ALL]', $res['vin'][0]['scriptSig']['asm']);
         $res = $this->bitcoin->decodescript(trim(array_pop($scripts)));
-
+*/
         print_r($res);
 
         exit;

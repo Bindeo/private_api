@@ -124,11 +124,18 @@ $container['Api\Model\StoreData'] = function ($c) {
         $c->get('settings')['front_urls']);
 };
 
+$container['Api\Model\Callback\CallbackCaller'] = function ($c) {
+    return new Api\Model\Callback\CallbackCaller($c->get('Api\Repository\BulkTransactions'),
+        $c->get('Api\Repository\StoreData'), $c->get('Api\Model\Email\Email'), $c->get('view'), $c->get('logger'),
+        $c->get('settings')['front_urls']);
+};
+
 $container['Api\Model\System'] = function ($c) {
     $c->get('Api\Lib\BlockChain\BlockChain');
 
     return new Api\Model\System($c->get('Api\Repository\BulkTransactions'), $c->get('Api\Repository\StoreData'),
-        $c->get('Api\Model\Email\Email'), $c->get('view'), $c->get('logger'));
+        $c->get('Api\Model\Email\Email'), $c->get('view'), $c->get('logger'),
+        $c->get('Api\Model\Callback\CallbackCaller'));
 };
 
 // Controllers

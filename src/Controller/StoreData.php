@@ -316,9 +316,11 @@ class StoreData
      */
     public function signDocument(Request $request, Response $response, $args)
     {
-        $this->modelData->signDocument(new SignCode($request->getParams()));
+        $res = $this->modelData->signDocument(new SignCode($request->getParams()));
 
-        return $response->withJson('', 204);
+        $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res->toArray()]];
+
+        return $response->withJson($res, 200);
     }
 
     /**

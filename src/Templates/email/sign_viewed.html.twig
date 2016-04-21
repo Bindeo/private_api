@@ -11,7 +11,7 @@
         text-align: center;">
     <p>{{ translate.translate('sign_viewed_subject', viewer.name~' ('~viewer.email~')<br>')|raw }}:</p>
     <p style="font-weight: bold;">{{ element_name }}</p>
-    <p><a class="cta-button" href="#" style="background: #4183C4;
+    <p><a class="cta-button" href="{{ url }}?t={{ user.token }}" style="background: #4183C4;
                     color: #ffffff;
                     display: inline-block;
                     border-radius: 2px;

@@ -29,7 +29,12 @@ class EnUs extends TranslateAbstract
             'sign_viewed_explanation'   => 'At %s, %s opened and viewed you document',
             'sign_code_subject'         => 'Your verification code',
             'sign_code_title'           => 'Your verification code to sign document',
-            'sign_code_explanation'     => 'This code is valid during following 10 minutes'
+            'sign_code_explanation'     => 'This code is valid during following 10 minutes',
+            'sign_signed_subject'       => '%s signed your document',
+            'sign_signed_explanation'   => 'At %s, %s signed you document',
+            'sign_signed_pending_sing'  => '%s recipient is pending',
+            'sign_signed_pending_plur'  => '%s recipients are pending',
+            'sign_signed_notarizing'    => 'Your signed document is being notarized, you will receive an email when it finish'
         ];
     }
 }

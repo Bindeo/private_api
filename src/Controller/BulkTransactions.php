@@ -166,7 +166,7 @@ class BulkTransactions
     public function getBulk(Request $request, Response $response, $args)
     {
         $res = $this->model->getBulk(new BulkTransaction($request->getParams()));
-        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res ? $res->toArray() : []]];
 
         return $response->withJson($res, 200);
     }
@@ -204,7 +204,7 @@ class BulkTransactions
      */
     private function addEvent(Request $request, Response $response)
     {
-        $res = $this->model->addEvent(new BulkEvent($request->getParams()));
+        $res = $this->model->addEvent(new BulkEvent($request->getParams()))->toArray();
         $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
 
         return $response->withJson($res, 201);

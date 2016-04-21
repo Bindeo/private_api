@@ -63,6 +63,7 @@ $app->group('/bulk', function () {
 // Signature routes
 $app->group('/signature', function () {
     $this->get('', 'Api\Controller\StoreData:getDocSignable');
+    $this->put('', 'Api\Controller\StoreData:signDocument');
     $this->get('/code', 'Api\Controller\StoreData:getSignCode');
 });
 

@@ -5,6 +5,7 @@ namespace Api\Model;
 use Api\Entity\BlockChain;
 use Api\Entity\BulkTransaction;
 use Api\Entity\BulkType;
+use Api\Model\Callback\CallbackCaller;
 use Api\Repository\RepositoryAbstract;
 use Bindeo\DataModel\Exceptions;
 use Api\Model\Email\EmailInterface;
@@ -42,18 +43,25 @@ class System
      */
     private $logger;
 
+    /**
+     * @var CallbackCaller
+     */
+    private $callbackCaller;
+
     public function __construct(
         RepositoryAbstract $bulkRepo,
         RepositoryAbstract $dataRepo,
         EmailInterface $email,
         Twig $view,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        CallbackCaller $callbackCaller
     ) {
         $this->bulkRepo = $bulkRepo;
         $this->dataRepo = $dataRepo;
         $this->email = $email;
         $this->view = $view;
         $this->logger = $logger;
+        $this->callbackCaller = $callbackCaller;
     }
 
     /**
@@ -65,7 +73,7 @@ class System
      */
     private function executeCallbak(BlockChain $blockchain)
     {
-        if ($blockchain->getClientType() == 'C' and $blockchain->getType() == 'B') {
+        if ($blockchain->getType() == 'B') {
             if (($bulk = $this->bulkRepo->getBulk((new BulkTransaction())->setIdBulkTransaction($blockchain->getIdElement()))) and
                 ($bulkType = $this->bulkRepo->getType((new BulkType())->setType($bulk->getType())
                                                                       ->setClientType($bulk->getClientType())
@@ -89,6 +97,9 @@ class System
                     } catch (\Exception $e) {
                         $this->logger->addError('Error sending and email', $to);
                     }
+                } elseif($bulkType->getCallbackType() == 'C') {
+                    // Class type callback
+                    $this->callbackCaller->call($bulkType->getCallbackValue(), $bulk);
                 }
             }
         }
@@ -118,7 +129,7 @@ class System
 
                 // If transaction has confirmations, confirm it
                 if (isset($res['confirmations']) and $res['confirmations'] > 0) {
-                    $this->dataRepo->confirmTransaction($row);
+                    //$this->dataRepo->confirmTransaction($row);
 
                     // Execute callback process depending on the client
                     $this->executeCallbak($row);

@@ -29,7 +29,12 @@ class EsEs extends TranslateAbstract
             'sign_viewed_explanation'   => 'El %s, %s abrió y revisó tu documento',
             'sign_code_subject'         => 'Tu código de verificación',
             'sign_code_title'           => 'Tu código de verificación para firmar el documento',
-            'sign_code_explanation'     => 'Este código es válido durante los próximos 10 minutos'
+            'sign_code_explanation'     => 'Este código es válido durante los próximos 10 minutos',
+            'sign_signed_subject'       => '%s firmó tu documento',
+            'sign_signed_explanation'   => 'El %s, %s firmó tu documento',
+            'sign_signed_pending_sing'  => 'Está pendiente %s receptor',
+            'sign_signed_pending_plur'  => 'Están pendientes %s receptores',
+            'sign_signed_notarizing'    => 'Tu documento firmado está siendo notarizado, recibirás un email cuando termine'
         ];
     }
 }

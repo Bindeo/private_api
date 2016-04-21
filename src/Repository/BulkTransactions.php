@@ -69,7 +69,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
 
         // Build the query
         $sql = "SELECT ID_BULK_TRANSACTION, EXTERNAL_ID, TYPE, ELEMENTS_TYPE, CLIENT_TYPE, FK_ID_CLIENT, NUM_ITEMS, CLOSED,
-                  STRUCTURE, HASH, STATUS, TRANSACTION, ACCOUNT, CONFIRMED
+                  STRUCTURE, HASH, STATUS, LINKED_TRANSACTION, TRANSACTION, ACCOUNT, CONFIRMED
                 FROM BULK_TRANSACTIONS WHERE STATUS = 'A'";
 
         if ($bulk->getIdBulkTransaction()) {
@@ -174,13 +174,14 @@ class BulkTransactions extends RepositoryLocatableAbstract
         }
 
         // Update bulk
-        $sql = 'UPDATE BULK_TRANSACTIONS SET STRUCTURE = :structure, HASH = :hash, NUM_ITEMS = :num_items
+        $sql = 'UPDATE BULK_TRANSACTIONS SET STRUCTURE = :structure, HASH = :hash, NUM_ITEMS = :num_items, LINKED_TRANSACTION = :txid
                 WHERE ID_BULK_TRANSACTION = :id AND CLOSED = 0';
         $data = [
             ':id'        => $bulk->getIdBulkTransaction(),
             ':structure' => $bulk->getStructure(),
             ':hash'      => $bulk->getHash(),
-            ':num_items' => $bulk->getNumItems()
+            ':num_items' => $bulk->getNumItems(),
+            ':txid'      => $bulk->getLinkedTransaction() ? $bulk->getLinkedTransaction() : null
         ];
 
         // Execute query
@@ -212,17 +213,15 @@ class BulkTransactions extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // Obtain main id if it hasn't been given
-        if (!$bulk->getIdBulkTransaction()) {
-            $ip = $bulk->getIp();
-            $bulk = $this->getBulk($bulk);
+        // Obtain whole bulk transaction
+        $ip = $bulk->getIp();
+        $bulk = $this->getBulk($bulk);
 
-            if (!$bulk) {
-                throw new \Exception(Exceptions::NON_EXISTENT, 409);
-            }
-
-            $bulk->setIp($ip);
+        if (!$bulk) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
+
+        $bulk->setIp($ip);
 
         $sql = 'UPDATE BULK_TRANSACTIONS SET CTRL_DATE_CLOSED = SYSDATE(), CTRL_IP_CLOSED = :ip, CLOSED = 1
                 WHERE CLOSED = 0 AND ID_BULK_TRANSACTION = :id';
@@ -293,10 +292,26 @@ class BulkTransactions extends RepositoryLocatableAbstract
     {
         $event->clean();
         // Check remain data
-        if (!$event->getClientType() or !$event->getIdClient() or !$event->getIdBulk() or !$event->getName() or
-            !$event->getTimestamp() or !$event->getData() or !$event->getIp()
+        if (!$event->getIdBulk() or !$event->getName() or !$event->getTimestamp() or !$event->getData() or
+            !$event->getIp()
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Check if the bulk transaction is able to be filled by anonymous users
+        if (!$event->getClientType() or !$event->getIdClient()) {
+            $sql = "SELECT T.ALLOW_ANONYMOUS FROM BULK_TYPES T, BULK_TRANSACTIONS B
+                    WHERE B.ID_BULK_TRANSACTION = :id AND (T.CLIENT_TYPE = B.CLIENT_TYPE AND
+                      T.FK_ID_CLIENT = B.FK_ID_CLIENT OR T.CLIENT_TYPE = 'A' AND T.FK_ID_CLIENT = 0) AND T.TYPE = B.TYPE
+                    ORDER BY CASE WHEN T.CLIENT_TYPE = B.CLIENT_TYPE THEN 1 ELSE 2 END ASC LIMIT 1";
+            $res = $this->db->query($sql, [':id' => $event->getIdBulk()]);
+
+            // Check permissions
+            if ($res->getNumRows() == 0) {
+                throw new \Exception(Exceptions::NON_EXISTENT, 409);
+            } elseif ($res->getRows()[0]['ALLOW_ANONYMOUS'] != 1) {
+                throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
+            }
         }
 
         // Prepare query and mandatory data
@@ -305,8 +320,8 @@ class BulkTransactions extends RepositoryLocatableAbstract
 
         $data = [
             ':id_bulk'     => $event->getIdBulk(),
-            ':client_type' => $event->getClientType(),
-            ':id_client'   => $event->getIdClient(),
+            ':client_type' => $event->getClientType() ? $event->getClientType() : null,
+            ':id_client'   => $event->getIdClient() ? $event->getIdClient() : null,
             ':name'        => $event->getName(),
             ':timestamp'   => $event->getFormattedTimestamp(),
             ':data'        => $event->getData(),
@@ -316,7 +331,11 @@ class BulkTransactions extends RepositoryLocatableAbstract
         // Execute query
         $this->db->action($sql, $data);
         if (!$this->db->getError()) {
-            $event->setIdBulkEvent($this->db->lastInsertId());
+            // Get event
+            $sql = 'SELECT ID_BULK_EVENT, FK_ID_BULK, CLIENT_TYPE, FK_ID_CLIENT, NAME, TIMESTAMP, DATA, CTRL_DATE DATE
+                    FROM BULK_EVENTS WHERE ID_BULK_EVENT = :id';
+            $res = $this->db->query($sql, [':id' => $this->db->lastInsertId()], 'Api\Entity\BulkEvent');
+            $event->setIdBulkEvent($res->getRows()[0]->getIdBulkEvent())->setDate($res->getRows()[0]->getDate());
         } else {
             throw $this->dbException();
         }
@@ -445,7 +464,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = "SELECT TYPE, BULK_INFO, ELEMENTS_TYPE FROM BULK_TYPES WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id";
+        $sql = "SELECT TYPE, ASSET, BULK_INFO, ELEMENTS_TYPE FROM BULK_TYPES WHERE CLIENT_TYPE = :type AND FK_ID_CLIENT = :id";
         $params = [':type' => $bulk->getClientType(), ':id' => $bulk->getIdClient()];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\BulkType');
@@ -474,7 +493,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
         }
 
         // Select requested bulk type looking for it first in client defined bulk types and later in all users bulk types
-        $sql = "SELECT CLIENT_TYPE, FK_ID_CLIENT, TYPE, ELEMENTS_TYPE, BULK_INFO, DEFAULT_INFO, CALLBACK_TYPE, CALLBACK_VALUE
+        $sql = "SELECT CLIENT_TYPE, FK_ID_CLIENT, TYPE, ASSET, ELEMENTS_TYPE, BULK_INFO, DEFAULT_INFO, CALLBACK_TYPE, CALLBACK_VALUE
                 FROM BULK_TYPES WHERE (CLIENT_TYPE = :type AND FK_ID_CLIENT = :id OR CLIENT_TYPE = 'A' AND FK_ID_CLIENT = 0) AND TYPE = :name
                 ORDER BY CASE WHEN CLIENT_TYPE = :type THEN 1 ELSE 2 END ASC LIMIT 1";
         $params = [':type' => $bulk->getClientType(), ':id' => $bulk->getIdClient(), ':name' => $bulk->getType()];
