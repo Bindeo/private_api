@@ -556,7 +556,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get signers list
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.ACCOUNT, U.LANG
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.ACCOUNT, U.LANG, S.TOKEN
                 FROM SIGNERS S LEFT JOIN USERS U ON U.ID_USER = S.FK_ID_USER
                 WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id
                 ORDER BY S.CREATOR DESC, S.EMAIL ASC';

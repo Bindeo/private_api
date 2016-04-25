@@ -97,22 +97,46 @@ class SignDocument
         $urlLogin = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
                     $this->frontUrls['login'];
 
-        $creatorLang = $signers[0]->getLang();
+        // Document creator
+        $creator = $signers[0];
 
-        foreach ($signers as $signer) {
+        // Instantiate creator language
+        $translate = TranslateFactory::factory($creator->getLang());
+
+        // Send the email to the creator
+        $response = $this->view->render(new Response(), 'email/sign_completed.html.twig', [
+            'translate'    => $translate,
+            'element_name' => $file->getElementName(),
+            'user'         => $creator,
+            'url'          => $url
+        ]);
+
+        // Send and email
+        try {
+            $res = $this->email->sendEmail($creator->getEmail(), $translate->translate('sign_completed_subject'),
+                $response->getBody()->__toString());
+
+            if (!$res or $res->http_response_code != 200) {
+                $this->logger->addError('Error sending and email', $creator->toArray());
+            }
+        } catch (\Exception $e) {
+            $this->logger->addError('Error sending and email', $creator->toArray());
+        }
+
+        // Send emails to signers
+        for ($i = 1, $count = count($signers); $i < $count; $i++) {
+            $signer = $signers[$i];
             // Instantiate signer language
-            $translate = TranslateFactory::factory($signer->getLang() ? $signer->getLang() : $creatorLang);
+            $translate = TranslateFactory::factory($signer->getLang() ? $signer->getLang() : $creator->getLang());
 
             // Send the email to the signer
-            //TODO EMAILS
-            $response = $this->view->render(new Response(), 'email/sign_signed.html.twig', [
+            $response = $this->view->render(new Response(), 'email/sign_completed_copy.html.twig', [
                 'translate'    => $translate,
-                'element_name' => $element->getElementName(),
-                'datetime'     => $event->getDate()->format('Y-m-d H:i:s T'),
-                'signer'       => $element->getSigners()[0],
-                'user'         => $creator->getRows()[0],
-                'pending'      => $element->getPendingSigners(),
-                'url'          => $url
+                'element_name' => $file->getElementName(),
+                'creator'      => $creator,
+                'user'         => $signer,
+                'url'          => $url,
+                'urlLogin'     => $urlLogin
             ]);
 
             // Send and email

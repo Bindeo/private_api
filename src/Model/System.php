@@ -129,7 +129,7 @@ class System
 
                 // If transaction has confirmations, confirm it
                 if (isset($res['confirmations']) and $res['confirmations'] > 0) {
-                    //$this->dataRepo->confirmTransaction($row);
+                    $this->dataRepo->confirmTransaction($row);
 
                     // Execute callback process depending on the client
                     $this->executeCallbak($row);
