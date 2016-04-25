@@ -48,6 +48,11 @@ $container['Api\Lib\BlockChain\BlockChain'] = function ($c) {
     \Api\Lib\BlockChain\BlockChain::setConf($c->get('settings')['blockchain']);
 };
 
+// ScriptLauncher
+$container['Api\Model\General\ScriptsLauncher'] = function ($c) {
+    \Api\Model\General\ScriptsLauncher::getInstance()->setScripts($c->get('settings')['scripts']);
+};
+
 // Files
 $container['Api\Model\General\FilesStorage'] = function ($c) {
     $settings = $c->get('settings')['files'];
@@ -117,6 +122,7 @@ $container['Api\Model\BulkTransactions'] = function ($c) {
 
 $container['Api\Model\StoreData'] = function ($c) {
     $c->get('Api\Lib\BlockChain\BlockChain');
+    $c->get('Api\Model\General\ScriptsLauncher');
 
     return new Api\Model\StoreData($c->get('Api\Repository\StoreData'), $c->get('Api\Repository\Users'),
         $c->get('Api\Repository\OAuth'), $c->get('Api\Model\BulkTransactions'),

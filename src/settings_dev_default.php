@@ -37,3 +37,8 @@ $settings['settings']['maxmind'] = '/usr/local/share/geoIP/GeoLite2-City.mmdb';
 
 // Host and front urls for emails
 $settings['settings']['front_urls']['host'] = 'https://';
+
+// Scripts path
+$settings['scripts']['path'] = 'export HOME=/tmp && /var/www/html/bindeo/private_api/scripts';
+// Scripts status, set to disabled to avoid script launching, ie you are in windows environment
+$settings['scripts']['status'] = 'enabled';

@@ -13,6 +13,7 @@ use Api\Entity\User;
 use Api\Entity\File;
 use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
+use Api\Model\General\ScriptsLauncher;
 use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
@@ -267,6 +268,9 @@ class StoreData
         // File has been created in mode to be signed
         if ($file->getMode() == 'S') {
             $this->fileToSign($file, $lang);
+
+            // Launch doc conversion script
+            ScriptsLauncher::getInstance()->execBackground('convert-documents.sh ' . $file->getPath());
         }
 
         return $this->getFile($file);

@@ -81,6 +81,12 @@ return [
             'login'            => 'www.bindeo.com/login',
             'validation_token' => 'www.bindeo.com/user/validate',
             'review_contract'  => 'www.bindeo.com/contracts/review'
+        ],
+
+        // Scripts path
+        'scripts'             => [
+            'status' => 'enabled',
+            'path'   => '/var/www/html/bindeo/private_api/scripts'
         ]
     ]
 ];
