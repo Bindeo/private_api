@@ -490,7 +490,7 @@ class StoreData extends RepositoryLocatableAbstract
             // Instantiate new signature object
             $signer = new Signer($signer);
             $signer->clean();
-            if (!$signer->getEmail() or !$signer->getName()) {
+            if (!$signer->getEmail() or !$signer->getName() or !$signer->getDocument()) {
                 throw new \Exception(Exceptions::MISSING_FIELDS, 400);
             }
 
@@ -511,9 +511,9 @@ class StoreData extends RepositoryLocatableAbstract
             $identity = $res->getNumRows() == 1 ? $res->getRows()[0] : null;
 
             // Insert signatures
-            $sql = 'INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
+            $sql = 'INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, DOCUMENT, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
                       FK_ID_USER, FK_ID_IDENTITY, PHONE)
-                    VALUES (:element_type, :element_id, :creator, :email, :name, :account, :token, SYSDATE() + INTERVAL 15 DAY,
+                    VALUES (:element_type, :element_id, :creator, :email, :name, :document, :account, :token, SYSDATE() + INTERVAL 15 DAY,
                       :id_user, :id_identity, :phone)';
 
             $params = [
@@ -522,6 +522,7 @@ class StoreData extends RepositoryLocatableAbstract
                 ':creator'      => $signer->getCreator() ? 1 : 0,
                 ':email'        => $signer->getEmail(),
                 ':name'         => $signer->getName(),
+                ':document'     => $signer->getDocument(),
                 ':account'      => $signer->setAccount($identity ? $identity->getAccount()
                     : hash('sha256', $signer->getEmail()))->getAccount(),
                 ':token'        => $signer->setToken(hash('sha256',
@@ -556,7 +557,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get signers list
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.ACCOUNT, U.LANG, S.TOKEN
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.DOCUMENT, S.ACCOUNT, U.LANG, S.TOKEN
                 FROM SIGNERS S LEFT JOIN USERS U ON U.ID_USER = S.FK_ID_USER
                 WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id
                 ORDER BY S.CREATOR DESC, S.EMAIL ASC';
@@ -581,7 +582,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get signature creator
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.ACCOUNT, S.TOKEN, U.LANG
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.DOCUMENT, S.ACCOUNT, S.TOKEN, U.LANG
                 FROM SIGNERS S, USERS U
                 WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id AND S.CREATOR = 1 AND U.ID_USER = S.FK_ID_USER';
         $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
@@ -600,7 +601,7 @@ class StoreData extends RepositoryLocatableAbstract
     public function getSignableElement($token)
     {
         // Get requested token
-        $sql = 'SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED
+        $sql = 'SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, S.DOCUMENT, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED
                 FROM SIGNERS WHERE TOKEN = :token AND (SIGNED = 1 OR TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0)';
         $res = $this->db->query($sql, [':token' => trim($token)], 'Api\Entity\Signer');
 
@@ -714,7 +715,7 @@ class StoreData extends RepositoryLocatableAbstract
         $this->geolocalize($code);
 
         // Get signature associated to code
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.FK_ID_USER, S.FK_ID_IDENTITY, S.ACCOUNT
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT, S.FK_ID_USER, S.FK_ID_IDENTITY, S.ACCOUNT
                 FROM SIGNERS S, SIGN_CODES C
                 WHERE C.TOKEN = :token AND C.CODE = :code AND C.CODE_EXPIRATION > SYSDATE() AND
                   S.TOKEN = C.TOKEN AND S.TOKEN_EXPIRATION > SYSDATE() AND S.SIGNED = 0';

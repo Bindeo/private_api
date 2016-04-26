@@ -864,7 +864,12 @@ class StoreData
         $creator = $this->dataRepo->getSignatureCreator($element);
 
         // Signature data
-        $data = ['name' => $signer->getName(), 'email' => $signer->getEmail(), 'ip' => $code->getIp()];
+        $data = [
+            'name'        => $signer->getName(),
+            'email'       => $signer->getEmail(),
+            'id_document' => $signer->getDocument(),
+            'ip'          => $code->getIp()
+        ];
 
         // Additional data if available
         if ($code->getLatitude() and $code->getLongitude()) {
