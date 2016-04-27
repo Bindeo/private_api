@@ -457,14 +457,13 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Retrive the full user of the db
-        $user = $this->find($user);
-        if (!$user) {
+        $fullUser = $this->find($user);
+        if (!$fullUser) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
-        $user->setIp($user->getIp());
 
         // Change the user type
-        return $this->changeType($user, $user->getType());
+        return $this->changeType($fullUser->setIp($user->getIp()), $user->getType());
     }
 
     /**
@@ -477,6 +476,8 @@ class Users extends RepositoryLocatableAbstract
      */
     public function saveIdentity(UserIdentity $identity)
     {
+        $identity->clean();
+
         // Check necessary fields
         if ((!$identity->getIdIdentity() and !$identity->getIdUser()) or !$identity->getName() or
             !$identity->getValue() or !$identity->getIp()
@@ -487,8 +488,8 @@ class Users extends RepositoryLocatableAbstract
         $identity->setValue(mb_strtolower($identity->getValue()))->clean();
 
         // Check if the user is confirmed
-        $sql = 'SELECT U.ID_USER, U.CONFIRMED, U.EMAIL, U.LANG, I.ID_IDENTITY FROM USERS U, USERS_IDENTITIES I
-                WHERE U.ID_USER = I.FK_ID_USER';
+        $sql = 'SELECT U.ID_USER, U.CONFIRMED, U.NAME, U.EMAIL, U.LANG, I.ID_IDENTITY, I.DOCUMENT
+                FROM USERS U, USERS_IDENTITIES I WHERE U.ID_USER = I.FK_ID_USER';
 
         if ($identity->getIdIdentity()) {
             $sql .= ' AND I.ID_IDENTITY = :id';
@@ -508,6 +509,7 @@ class Users extends RepositoryLocatableAbstract
                 'idUser'    => $res->getRows()[0]['ID_USER'],
                 'confirmed' => $res->getRows()[0]['CONFIRMED'],
                 'email'     => $res->getRows()[0]['EMAIL'],
+                'name'      => $res->getRows()[0]['NAME'],
                 'lang'      => $res->getRows()[0]['LANG']
             ]);
         }
@@ -515,8 +517,11 @@ class Users extends RepositoryLocatableAbstract
         // Generate empty response
         $response = ['user' => $user, 'token' => ''];
         $emailChanged = $user->getEmail() != $identity->getValue();
+        $nameChanged = $user->getName() != $identity->getName();
+        $oldDocument = $res->getRows()[0]['DOCUMENT'];
 
-        if (!$emailChanged and $user->getName() == $identity->getName()) {
+        // Check if it is really necessary to update anything
+        if (!$emailChanged and !$nameChanged and $oldDocument == $identity->getDocument()) {
             return $response;
         }
 
@@ -532,19 +537,20 @@ class Users extends RepositoryLocatableAbstract
 
         // If the user is not confirmed we can update the identity and user profile
         if (!$user->getConfirmed()) {
-            $sql = "UPDATE USERS_IDENTITIES SET NAME = :name, VALUE = :value, ACCOUNT = :account, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+            $sql = "UPDATE USERS_IDENTITIES SET NAME = :name, VALUE = :value, DOCUMENT = :document, ACCOUNT = :account, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
                     WHERE ID_IDENTITY = :id;
                     UPDATE USERS SET NAME = :name, EMAIL = :value, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
                     WHERE ID_USER = :id_user;
                     UPDATE USERS_VALIDATIONS SET EMAIL = :value WHERE FK_ID_USER = :id_user AND TYPE = 'V';";
 
             $params = [
-                ':id'      => $identity->getIdIdentity(),
-                ':name'    => $identity->getName(),
-                ':value'   => $identity->getValue(),
-                ':account' => hash('sha256', $identity->getName() . $identity->getValue()),
-                ':ip'      => $identity->getIp(),
-                ':id_user' => $user->getIdUser()
+                ':id'       => $identity->getIdIdentity(),
+                ':name'     => $identity->getName(),
+                ':value'    => $identity->getValue(),
+                ':document' => $identity->getDocument(),
+                ':account'  => hash('sha256', $identity->getName() . $identity->getValue()),
+                ':ip'       => $identity->getIp(),
+                ':id_user'  => $user->getIdUser()
             ];
 
             // Execute query
@@ -564,21 +570,33 @@ class Users extends RepositoryLocatableAbstract
             }
         } else {
             if (!$emailChanged) {
-                // If the email didn't change we can create a new confirmed identity and deprecate the old one
-                $sql = "UPDATE USERS_IDENTITIES SET MAIN = 0, STATUS = 'D', CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
-                        WHERE ID_IDENTITY = :id;
-                        INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, ACCOUNT, CONFIRMED, CTRL_IP, CTRL_DATE)
-                        VALUES (:id_user, 1, 'E', :name, :value, :account, 1, :ip, SYSDATE());
-                        UPDATE USERS SET NAME = :name, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
-                        WHERE ID_USER = :id_user;";
-                $params = [
-                    ':id'      => $identity->getIdIdentity(),
-                    ':name'    => $identity->getName(),
-                    ':value'   => $user->getEmail(),
-                    ':account' => hash('sha256', $identity->getName() . $user->getEmail()),
-                    ':ip'      => $identity->getIp(),
-                    ':id_user' => $user->getIdUser()
-                ];
+                // If the email didn't change we can create a new confirmed identity and deprecate the old one if it had document
+                if (!$oldDocument and !$nameChanged) {
+                    // If only changed document but user didn't have document before, we can direct update it
+                    $sql = "UPDATE USERS_IDENTITIES SET DOCUMENT = :document, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                            WHERE ID_IDENTITY = :id";
+                    $params = [
+                        ':id'       => $identity->getIdIdentity(),
+                        ':document' => $identity->getDocument(),
+                        ':ip'       => $identity->getIp()
+                    ];
+                } else {
+                    $sql = "UPDATE USERS_IDENTITIES SET MAIN = 0, STATUS = 'D', CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                            WHERE ID_IDENTITY = :id;
+                            INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, DOCUMENT, ACCOUNT, CONFIRMED, CTRL_IP, CTRL_DATE)
+                            VALUES (:id_user, 1, 'E', :name, :value, :document, :account, 1, :ip, SYSDATE());
+                            UPDATE USERS SET NAME = :name, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                            WHERE ID_USER = :id_user;";
+                    $params = [
+                        ':id'       => $identity->getIdIdentity(),
+                        ':name'     => $identity->getName(),
+                        ':value'    => $user->getEmail(),
+                        ':document' => $identity->getDocument(),
+                        ':account'  => hash('sha256', $identity->getName() . $user->getEmail()),
+                        ':ip'       => $identity->getIp(),
+                        ':id_user'  => $user->getIdUser()
+                    ];
+                }
 
                 // Execute query
                 if (!$this->db->action($sql, $params)) {
@@ -626,14 +644,15 @@ class Users extends RepositoryLocatableAbstract
                     $response['token'] = md5($user->getIdUser() . $identity->getValue() . time());
 
                     // Create the identity
-                    $sql = "INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, ACCOUNT, CONFIRMED, CTRL_IP, CTRL_DATE)
-                            VALUES (:id_user, 0, 'E', :name, :value, :account, 0, :ip, SYSDATE());";
+                    $sql = "INSERT INTO USERS_IDENTITIES(FK_ID_USER, MAIN, TYPE, NAME, VALUE, DOCUMENT, ACCOUNT, CONFIRMED, CTRL_IP, CTRL_DATE)
+                            VALUES (:id_user, 0, 'E', :name, :value, :document, :account, 0, :ip, SYSDATE());";
                     $params = [
-                        ':name'    => $identity->getName(),
-                        ':value'   => $identity->getValue(),
-                        ':account' => hash('sha256', $identity->getName() . $identity->getValue()),
-                        ':ip'      => $identity->getIp(),
-                        ':id_user' => $user->getIdUser()
+                        ':name'     => $identity->getName(),
+                        ':value'    => $identity->getValue(),
+                        ':document' => $identity->getDocument(),
+                        ':account'  => hash('sha256', $identity->getName() . $identity->getValue()),
+                        ':ip'       => $identity->getIp(),
+                        ':id_user'  => $user->getIdUser()
                     ];
 
                     // Execute query
@@ -982,7 +1001,7 @@ class Users extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
         // Create query
-        $sql = "SELECT ID_IDENTITY, FK_ID_USER, MAIN, TYPE, NAME, VALUE, ACCOUNT, CONFIRMED, STATUS
+        $sql = "SELECT ID_IDENTITY, FK_ID_USER, MAIN, TYPE, NAME, VALUE, DOCUMENT, ACCOUNT, CONFIRMED, STATUS
                 FROM USERS_IDENTITIES WHERE FK_ID_USER = :id AND STATUS = 'A'";
         if ($main) {
             $sql .= ' AND MAIN = 1';

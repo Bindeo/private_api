@@ -4,6 +4,7 @@ namespace Api\Model\Callback;
 
 use Api\Model\Email\EmailInterface;
 use Api\Repository\RepositoryAbstract;
+use Bindeo\DataModel\DataModelAbstract;
 use Bindeo\DataModel\Exceptions;
 use Slim\Views\Twig;
 use \Psr\Log\LoggerInterface;
@@ -19,6 +20,11 @@ class CallbackCaller
      * @var \Api\Repository\StoreData
      */
     private $dataRepo;
+
+    /**
+     * @var \Api\Model\StoreData
+     */
+    private $dataModel;
 
     /**
      * @var EmailInterface
@@ -42,6 +48,7 @@ class CallbackCaller
     public function __construct(
         RepositoryAbstract $bulkRepo,
         RepositoryAbstract $dataRepo,
+        DataModelAbstract $dataModel,
         EmailInterface $email,
         Twig $view,
         LoggerInterface $logger,
@@ -49,6 +56,7 @@ class CallbackCaller
     ) {
         $this->bulkRepo = $bulkRepo;
         $this->dataRepo = $dataRepo;
+        $this->dataModel = $dataModel;
         $this->email = $email;
         $this->view = $view;
         $this->logger = $logger;
@@ -61,6 +69,7 @@ class CallbackCaller
                 'params' => [
                     $this->bulkRepo,
                     $this->dataRepo,
+                    $this->dataModel,
                     $this->email,
                     $this->view,
                     $this->logger,

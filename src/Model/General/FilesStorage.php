@@ -3,6 +3,7 @@
 namespace Api\Model\General;
 
 use Bindeo\DataModel\Exceptions;
+use Bindeo\DataModel\SignableInterface;
 use Bindeo\DataModel\StorableFileInterface;
 use Psr\Log\LoggerInterface;
 
@@ -74,7 +75,7 @@ class FilesStorage implements FilesInterface
     public function get(StorableFileInterface $file)
     {
         // Get the subpath
-        return $this->baseUrl . $this->getSubPath($file) . '/' . $file->getFileName();
+        return $this->basePath . $this->getSubPath($file) . '/' . $file->getFileName();
     }
 
     /**
@@ -161,5 +162,31 @@ class FilesStorage implements FilesInterface
         } else {
             return $path;
         }
+    }
+
+    /**
+     * Count generated pages of a signable and storable file
+     *
+     * @param SignableInterface $file
+     *
+     * @return int Number of pages
+     */
+    public function countPages(SignableInterface $file)
+    {
+        // File must be storable and signable
+        $pages = 0;
+        if ($file instanceof StorableFileInterface) {
+            // Find folder name
+            $matches = [];
+            preg_match('/^([a-z0-9]+)\./', $file->getFileName(), $matches);
+            $folder = $this->basePath . $this->getSubPath($file) . '/' . $matches[1];
+
+            // check if folder exists and how many png pages are inside
+            if (is_dir($folder)) {
+                $pages = scandir($folder) - 2; // Remove '.' and '..' directories
+            }
+        }
+
+        return $pages;
     }
 }

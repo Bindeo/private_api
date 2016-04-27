@@ -18,7 +18,8 @@ use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
 use Bindeo\DataModel\NotarizableInterface;
-use Bindeo\DataModel\SpendingStorageInterface;
+use Bindeo\DataModel\SignableInterface;
+use Bindeo\DataModel\UserInterface;
 use Bindeo\Filter\FilesFilter;
 use \Psr\Log\LoggerInterface;
 use Slim\Views\Twig;
@@ -131,6 +132,9 @@ class StoreData
     {
         // File is prepared to be signed
         if ($file->getMode() == 'S') {
+            // Launch doc conversion script
+            ScriptsLauncher::getInstance()->execBackground('convert-documents.sh ' . $this->storage->get($file));
+
             $signers = $this->dataRepo->associateSigners($file);
 
             // Generate params array
@@ -147,7 +151,9 @@ class StoreData
             // Signature hash
             $params['hash'] = $signature->generateHash();
             // Size in bytes
-            $params['size'] = $file->getSize() * 1024;
+            $params['size'] = $file->getSize();
+            // Number of pages
+            $params['pages'] = 0;
 
             // Calculate account name depending on signers
             if (count($signers) == 1) {
@@ -174,26 +180,29 @@ class StoreData
                    $this->frontUrls['review_contract'];
 
             // Send an email by each signer distinct from creator
-            for ($i = 1, $count = count($signers); $i < $count; $i++) {
-                $response = $this->view->render(new Response(), 'email/sign_request.html.twig', [
-                    'translate' => $translate,
-                    'filename'  => $file->getFileOrigName(),
-                    'creator'   => $signers[0],
-                    'user'      => $signers[$i],
-                    'url'       => $url
-                ]);
+            foreach ($signers as $signer) {
+                if (!$signer->getCreator()) {
+                    $response = $this->view->render(new Response(), 'email/sign_request.html.twig', [
+                        'translate' => $translate,
+                        'filename'  => $file->getFileOrigName(),
+                        'creator'   => $file->getUser(),
+                        'user'      => $signer,
+                        'url'       => $url
+                    ]);
 
-                // Send and email
-                try {
-                    $res = $this->email->sendEmail($signers[$i]->getEmail(),
-                        $translate->translate('sign_request_subject', $signers[0]->getName()),
-                        $response->getBody()->__toString(), [], null, $signers[0]->getEmail());
+                    // Send and email
+                    try {
+                        $res = $this->email->sendEmail($signer->getEmail(),
+                            $translate->translate('sign_request_subject', $file->getUser()->getName()),
+                            $response->getBody()->__toString(), [], null,
+                            $file->getUser()->getEmail() ? $file->getUser()->getEmail() : null);
 
-                    if (!$res or $res->http_response_code != 200) {
-                        $this->logger->addError('Error sending and email', $signers[$i]->toArray());
+                        if (!$res or $res->http_response_code != 200) {
+                            $this->logger->addError('Error sending and email', $signer->toArray());
+                        }
+                    } catch (\Exception $e) {
+                        $this->logger->addError('Error sending and email', $signer->toArray());
                     }
-                } catch (\Exception $e) {
-                    $this->logger->addError('Error sending and email', $signers[$i]->toArray());
                 }
             }
         }
@@ -213,33 +222,37 @@ class StoreData
         // We try to create file first
         if (!in_array($file->getClientType(), ['U', 'C']) or !$file->getIdClient() or !$file->getPath() or
             !file_exists($file->getPath()) or !$file->getFileOrigName() or
-            ($file->getMode() == 'S' and (!$file->getSigners() or !$lang))
+            ($file->getMode() == 'S' and !$file->getSigners())
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // Convert signers into array if it needed
-        if (!is_array($file->getSigners()) and
-            !$file->setSigners(json_decode($file->getSigners(), true))->getSigners()
-        ) {
-            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        if ($file->getMode() == 'S') {
+            $file->transformSigners();
         }
 
         // We need to check if the client exists and has enough free space
         if ($file->getClientType() == 'U') {
-            $user = $this->usersRepo->find(new User(['idUser' => $file->getIdClient()]));
+            $user = $this->usersRepo->find((new User())->setIdUser($file->getIdClient()));
+            $lang = $user->getLang();
         } else {
-            $user = $this->oauthRepo->oauthClient(new OAuthClient(['idClient' => $file->getIdClient()]));
-        }
+            $user = $this->oauthRepo->oauthClient((new OAuthClient())->setIdClient($file->getIdClient()));
 
-        /** @var SpendingStorageInterface $user */
+            if (!$lang) {
+                $lang = 'en_US';
+            }
+        }
         if (!$user) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
-        // Transform bytes to kilobytes
-        $file->setSize(ceil(filesize($file->getPath()) / 1024));
-        if ($user->getType() > 1 and $file->getSize() > $user->getStorageLeft()) {
+        // Set user in file
+        $file->setUser($user);
+
+        // Get filesize
+        $file->setSize(filesize($file->getPath()));
+        if ($user->getType() > 1 and $file->getSize() > ($user->getStorageLeft() * 1024)) {
             throw new \Exception(Exceptions::FULL_SPACE, 403);
         }
 
@@ -268,9 +281,6 @@ class StoreData
         // File has been created in mode to be signed
         if ($file->getMode() == 'S') {
             $this->fileToSign($file, $lang);
-
-            // Launch doc conversion script
-            ScriptsLauncher::getInstance()->execBackground('convert-documents.sh ' . $file->getPath());
         }
 
         return $this->getFile($file);
@@ -378,6 +388,7 @@ class StoreData
 
             // Get accounts list
             $accounts = [];
+            /** @var Signer $signer */
             foreach ($signers->getRows() as $signer) {
                 $accounts[] = $signer->getAccount();
             }
@@ -437,11 +448,11 @@ class StoreData
             // OAuth client type
             $client = $this->oauthRepo->oauthClient(new OAuthClient(['idClient' => $assert->getIdClient()]));
 
-            if ($client->getNumRows() == 0) {
+            if (!$client) {
                 throw new \Exception(Exceptions::NON_EXISTENT, 409);
             }
 
-            $signature->setOwnerId($client->getRows()[0]->getName())->setOwnerName($client->getRows()[0]->getName());
+            $signature->setOwnerId($client->getName())->setOwnerName($client->getName());
         }
 
         return $signature;
@@ -691,7 +702,7 @@ class StoreData
         }
 
         // Store string in blockchain
-        return $blockchain->storeData($data, 'S');
+        return $blockchain->storeData($data);
     }
 
     /**
@@ -724,6 +735,25 @@ class StoreData
     }
 
     /**
+     * Get the signature creator
+     *
+     * @param SignableInterface $element
+     *
+     * @return UserInterface
+     * @throws \Exception
+     */
+    public function getSignatureCreator(SignableInterface $element)
+    {
+        if ($element->getClientType() == 'U') {
+            $user = $this->usersRepo->find((new User())->setIdUser($element->getIdClient()));
+        } else {
+            $user = $this->oauthRepo->oauthClient((new OAuthClient())->setIdClient($element->getIdClient()));
+        }
+
+        return $user;
+    }
+
+    /**
      * Use an existent and valid token to get a signable element
      *
      * @param $token
@@ -748,15 +778,12 @@ class StoreData
         $element->setSignerJson($element->getSigners()[0]->toArray());
 
         // If signer is the first time that he viewed document, we need to send a email to the creator
-        $res = $this->dataRepo->getSignatureCreator($element);
+        if ($element->getSigners()[0]->getViewed() == 0 and !$element->getSigners()[0]->getCreator()) {
 
-        if ($res->getNumRows() == 1) {
-            /** @var Signer $creator */
-            $creator = $res->getRows()[0];
+            // Get the signature creator
+            $creator = $this->getSignatureCreator($element);
 
-            if ($element->getSigners()[0]->getViewed() == 0 and
-                $element->getSigners()[0]->getEmail() != $creator->getEmail()
-            ) {
+            if ($creator and $creator->getEmail()) {
                 // Send email to the creator
                 $translate = TranslateFactory::factory($creator->getLang());
 
@@ -861,7 +888,7 @@ class StoreData
         $element = $this->dataRepo->getSignableElement($code->getToken());
 
         // Get creator
-        $creator = $this->dataRepo->getSignatureCreator($element);
+        $creator = $this->getSignatureCreator($element);
 
         // Signature data
         $data = [
@@ -902,6 +929,12 @@ class StoreData
 
             // Modify structure for Sign Document type of bulk transaction
             $structure['document']['transaction'] = $element->getTransaction();
+
+            // If we have no count pages yet, we count them
+            if ($structure['document']['pages'] == 0) {
+                $structure['document']['pages'] = $this->storage->countPages($element);
+            }
+
             $bulk->setStructure(json_encode($structure));
         }
 
@@ -911,7 +944,7 @@ class StoreData
         // Update signature
         $this->dataRepo->updateSigner($signer->setDate($event->getDate())->setIp($code->getIp()));
 
-        if ($element->getSigners()[0]->getEmail() != $creator->getRows()[0]->getEmail()) {
+        if ($element->getSigners()[0]->getEmail() != $creator->getEmail()) {
             // Send email to creator
             $translate = TranslateFactory::factory($code->getLang());
 
@@ -924,22 +957,22 @@ class StoreData
                 'element_name' => $element->getElementName(),
                 'datetime'     => $event->getDate()->format('Y-m-d H:i:s T'),
                 'signer'       => $element->getSigners()[0],
-                'user'         => $creator->getRows()[0],
+                'user'         => $creator,
                 'pending'      => $element->getPendingSigners(),
                 'url'          => $url
             ]);
 
             // Send and email
             try {
-                $res = $this->email->sendEmail($creator->getRows()[0]->getEmail(),
+                $res = $this->email->sendEmail($creator->getEmail(),
                     $translate->translate('sign_signed_subject', $element->getSigners()[0]->getName()),
                     $response->getBody()->__toString());
 
                 if (!$res or $res->http_response_code != 200) {
-                    $this->logger->addError('Error sending and email', $creator->getRows()[0]->toArray());
+                    $this->logger->addError('Error sending and email', $creator->toArray());
                 }
             } catch (\Exception $e) {
-                $this->logger->addError('Error sending and email', $creator->getRows()[0]->toArray());
+                $this->logger->addError('Error sending and email', $creator->toArray());
             }
         }
 

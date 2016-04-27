@@ -619,7 +619,7 @@ class BitcoinClient implements BlockChainClientInterface
         }
 
         // Create the new transaction
-        $result = $this->createTransaction($inputs['input'], $outputs);
+        $result = $this->createTransaction($inputs['inputs'], $outputs);
 
         return $result;
     }

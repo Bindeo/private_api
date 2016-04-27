@@ -239,9 +239,9 @@ class StoreData extends RepositoryLocatableAbstract
         $this->db->beginTransaction();
         // Prepare query and mandatory data
         if ($file->getClientType() == 'U') {
-            $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT - :size ELSE 0 END WHERE ID_USER = :id_client;';
+            $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT - CEIL(:size / 1024) ELSE 0 END WHERE ID_USER = :id_client;';
         } else {
-            $sql = 'UPDATE OAUTH_CLIENTS SET STORAGE_LEFT = STORAGE_LEFT - :size WHERE ID_CLIENT = :id_client;';
+            $sql = 'UPDATE OAUTH_CLIENTS SET STORAGE_LEFT = STORAGE_LEFT - CEIL(:size / 1024) WHERE ID_CLIENT = :id_client;';
         }
 
         $sql .= 'INSERT INTO FILES(CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
@@ -314,9 +314,9 @@ class StoreData extends RepositoryLocatableAbstract
         // If the file has been permanently deleted, we free the space
         if ($file->getStatus() == 'D') {
             if ($file->getClientType() == 'U') {
-                $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + :size ELSE 0 END WHERE ID_USER = :id_client;';
+                $sql = 'UPDATE USERS SET STORAGE_LEFT = CASE WHEN TYPE > 1 THEN STORAGE_LEFT + CEIL(:size / 1024) ELSE 0 END WHERE ID_USER = :id_client;';
             } else {
-                $sql = 'UPDATE OAUTH_CLIENTS SET STORAGE_LEFT = STORAGE_LEFT + :size WHERE ID_CLIENT = :id_client;';
+                $sql = 'UPDATE OAUTH_CLIENTS SET STORAGE_LEFT = STORAGE_LEFT + CEIL(:size / 1024) WHERE ID_CLIENT = :id_client;';
             }
 
             $sql .= 'DELETE FROM FILES WHERE ID_FILE = :id;';
@@ -487,10 +487,9 @@ class StoreData extends RepositoryLocatableAbstract
         // Create new signers
         $signers = [];
         foreach ($element->getSigners() as $signer) {
-            // Instantiate new signature object
-            $signer = new Signer($signer);
+            // Check signers
             $signer->clean();
-            if (!$signer->getEmail() or !$signer->getName() or !$signer->getDocument()) {
+            if (!$signer->getEmail() or !$signer->getName()) {
                 throw new \Exception(Exceptions::MISSING_FIELDS, 400);
             }
 
@@ -511,10 +510,10 @@ class StoreData extends RepositoryLocatableAbstract
             $identity = $res->getNumRows() == 1 ? $res->getRows()[0] : null;
 
             // Insert signatures
-            $sql = 'INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, DOCUMENT, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
+            $sql = "INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, DOCUMENT, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
                       FK_ID_USER, FK_ID_IDENTITY, PHONE)
-                    VALUES (:element_type, :element_id, :creator, :email, :name, :document, :account, :token, SYSDATE() + INTERVAL 15 DAY,
-                      :id_user, :id_identity, :phone)';
+                    VALUES (:element_type, :element_id, :creator, :email, :name, 'PENDING', :account, :token, SYSDATE() + INTERVAL 15 DAY,
+                      :id_user, :id_identity, :phone)";
 
             $params = [
                 ':element_type' => $element->getElementType(),
@@ -522,7 +521,6 @@ class StoreData extends RepositoryLocatableAbstract
                 ':creator'      => $signer->getCreator() ? 1 : 0,
                 ':email'        => $signer->getEmail(),
                 ':name'         => $signer->getName(),
-                ':document'     => $signer->getDocument(),
                 ':account'      => $signer->setAccount($identity ? $identity->getAccount()
                     : hash('sha256', $signer->getEmail()))->getAccount(),
                 ':token'        => $signer->setToken(hash('sha256',
@@ -561,30 +559,6 @@ class StoreData extends RepositoryLocatableAbstract
                 FROM SIGNERS S LEFT JOIN USERS U ON U.ID_USER = S.FK_ID_USER
                 WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id
                 ORDER BY S.CREATOR DESC, S.EMAIL ASC';
-        $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
-
-        return $this->db->query($sql, $params, 'Api\Entity\Signer');
-    }
-
-    /**
-     * Get the signature creator
-     *
-     * @param SignableInterface $element
-     *
-     * @return ResultSet
-     * @throws \Exception
-     */
-    public function getSignatureCreator(SignableInterface $element)
-    {
-        // Check data
-        if (!$element->getElementId() or !$element->getElementType()) {
-            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        }
-
-        // Get signature creator
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.DOCUMENT, S.ACCOUNT, S.TOKEN, U.LANG
-                FROM SIGNERS S, USERS U
-                WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id AND S.CREATOR = 1 AND U.ID_USER = S.FK_ID_USER';
         $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
 
         return $this->db->query($sql, $params, 'Api\Entity\Signer');

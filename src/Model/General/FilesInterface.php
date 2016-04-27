@@ -2,6 +2,7 @@
 
 namespace Api\Model\General;
 
+use Bindeo\DataModel\SignableInterface;
 use Bindeo\DataModel\StorableFileInterface;
 use Psr\Log\LoggerInterface;
 
@@ -33,6 +34,15 @@ interface FilesInterface
      * @return string hash code
      */
     public function getHash(StorableFileInterface $file);
+
+    /**
+     * Count generated pages of a signable and storable file
+     *
+     * @param SignableInterface $file
+     *
+     * @return int Number of pages
+     */
+    public function countPages(SignableInterface $file);
 
     /**
      * Delete a file

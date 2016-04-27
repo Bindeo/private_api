@@ -8,6 +8,7 @@ use Api\Entity\Signer;
 use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
 use Api\Repository\RepositoryAbstract;
+use Bindeo\DataModel\DataModelAbstract;
 use Bindeo\DataModel\Exceptions;
 use Slim\Views\Twig;
 use \Psr\Log\LoggerInterface;
@@ -24,6 +25,11 @@ class SignDocument
      * @var \Api\Repository\StoreData
      */
     private $dataRepo;
+
+    /**
+     * @var \Api\Model\StoreData
+     */
+    private $dataModel;
 
     /**
      * @var EmailInterface
@@ -45,6 +51,7 @@ class SignDocument
     public function __construct(
         RepositoryAbstract $bulkRepo,
         RepositoryAbstract $dataRepo,
+        DataModelAbstract $dataModel,
         EmailInterface $email,
         Twig $view,
         LoggerInterface $logger,
@@ -52,6 +59,7 @@ class SignDocument
     ) {
         $this->bulkRepo = $bulkRepo;
         $this->dataRepo = $dataRepo;
+        $this->dataModel = $dataModel;
         $this->email = $email;
         $this->view = $view;
         $this->logger = $logger;
@@ -87,8 +95,8 @@ class SignDocument
         if ($signers->getNumRows() == 0) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         } else {
-            /** @var Signer[] $signers */
             $signers = $signers->getRows();
+            /** @var Signer[] $signers */
         }
 
         // Prepare urls
@@ -98,7 +106,7 @@ class SignDocument
                     $this->frontUrls['login'];
 
         // Document creator
-        $creator = $signers[0];
+        $creator = $this->dataModel->getSignatureCreator($file);
 
         // Instantiate creator language
         $translate = TranslateFactory::factory($creator->getLang());
@@ -124,32 +132,33 @@ class SignDocument
         }
 
         // Send emails to signers
-        for ($i = 1, $count = count($signers); $i < $count; $i++) {
-            $signer = $signers[$i];
-            // Instantiate signer language
-            $translate = TranslateFactory::factory($signer->getLang() ? $signer->getLang() : $creator->getLang());
+        foreach ($signers as $signer) {
+            if (!$signer->getCreator()) {
+                // Instantiate signer language
+                $translate = TranslateFactory::factory($signer->getLang() ? $signer->getLang() : $creator->getLang());
 
-            // Send the email to the signer
-            $response = $this->view->render(new Response(), 'email/sign_completed_copy.html.twig', [
-                'translate'    => $translate,
-                'element_name' => $file->getElementName(),
-                'creator'      => $creator,
-                'user'         => $signer,
-                'url'          => $url,
-                'urlLogin'     => $urlLogin
-            ]);
+                // Send the email to the signer
+                $response = $this->view->render(new Response(), 'email/sign_completed_copy.html.twig', [
+                    'translate'    => $translate,
+                    'element_name' => $file->getElementName(),
+                    'creator'      => $creator,
+                    'user'         => $signer,
+                    'url'          => $url,
+                    'urlLogin'     => $urlLogin
+                ]);
 
-            // Send and email
-            try {
-                $res = $this->email->sendEmail($signer->getEmail(),
-                    $translate->translate('sign_signed_subject', $signer->getName()),
-                    $response->getBody()->__toString());
+                // Send and email
+                try {
+                    $res = $this->email->sendEmail($signer->getEmail(),
+                        $translate->translate('sign_signed_subject', $signer->getName()),
+                        $response->getBody()->__toString());
 
-                if (!$res or $res->http_response_code != 200) {
+                    if (!$res or $res->http_response_code != 200) {
+                        $this->logger->addError('Error sending and email', $signer->toArray());
+                    }
+                } catch (\Exception $e) {
                     $this->logger->addError('Error sending and email', $signer->toArray());
                 }
-            } catch (\Exception $e) {
-                $this->logger->addError('Error sending and email', $signer->toArray());
             }
         }
     }

@@ -11,6 +11,7 @@ class BulkTransaction extends BulkTransactionAbstract
 
     /**
      * Transform original Json string of files into an array of BulkFile objects
+     * @return $this
      * @throws \Exception
      */
     public function transformFiles()
@@ -35,6 +36,8 @@ class BulkTransaction extends BulkTransactionAbstract
                                                   ->setIp($this->ip);
         }
         $this->numItems = count($this->files);
+
+        return $this;
     }
 
     /**

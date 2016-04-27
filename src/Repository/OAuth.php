@@ -14,7 +14,7 @@ class OAuth extends RepositoryAbstract
      *
      * @param OAuthClient $client
      *
-     * @return ResultSet
+     * @return OAuthClient
      * @throws \Exception
      */
     public function oauthClient(OAuthClient $client)
@@ -40,7 +40,7 @@ class OAuth extends RepositoryAbstract
             throw new \Exception($this->db->getError(), 400);
         }
 
-        return $data;
+        return $data->getNumRows() ? $data->getRows()[0] : null;
     }
 
     /**

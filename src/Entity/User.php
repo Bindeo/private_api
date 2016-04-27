@@ -3,8 +3,9 @@
 namespace Api\Entity;
 
 use Bindeo\DataModel\UserAbstract;
+use Bindeo\DataModel\UserInterface;
 
-class User extends UserAbstract
+class User extends UserAbstract implements UserInterface
 {
     // Optionals and temporary attributes
     protected $renew;
@@ -27,5 +28,13 @@ class User extends UserAbstract
         $this->renew = $renew;
 
         return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getUserType()
+    {
+        return 'U';
     }
 }

@@ -37,7 +37,7 @@ class OAuth
         $res = [
             'data' => [
                 'type'       => 'oauth_clients',
-                'attributes' => isset($data->getRows()[0]) ? $data->getRows()[0]->toArray() : []
+                'attributes' => $data ? $data->toArray() : []
             ]
         ];
 
