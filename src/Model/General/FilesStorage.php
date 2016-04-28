@@ -165,13 +165,13 @@ class FilesStorage implements FilesInterface
     }
 
     /**
-     * Count generated pages of a signable and storable file
+     * Get array of pages previews of the document
      *
      * @param SignableInterface $file
      *
-     * @return int Number of pages
+     * @return array Pages images path
      */
-    public function countPages(SignableInterface $file)
+    public function pagesPreview(SignableInterface $file)
     {
         // File must be storable and signable
         $pages = 0;
@@ -183,7 +183,15 @@ class FilesStorage implements FilesInterface
 
             // check if folder exists and how many png pages are inside
             if (is_dir($folder)) {
-                $pages = scandir($folder) - 2; // Remove '.' and '..' directories
+                $pages = scandir($folder);
+                // Remove '.' and '..' directories and set path for the rest
+                $newPages = [];
+                foreach ($pages as $page) {
+                    if ($page != '.' and $page != '..') {
+                        $newPages[] = $folder . '/' . $page;
+                    }
+                }
+                $pages = $newPages;
             }
         }
 

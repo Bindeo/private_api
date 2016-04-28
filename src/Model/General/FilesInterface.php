@@ -36,13 +36,13 @@ interface FilesInterface
     public function getHash(StorableFileInterface $file);
 
     /**
-     * Count generated pages of a signable and storable file
+     * Get array of pages previews of the document
      *
      * @param SignableInterface $file
      *
-     * @return int Number of pages
+     * @return array Pages images path
      */
-    public function countPages(SignableInterface $file);
+    public function pagesPreview(SignableInterface $file);
 
     /**
      * Delete a file

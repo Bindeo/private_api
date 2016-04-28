@@ -272,6 +272,24 @@ class StoreData
     }
 
     /**
+     * Get a signer through a token
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function getSigner(Request $request, Response $response, $args)
+    {
+        $res = $this->modelData->getSigner($request->getParam('token'));
+
+        $res = ['data' => ['type' => 'signers', 'attributes' => $res->toArray()]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
      * Get a signable document by sending a signer token
      *
      * @param Request|\Slim\Http\Request   $request
@@ -282,7 +300,7 @@ class StoreData
      */
     public function getDocSignable(Request $request, Response $response, $args)
     {
-        $res = $this->modelData->getSignableElement($request->getParam('token'));
+        $res = $this->modelData->getSignableElement($request->getParam('token'), $request->getParam('idUser'));
 
         $res = ['data' => ['type' => 'files', 'attributes' => $res]];
 

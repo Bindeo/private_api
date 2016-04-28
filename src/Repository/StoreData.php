@@ -503,7 +503,7 @@ class StoreData extends RepositoryLocatableAbstract
             }
 
             // Look for user identity
-            $sql = "SELECT FK_ID_USER, ID_IDENTITY, ACCOUNT FROM USERS_IDENTITIES WHERE TYPE = 'E' AND VALUE = :email";
+            $sql = "SELECT FK_ID_USER, ID_IDENTITY, ACCOUNT, DOCUMENT FROM USERS_IDENTITIES WHERE TYPE = 'E' AND VALUE = :email";
             $params = [':email' => $signer->getEmail()];
             $res = $this->db->query($sql, $params, 'Api\Entity\UserIdentity');
             /** @var UserIdentity $identity */
@@ -512,7 +512,7 @@ class StoreData extends RepositoryLocatableAbstract
             // Insert signatures
             $sql = "INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, DOCUMENT, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
                       FK_ID_USER, FK_ID_IDENTITY, PHONE)
-                    VALUES (:element_type, :element_id, :creator, :email, :name, 'PENDING', :account, :token, SYSDATE() + INTERVAL 15 DAY,
+                    VALUES (:element_type, :element_id, :creator, :email, :name, :document, :account, :token, SYSDATE() + INTERVAL 15 DAY,
                       :id_user, :id_identity, :phone)";
 
             $params = [
@@ -526,6 +526,7 @@ class StoreData extends RepositoryLocatableAbstract
                 ':token'        => $signer->setToken(hash('sha256',
                     $element->getElementType() . '_' . $element->getElementId() . '_' . $signer->getAccount() . '_' .
                     time()))->getToken(),
+                ':document'     => ($identity and $identity->getDocument()) ? $identity->getDocument() : null,
                 ':id_user'      => $identity ? $identity->getIdUser() : null,
                 ':id_identity'  => $identity ? $identity->getIdIdentity() : null,
                 ':phone'        => $signer->getPhone() ? $signer->getPhone() : null
@@ -565,18 +566,18 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
-     * Get a signable element by a signer token
+     * Get a signer through a token
      *
-     * @param $token
+     * @param string $token
      *
-     * @return SignableInterface
+     * @return Signer
      * @throws \Exception
      */
-    public function getSignableElement($token)
+    public function getSigner($token)
     {
         // Get requested token
-        $sql = 'SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, S.DOCUMENT, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED
-                FROM SIGNERS WHERE TOKEN = :token AND (SIGNED = 1 OR TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0)';
+        $sql = "SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, DOCUMENT, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED
+                FROM SIGNERS WHERE TOKEN = :token AND (SIGNED = 1 OR TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0)";
         $res = $this->db->query($sql, [':token' => trim($token)], 'Api\Entity\Signer');
 
         if ($res->getNumRows() == 0) {
@@ -585,12 +586,35 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // If token is correct, get associated element
-        /** @var Signer $signer */
-        $signer = $res->getRows()[0];
+        return $res->getRows()[0];
+    }
 
-        $sql = 'UPDATE SIGNERS SET VIEWED = 1 WHERE TOKEN = :token AND VIEWED = 0';
-        // Execute query
-        $this->db->action($sql, [':token' => trim($token)]);
+    /**
+     * Get a signable element by a signer token
+     *
+     * @param string $token
+     * @param int    $idUser
+     *
+     * @return SignableInterface
+     * @throws \Exception
+     */
+    public function getSignableElement($token, $idUser = null)
+    {
+        // Get signer
+        $signer = $this->getSigner($token);
+
+        // If signer has user, idUser must be the same
+        if (($signer->getIdUser() or $idUser) and $signer->getIdUser() != $idUser) {
+            // Correct user must be logged
+            throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
+        }
+
+        // Mark as viewed
+        if (!$signer->getViewed()) {
+            $sql = 'UPDATE SIGNERS SET VIEWED = 1 WHERE TOKEN = :token AND VIEWED = 0';
+            // Execute query
+            $this->db->action($sql, [':token' => trim($token)]);
+        }
 
         if ($signer->getElementType() == 'F') {
             $sql = "SELECT F.ID_FILE, F.CLIENT_TYPE, F.FK_ID_CLIENT, F.MODE, F.FK_ID_MEDIA, F.NAME, F.FILE_NAME,
@@ -705,13 +729,44 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
-     * Update a signer when he signs
+     * Update a signer personal data when he signs
      *
      * @param Signer $signer
      *
      * @throws \Exception
      */
     public function updateSigner(Signer $signer)
+    {
+        $signer->clean();
+
+        // Check data
+        if (!$signer->getToken()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Set as signed
+        $sql = 'UPDATE SIGNERS SET NAME = :name, DOCUMENT = :document, FK_ID_IDENTITY = :identity WHERE TOKEN = :token';
+        $params = [
+            ':token'    => $signer->getToken(),
+            ':name'     => $signer->getName(),
+            ':document' => $signer->getDocument(),
+            ':identity' => $signer->getIdIdentity() ? $signer->getIdIdentity() : null
+        ];
+
+        // Execute query
+        if (!$this->db->action($sql, $params)) {
+            throw $this->dbException();
+        }
+    }
+
+    /**
+     * Update a signer when he signs
+     *
+     * @param Signer $signer
+     *
+     * @throws \Exception
+     */
+    public function signSigner(Signer $signer)
     {
         $signer->clean();
 

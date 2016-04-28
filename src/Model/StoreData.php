@@ -11,6 +11,7 @@ use Api\Entity\SignCode;
 use Api\Entity\Signer;
 use Api\Entity\User;
 use Api\Entity\File;
+use Api\Entity\UserIdentity;
 use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
 use Api\Model\General\ScriptsLauncher;
@@ -756,19 +757,20 @@ class StoreData
     /**
      * Use an existent and valid token to get a signable element
      *
-     * @param $token
+     * @param string $token
+     * @param int    $idUser
      *
      * @return array
      * @throws \Exception
      */
-    public function getSignableElement($token)
+    public function getSignableElement($token, $idUser = null)
     {
         if (!$token) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // Get the signable element
-        $element = $this->dataRepo->getSignableElement($token);
+        $element = $this->dataRepo->getSignableElement($token, $idUser);
 
         if (!$element) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
@@ -813,6 +815,15 @@ class StoreData
                     $this->logger->addError('Error sending and email', $creator->toArray());
                 }
             }
+        }
+
+        // Set element path
+        if ($element->getElementType() == 'F') {
+            /** @var File $element */
+            $element->setPagesPreviews($this->storage->pagesPreview($element))
+                    ->setPages(count($element->getPagesPreviews()))
+                    ->encodePages()
+                    ->setPath($this->storage->get($element));
         }
 
         return $element->toArray();
@@ -877,9 +888,11 @@ class StoreData
     public function signDocument(SignCode $code)
     {
         // Check data
-        if (!$code->getToken() or !$code->getCode() or !$code->getIp()) {
+        if (!$code->getToken() or !$code->getCode() or !$code->getIp() or !$code->getName() or !$code->getDocument()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
+
+        $code->clean();
 
         // Validate received code
         $signer = $this->dataRepo->validateSignCode($code);
@@ -889,6 +902,25 @@ class StoreData
 
         // Get creator
         $creator = $this->getSignatureCreator($element);
+
+        // If signer has changed his name or document, we need to update them
+        if ($signer->getName() != $code->getName() or $signer->getDocument() != $code->getDocument()) {
+            // If signer is a registered user, we need to update his identity
+            if ($signer->getIdIdentity()) {
+                $this->usersRepo->saveIdentity((new UserIdentity())->setIdIdentity($signer->getIdIdentity())
+                                                                   ->setValue($signer->getEmail())
+                                                                   ->setName($code->getName())
+                                                                   ->setDocument($code->getDocument())
+                                                                   ->setIp($code->getIp()));
+                $signer->setIdIdentity($this->usersRepo->getIdentities((new User())->setIdUser($signer->getIdUser()))
+                                                       ->getRows()[0]->getIdIdentity());
+            }
+
+            // Update signer with his new info
+            $this->dataRepo->updateSigner($signer->setToken($code->getToken())
+                                                 ->setName($code->getName())
+                                                 ->setDocument($code->getDocument()));
+        }
 
         // Signature data
         $data = [
@@ -932,7 +964,7 @@ class StoreData
 
             // If we have no count pages yet, we count them
             if ($structure['document']['pages'] == 0) {
-                $structure['document']['pages'] = $this->storage->countPages($element);
+                $structure['document']['pages'] = count($this->storage->pagesPreview($element));
             }
 
             $bulk->setStructure(json_encode($structure));
@@ -942,7 +974,7 @@ class StoreData
         $bulk = $this->bulkModel->addEvent($event->setBulkObj($bulk));
 
         // Update signature
-        $this->dataRepo->updateSigner($signer->setDate($event->getDate())->setIp($code->getIp()));
+        $this->dataRepo->signSigner($signer->setDate($event->getDate())->setIp($code->getIp()));
 
         if ($element->getSigners()[0]->getEmail() != $creator->getEmail()) {
             // Send email to creator
@@ -982,5 +1014,18 @@ class StoreData
         }
 
         return $bulk->setIp(null);
+    }
+
+    /**
+     * Get a signer through a token
+     *
+     * @param string $token
+     *
+     * @return Signer
+     * @throws \Exception
+     */
+    public function getSigner($token)
+    {
+        return $this->dataRepo->getSigner($token);
     }
 }
