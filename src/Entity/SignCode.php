@@ -9,6 +9,7 @@ class SignCode extends SignCodeAbstract
     protected $lang;
     protected $name;
     protected $document;
+    protected $idUser;
 
     /**
      * @return mixed
@@ -66,6 +67,26 @@ class SignCode extends SignCodeAbstract
     public function setDocument($document)
     {
         $this->document = $document;
+
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getIdUser()
+    {
+        return $this->idUser;
+    }
+
+    /**
+     * @param mixed $idUser
+     *
+     * @return $this
+     */
+    public function setIdUser($idUser)
+    {
+        $this->idUser = $idUser;
 
         return $this;
     }

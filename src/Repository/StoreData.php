@@ -347,9 +347,9 @@ class StoreData extends RepositoryLocatableAbstract
 
         // Build the query
         $data = [
-            'client_type' => $filter->getClientType(),
-            ':id_client'  => $filter->getIdClient(),
-            ':status'     => $filter->getStatus()
+            ':client_type' => $filter->getClientType(),
+            ':id_client'   => $filter->getIdClient(),
+            ':status'      => $filter->getStatus()
         ];
         $where = '';
 
@@ -406,7 +406,7 @@ class StoreData extends RepositoryLocatableAbstract
         // Get the paginated list
         $from = $filter->getStatus() != 'D' ? 'FILES' : 'FILES_DELETED';
 
-        $sql = "SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_TYPE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME,
+        $sql = "SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME,
                   HASH, SIZE, CTRL_DATE, FK_ID_BULK, TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE
                 FROM " . $from . " WHERE CLIENT_TYPE = :client_type AND FK_ID_CLIENT = :id_client" . $where .
                " AND STATUS = :status ORDER BY " . $order;
@@ -576,7 +576,7 @@ class StoreData extends RepositoryLocatableAbstract
     public function getSigner($token)
     {
         // Get requested token
-        $sql = "SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, DOCUMENT, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED
+        $sql = "SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, DOCUMENT, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED, TOKEN
                 FROM SIGNERS WHERE TOKEN = :token AND (SIGNED = 1 OR TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0)";
         $res = $this->db->query($sql, [':token' => trim($token)], 'Api\Entity\Signer');
 
@@ -590,10 +590,36 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
+     * Get a signer through a file id
+     *
+     * @param int $id
+     *
+     * @return Signer
+     * @throws \Exception
+     */
+    public function getSignableFileCreator($id)
+    {
+        // Get requested token
+        $sql = "SELECT 'F' ELEMENT_TYPE, F.ID_FILE ELEMENT_ID, 1 CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT,
+                  F.FK_ID_CLIENT FK_ID_USER, S.FK_ID_IDENTITY, S.PHONE, S.VIEWED, IFNULL(S.SIGNED, 1) SIGNED, S.TOKEN
+                FROM FILES F LEFT JOIN SIGNERS S ON S.ELEMENT_TYPE = 'F' AND S.ELEMENT_ID = F.ID_FILE AND S.CREATOR = 1
+                WHERE F.ID_FILE = :id";
+        $res = $this->db->query($sql, [':id' => $id], 'Api\Entity\Signer');
+
+        if ($res->getNumRows() == 0) {
+            // Token doesn't exists or it is expired
+            throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
+        }
+
+        // If token is correct, get associated element
+        return $res->getRows()[0];
+    }
+
+    /**
      * Get a signable element by a signer token
      *
-     * @param string $token
-     * @param int    $idUser
+     * @param string|int $token
+     * @param int        $idUser
      *
      * @return SignableInterface
      * @throws \Exception
@@ -601,7 +627,7 @@ class StoreData extends RepositoryLocatableAbstract
     public function getSignableElement($token, $idUser = null)
     {
         // Get signer
-        $signer = $this->getSigner($token);
+        $signer = is_numeric($token) ? $this->getSignableFileCreator($token) : $this->getSigner($token);
 
         // If signer has user, idUser must be the same
         if (($signer->getIdUser() or $idUser) and $signer->getIdUser() != $idUser) {
@@ -610,10 +636,10 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Mark as viewed
-        if (!$signer->getViewed()) {
+        if (!$signer->getViewed() AND $signer->getToken()) {
             $sql = 'UPDATE SIGNERS SET VIEWED = 1 WHERE TOKEN = :token AND VIEWED = 0';
             // Execute query
-            $this->db->action($sql, [':token' => trim($token)]);
+            $this->db->action($sql, [':token' => $signer->getToken()]);
         }
 
         if ($signer->getElementType() == 'F') {

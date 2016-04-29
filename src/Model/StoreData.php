@@ -188,7 +188,7 @@ class StoreData
                         'filename'  => $file->getFileOrigName(),
                         'creator'   => $file->getUser(),
                         'user'      => $signer,
-                        'url'       => $url
+                        'url'       => $url . '/' . $signer->getToken()
                     ]);
 
                     // Send and email
@@ -765,7 +765,7 @@ class StoreData
      */
     public function getSignableElement($token, $idUser = null)
     {
-        if (!$token) {
+        if (!$token or is_numeric($token) and !$idUser) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -780,8 +780,9 @@ class StoreData
         $element->setSignerJson($element->getSigners()[0]->toArray());
 
         // If signer is the first time that he viewed document, we need to send a email to the creator
-        if ($element->getSigners()[0]->getViewed() == 0 and !$element->getSigners()[0]->getCreator()) {
-
+        if ($element->getSigners()[0]->isSigner() and
+            $element->getSigners()[0]->getViewed() == 0 and !$element->getSigners()[0]->getCreator()
+        ) {
             // Get the signature creator
             $creator = $this->getSignatureCreator($element);
 
@@ -790,7 +791,7 @@ class StoreData
                 $translate = TranslateFactory::factory($creator->getLang());
 
                 $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                       $this->frontUrls['review_contract'];
+                       $this->frontUrls['review_contract'] .'/'. $element->getElementId();
 
                 // Send an email to the creator
                 $response = $this->view->render(new Response(), 'email/sign_viewed.html.twig', [
@@ -844,7 +845,7 @@ class StoreData
         }
 
         // Get the signable element
-        $element = $this->dataRepo->getSignableElement($code->getToken());
+        $element = $this->dataRepo->getSignableElement($code->getToken(), $code->getIdUser());
 
         if (!$element) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
@@ -856,7 +857,6 @@ class StoreData
         // Send an email with the code
         $translate = TranslateFactory::factory($code->getLang());
 
-        // Send an email to the creator
         $response = $this->view->render(new Response(), 'email/sign_code.html.twig', [
             'translate'    => $translate,
             'element_name' => $element->getElementName(),
@@ -898,7 +898,7 @@ class StoreData
         $signer = $this->dataRepo->validateSignCode($code);
 
         // Get the signable element
-        $element = $this->dataRepo->getSignableElement($code->getToken());
+        $element = $this->dataRepo->getSignableElement($code->getToken(), $code->getIdUser());
 
         // Get creator
         $creator = $this->getSignatureCreator($element);
@@ -981,7 +981,7 @@ class StoreData
             $translate = TranslateFactory::factory($code->getLang());
 
             $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                   $this->frontUrls['review_contract'];
+                   $this->frontUrls['review_contract'] . '/' . $element->getElementId();
 
             // Send an email to the creator
             $response = $this->view->render(new Response(), 'email/sign_signed.html.twig', [
@@ -1026,6 +1026,8 @@ class StoreData
      */
     public function getSigner($token)
     {
-        return $this->dataRepo->getSigner($token);
+        // If token is numeric, it means a file id and we need to get the file creator
+        return is_numeric($token) ? $this->dataRepo->getSignableFileCreator($token)
+            : $this->dataRepo->getSigner($token);
     }
 }

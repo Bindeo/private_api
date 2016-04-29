@@ -37,6 +37,14 @@ class MailGunClient implements EmailInterface
         // Build the message
         $message = new MessageBuilder();
         $message->setFromAddress($from ? $from : $this->baseFrom, ['first' => 'Bindeo']);
+
+        // If we are in development, mails are only sent to @bindeo.com mails
+        if (ENV == 'development') {
+            if (!preg_match('/.*@bindeo.com$/i', $to)) {
+                $to = DEVELOPER . '@bindeo.com';
+            }
+        }
+
         $message->addToRecipient($to);
         $message->setSubject($subject);
         $message->setHtmlBody($content);

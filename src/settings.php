@@ -80,7 +80,7 @@ return [
             'host'             => 'https://',
             'login'            => 'www.bindeo.com/login',
             'validation_token' => 'www.bindeo.com/user/validate',
-            'review_contract'  => 'www.bindeo.com/contracts/review'
+            'review_contract'  => 'www.bindeo.com/data/signature'
         ],
 
         // Scripts path

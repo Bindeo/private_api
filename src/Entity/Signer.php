@@ -27,4 +27,14 @@ class Signer extends SignerAbstract
 
         return $this;
     }
+
+    /**
+     * Check if signer is a correct signer
+     *
+     * @return bool
+     */
+    public function isSigner()
+    {
+        return $this->email and $this->token;
+    }
 }

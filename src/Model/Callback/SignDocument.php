@@ -7,8 +7,8 @@ use Api\Entity\File;
 use Api\Entity\Signer;
 use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
+use Api\Model\StoreData;
 use Api\Repository\RepositoryAbstract;
-use Bindeo\DataModel\DataModelAbstract;
 use Bindeo\DataModel\Exceptions;
 use Slim\Views\Twig;
 use \Psr\Log\LoggerInterface;
@@ -51,7 +51,7 @@ class SignDocument
     public function __construct(
         RepositoryAbstract $bulkRepo,
         RepositoryAbstract $dataRepo,
-        DataModelAbstract $dataModel,
+        StoreData $dataModel,
         EmailInterface $email,
         Twig $view,
         LoggerInterface $logger,
@@ -116,7 +116,7 @@ class SignDocument
             'translate'    => $translate,
             'element_name' => $file->getElementName(),
             'user'         => $creator,
-            'url'          => $url
+            'url'          => $url . '/' . $file->getIdFile()
         ]);
 
         // Send and email
@@ -143,7 +143,7 @@ class SignDocument
                     'element_name' => $file->getElementName(),
                     'creator'      => $creator,
                     'user'         => $signer,
-                    'url'          => $url,
+                    'url'          => $url . '/' . $signer->getToken(),
                     'urlLogin'     => $urlLogin
                 ]);
 
