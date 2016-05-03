@@ -29,12 +29,4 @@ class User extends UserAbstract implements UserInterface
 
         return $this;
     }
-
-    /**
-     * @return string
-     */
-    public function getUserType()
-    {
-        return 'U';
-    }
 }

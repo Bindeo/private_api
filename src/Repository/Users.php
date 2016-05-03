@@ -1012,7 +1012,7 @@ class Users extends RepositoryLocatableAbstract
 
         $data = $this->db->query($sql, $params, 'Api\Entity\UserIdentity');
 
-        if (!$data or $this->db->getError()) {
+        if ($data->getNumRows() == 0 or $data->getError()) {
             throw new \Exception($this->db->getError(), 400);
         }
 

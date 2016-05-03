@@ -560,4 +560,46 @@ class BulkTransactions extends RepositoryLocatableAbstract
             throw $this->dbException();
         }
     }
+
+    /**
+     * Get an existent Bulk Transaction about a document signature, only signers and owner are allowed to get the bulk
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return BulkTransaction
+     * @throws \Exception
+     */
+    public function documentSignatureBulk(BulkTransaction $bulk)
+    {
+        $bulk->clean();
+
+        // Check mandatory data
+        if (!$bulk->getClientType() or !$bulk->getIdClient() or !$bulk->getExternalId()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Get the bulk transaction if user is the issuer or a signer
+        $sql = "SELECT ID_BULK_TRANSACTION, EXTERNAL_ID, TYPE, ELEMENTS_TYPE, CLIENT_TYPE, FK_ID_CLIENT, NUM_ITEMS, CLOSED,
+                  STRUCTURE, HASH, STATUS, LINKED_TRANSACTION, TRANSACTION, ACCOUNT, CONFIRMED, CTRL_DATE DATE
+                FROM BULK_TRANSACTIONS B WHERE STATUS = 'A' AND EXTERNAL_ID = :id AND
+                  (CLIENT_TYPE = :type AND FK_ID_CLIENT = :id_client OR
+                   EXISTS(SELECT 1 FROM SIGNERS S, FILES_SIGNATURE F
+                   WHERE F.FK_ID_BULK = B.ID_BULK_TRANSACTION AND S.ELEMENT_TYPE = 'F' AND S.ELEMENT_ID = F.FK_ID_FILE AND
+                    :type = 'U' AND S.FK_ID_USER = :id_client))";
+
+        $params = [
+            ':type'      => $bulk->getClientType(),
+            ':id_client' => $bulk->getIdClient(),
+            ':id'        => $bulk->getExternalId()
+        ];
+
+        // Execute query
+        $res = $this->db->query($sql, $params, 'Api\Entity\BulkTransaction');
+
+        if (!$res or $this->db->getError()) {
+            throw $this->dbException();
+        }
+
+        return $res->getNumRows() ? $res->getRows()[0] : null;
+    }
 }

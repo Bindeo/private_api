@@ -2,6 +2,7 @@
 
 namespace Api\Repository;
 
+use Api\Entity\BulkTransaction;
 use Api\Entity\File;
 use Api\Entity\ResultSet;
 use Api\Entity\SignCode;
@@ -556,7 +557,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get signers list
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.DOCUMENT, S.ACCOUNT, U.LANG, S.TOKEN
+        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.DOCUMENT, S.ACCOUNT, U.LANG, S.TOKEN, S.SIGNED, S.CTRL_DATE DATE
                 FROM SIGNERS S LEFT JOIN USERS U ON U.ID_USER = S.FK_ID_USER
                 WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id
                 ORDER BY S.CREATOR DESC, S.EMAIL ASC';
@@ -824,6 +825,45 @@ class StoreData extends RepositoryLocatableAbstract
         // Execute query
         if (!$this->db->action($sql, $params)) {
             throw $this->dbException();
+        }
+    }
+
+    /**
+     * Get a signable element by a signer token
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return SignableInterface[]
+     * @throws \Exception
+     */
+    public function getSignedElements(BulkTransaction $bulk)
+    {
+        // Check data
+        if (!$bulk->getIdBulkTransaction() or $bulk->getElementsType() != 'E') {
+            // Correct user must be logged
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Get element
+        if ($bulk->getType() == 'Sign Document') {
+            $sql = "SELECT F.ID_FILE, F.CLIENT_TYPE, F.FK_ID_CLIENT, F.MODE, F.FK_ID_MEDIA, F.NAME, F.FILE_NAME,
+                  F.FILE_ORIG_NAME, F.HASH, F.SIZE, F.CTRL_DATE, F.TAG, F.DESCRIPTION, F.FK_ID_BULK, F.TRANSACTION,
+                  F.CONFIRMED, F.STATUS
+                FROM FILES F, FILES_SIGNATURE S
+                WHERE S.FK_ID_BULK = :id AND F.ID_FILE = S.FK_ID_FILE";
+            $class = 'Api\Entity\File';
+        } else {
+            return null;
+        }
+
+        // Get element
+        $res = $this->db->query($sql, [':id' => $bulk->getIdBulkTransaction()], $class);
+
+        // If element exists, add current token signer
+        if ($res->getNumRows() == 0) {
+            return null;
+        } else {
+            return $res->getRows();
         }
     }
 }

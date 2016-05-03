@@ -5,7 +5,9 @@ namespace Api\Model;
 use Api\Entity\BlockChain;
 use Api\Entity\BulkEvent;
 use Api\Entity\BulkTransaction;
+use Api\Entity\DocsSignature;
 use Api\Entity\OAuthClient;
+use Api\Entity\ResultSet;
 use Api\Entity\SignatureGenerator;
 use Api\Entity\SignCode;
 use Api\Entity\Signer;
@@ -142,7 +144,7 @@ class StoreData
             $params = (new BulkTransaction())->setType('Sign Document')
                                              ->setClientType($file->getClientType())
                                              ->setIdClient($file->getIdClient())
-                                             ->setExternalId('Sign_Document' . '_' . $file->getIdFile())
+                                             ->setExternalId(hash('sha256', 'Sign_Document' . '_' . $file->getIdFile()))
                                              ->setIp($file->getIp())
                                              ->toArray();
 
@@ -791,7 +793,7 @@ class StoreData
                 $translate = TranslateFactory::factory($creator->getLang());
 
                 $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                       $this->frontUrls['review_contract'] .'/'. $element->getElementId();
+                       $this->frontUrls['review_contract'] . '/' . $element->getElementId();
 
                 // Send an email to the creator
                 $response = $this->view->render(new Response(), 'email/sign_viewed.html.twig', [
@@ -1029,5 +1031,73 @@ class StoreData
         // If token is numeric, it means a file id and we need to get the file creator
         return is_numeric($token) ? $this->dataRepo->getSignableFileCreator($token)
             : $this->dataRepo->getSigner($token);
+    }
+
+    /**
+     * Get a pin code to sign a document by sending a signer token
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return DocsSignature
+     * @throws \Exception
+     */
+    public function signatureCertificate(BulkTransaction $bulk)
+    {
+        // Get bulk transaction if user is allowed
+        $bulk = $this->bulkModel->documentSignatureBulk($bulk);
+
+        if (!$bulk) {
+            throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
+        }
+
+        // We will store all the information necessary to generate the certificate in a DocsSignature object
+        $signature = (new DocsSignature())->setBulk($bulk);
+
+        // Get owner
+        $owner = $this->getSignatureCreator((new File())->setClientType($bulk->getClientType())
+                                                        ->setIdClient($bulk->getIdClient()));
+
+        if (!$owner) {
+            throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
+        }
+
+        // If owner is user, it is better to get current identity
+        if ($owner instanceof User) {
+            $owner = $this->usersRepo->getIdentities($owner, true)->getRows()[0];
+        }
+
+        // Set owner
+        $signature->setIssuer($owner)->setIssuerType($bulk->getClientType());
+
+        // Get involved files
+        $files = $this->dataRepo->getSignedElements($bulk);
+
+        if (!$files) {
+            throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
+        }
+
+        if ($bulk->getElementsType() == 'E' and $bulk->getType() == 'Sign Document') {
+            $oldFiles = $files;
+            $files = [];
+            /** @var File $file */
+            foreach ($oldFiles as $file) {
+                $files[] = $file->setPages(count($this->storage->pagesPreview($file)));
+            }
+        }
+
+        // Set files
+        $signature->setFiles($files);
+
+        // Get signers
+        $signers = $this->dataRepo->signersList($files[0]);
+
+        if ($signers->getNumRows() == 0) {
+            throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
+        }
+
+        // Set signers
+        $signature->setSigners($signers->getRows());
+
+        return $signature;
     }
 }

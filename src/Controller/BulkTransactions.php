@@ -36,7 +36,7 @@ class BulkTransactions
     {
         $data = $this->model->bulkType(new BulkType($request->getParams()));
 
-        $res = ['data' => ['type' => 'bulk_type', 'attributes' => $data]];
+        $res = ['data' => ['type' => 'bulk_types', 'attributes' => $data]];
 
         return $response->withJson($res, 200);
     }
@@ -55,7 +55,7 @@ class BulkTransactions
     {
         $data = $this->model->bulkTypes(new BulkType($request->getParams()));
 
-        $res = ['data' => $data->toArray('bulk_type'), 'total_pages' => 1];
+        $res = ['data' => $data->toArray('bulk_types'), 'total_pages' => 1];
 
         return $response->withJson($res, 200);
     }
@@ -95,7 +95,7 @@ class BulkTransactions
     private function openBulk(Request $request, Response $response, $args)
     {
         $res = $this->model->openBulk($request->getParams());
-        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res]];
 
         return $response->withJson($res, 201);
     }
@@ -113,7 +113,7 @@ class BulkTransactions
     private function oneStepBulk(Request $request, Response $response, $args)
     {
         $res = $this->model->oneStepBulk($request->getParams());
-        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res]];
 
         return $response->withJson($res, 201);
     }
@@ -131,7 +131,7 @@ class BulkTransactions
     public function closeBulk(Request $request, Response $response, $args)
     {
         $res = $this->model->closeBulk(new BulkTransaction($request->getParams()));
-        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
     }
@@ -166,7 +166,7 @@ class BulkTransactions
     public function getBulk(Request $request, Response $response, $args)
     {
         $res = $this->model->getBulk(new BulkTransaction($request->getParams()));
-        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res ? $res->toArray() : []]];
+        $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res ? $res->toArray() : []]];
 
         return $response->withJson($res, 200);
     }
@@ -205,7 +205,7 @@ class BulkTransactions
     private function addEvent(Request $request, Response $response)
     {
         $res = $this->model->addEvent(new BulkEvent($request->getParams()))->toArray();
-        $res = ['data' => ['type' => 'bulk_transaction', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res]];
 
         return $response->withJson($res, 201);
     }

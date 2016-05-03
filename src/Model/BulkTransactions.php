@@ -202,6 +202,20 @@ class BulkTransactions
     }
 
     /**
+     * Get an existent Bulk Transaction about a document signature, only signers and owner are allowed to get the bulk
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @return BulkTransaction
+     * @throws \Exception
+     */
+    public function documentSignatureBulk(BulkTransaction $bulk)
+    {
+        // Open the bulk transaction
+        return $this->bulkRepo->documentSignatureBulk($bulk);
+    }
+
+    /**
      * Open a new bulk transaction
      *
      * @param BulkEvent $event

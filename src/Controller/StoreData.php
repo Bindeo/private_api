@@ -3,6 +3,7 @@
 namespace Api\Controller;
 
 use Api\Entity\BlockChain;
+use Api\Entity\BulkTransaction;
 use Api\Entity\Email;
 use Api\Entity\File;
 use Api\Entity\SignCode;
@@ -154,7 +155,8 @@ class StoreData
     public function getTransaction(Request $request, Response $response, $args)
     {
         // Get the transaction
-        $res = $this->modelData->getTransaction(new BlockChain($request->getParams()), $request->getParam('mode', 'light'));
+        $res = $this->modelData->getTransaction(new BlockChain($request->getParams()),
+            $request->getParam('mode', 'light'));
         $res = ['data' => ['type' => 'blockchain', 'attributes' => $res]];
 
         return $response->withJson($res, 200);
@@ -337,6 +339,26 @@ class StoreData
         $res = $this->modelData->signDocument(new SignCode($request->getParams()));
 
         $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res->toArray()]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
+     * Get a signature certificate
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function signatureCertificate(Request $request, Response $response, $args)
+    {
+        $res = $this->modelData->signatureCertificate((new BulkTransaction())->setExternalId($request->getParam('token'))
+                                                                             ->setClientType($request->getParam('clientType'))
+                                                                             ->setIdClient($request->getParam('idClient')));
+
+        $res = ['data' => ['type' => 'signatures', 'attributes' => $res->toArray()]];
 
         return $response->withJson($res, 200);
     }

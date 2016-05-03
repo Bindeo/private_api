@@ -55,6 +55,7 @@ source ../tables/BULK_TRANSACTIONS.sql;
 source ../tables/BULK_TYPES.sql;
 source ../tables/BULK_FILES.sql;
 source ../tables/BULK_EVENTS.sql;
+source ../tables/FILES_SIGNATURE.sql;
 source ../tables/SIGNERS.sql;
 source ../tables/SIGN_CODES.sql;
 
