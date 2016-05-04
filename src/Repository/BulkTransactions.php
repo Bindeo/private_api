@@ -140,7 +140,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
             ':structure'     => $bulk->getStructure(),
             ':hash'          => $bulk->getHash(),
             ':ip'            => $bulk->getIp(),
-            ':account'       => $bulk->getAccount(),
+            ':account'       => $bulk->getAccount() ? $bulk->getAccount() : '',
             ':id_geonames'   => $bulk->getIdGeonames() ? $bulk->getIdGeonames() : null,
             ':latitude'      => $bulk->getLatitude() ? $bulk->getLatitude() : null,
             ':longitude'     => $bulk->getLongitude() ? $bulk->getLongitude() : null
@@ -151,6 +151,41 @@ class BulkTransactions extends RepositoryLocatableAbstract
         if (!$this->db->getError()) {
             $bulk->setIdBulkTransaction($this->db->lastInsertId());
         } else {
+            throw $this->dbException();
+        }
+    }
+
+    /**
+     * Update bulk transaction with generated account and associate it with elements to sign
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @throws \Exception
+     */
+    public function associateSignableElements(BulkTransaction $bulk)
+    {
+        if (!$bulk->getIdBulkTransaction() or !$bulk->getAccount() or !is_array($bulk->getFiles())) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Update bulk transaction
+        $sql = 'UPDATE BULK_TRANSACTIONS SET ACCOUNT = :account WHERE ID_BULK_TRANSACTION = :id_bulk';
+        $params = [':account' => $bulk->getAccount(), ':id_bulk' => $bulk->getIdBulkTransaction()];
+
+        if (!$this->db->action($sql, $params)) {
+            throw $this->dbException();
+        }
+
+        // Associate files
+        $sql = '';
+        $params = [':id_bulk' => $bulk->getIdBulkTransaction()];
+        for ($i = 0, $count = count($bulk->getFiles()); $i < $count; $i++) {
+            $file = $bulk->getFiles()[$i];
+            $sql .= 'INSERT INTO FILES_SIGNATURE(FK_ID_BULK, FK_ID_FILE) VALUES (:id_bulk, :id_file_' . $i . ');';
+            $params[':id_file_' . $i] = $file->getIdFile();
+        }
+
+        if (!$this->db->action($sql, $params)) {
             throw $this->dbException();
         }
     }
@@ -174,14 +209,13 @@ class BulkTransactions extends RepositoryLocatableAbstract
         }
 
         // Update bulk
-        $sql = 'UPDATE BULK_TRANSACTIONS SET STRUCTURE = :structure, HASH = :hash, NUM_ITEMS = :num_items, LINKED_TRANSACTION = :txid
+        $sql = 'UPDATE BULK_TRANSACTIONS SET STRUCTURE = :structure, HASH = :hash, NUM_ITEMS = :num_items
                 WHERE ID_BULK_TRANSACTION = :id AND CLOSED = 0';
         $data = [
             ':id'        => $bulk->getIdBulkTransaction(),
             ':structure' => $bulk->getStructure(),
             ':hash'      => $bulk->getHash(),
-            ':num_items' => $bulk->getNumItems(),
-            ':txid'      => $bulk->getLinkedTransaction() ? $bulk->getLinkedTransaction() : null
+            ':num_items' => $bulk->getNumItems()
         ];
 
         // Execute query

@@ -95,7 +95,7 @@ class BulkTransactions
     private function openBulk(Request $request, Response $response, $args)
     {
         $res = $this->model->openBulk($request->getParams());
-        $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'bulk_transactions', 'attributes' => $res->toArray()]];
 
         return $response->withJson($res, 201);
     }

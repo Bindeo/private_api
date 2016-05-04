@@ -8,6 +8,7 @@ use Api\Entity\ResultSet;
 use Api\Entity\SignCode;
 use Api\Entity\Signer;
 use Api\Entity\UserIdentity;
+use Bindeo\DataModel\FileAbstract;
 use Bindeo\DataModel\NotarizableInterface;
 use Bindeo\DataModel\SignableInterface;
 use Bindeo\Filter\FilesFilter;
@@ -48,11 +49,12 @@ class StoreData extends RepositoryLocatableAbstract
      * Store a transaction from a signed asset
      *
      * @param BlockChain $blockchain
+     * @param int        $bulkLinked [optional]
      *
      * @return BlockChain
      * @throws \Exception
      */
-    public function signAsset(BlockChain $blockchain)
+    public function signAsset(BlockChain $blockchain, $bulkLinked = null)
     {
         if (!$blockchain->getIdElement() or !$blockchain->getIdClient() or !$blockchain->getIp() or
             !$blockchain->getNet() or !$blockchain->getTransaction() or !$blockchain->getHash() or
@@ -70,7 +72,7 @@ class StoreData extends RepositoryLocatableAbstract
                   CTRL_IP, TYPE, FK_ID_ELEMENT, ID_GEONAMES, LATITUDE, LONGITUDE)
                 VALUES (:txid, :net, :client_type, :id_client, :id_identity, :hash, :json_data, SYSDATE(), :ip, :type, :id_element,
                   :id_geonames, :latitude, :longitude)";
-        $data = [
+        $params = [
             ':txid'        => $blockchain->getTransaction(),
             ':net'         => $blockchain->getNet(),
             ':client_type' => $blockchain->getClientType(),
@@ -86,21 +88,28 @@ class StoreData extends RepositoryLocatableAbstract
             ':longitude'   => $blockchain->getLongitude() ? $blockchain->getLongitude() : null
         ];
 
-        if ($this->db->action($sql, $data)) {
+        if ($this->db->action($sql, $params)) {
             if ($blockchain->getType() == 'F') {
                 // Update the file
-                $sql = 'UPDATE FILES SET TRANSACTION = :txid WHERE ID_FILE = :id';
+                $sql = 'UPDATE FILES SET TRANSACTION = :txid WHERE ID_FILE = :id AND TRANSACTION IS NULL';
             } elseif ($blockchain->getType() == 'F') {
-                $sql = 'UPDATE EMAILS SET TRANSACTION = :txid WHERE ID_EMAIL = :id';
+                $sql = 'UPDATE EMAILS SET TRANSACTION = :txid WHERE ID_EMAIL = :id AND TRANSACTION IS NULL';
             } elseif ($blockchain->getType() == 'B') {
                 $sql = 'UPDATE BULK_TRANSACTIONS SET TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
             }
-            $data = [
+            $params = [
                 ':id'   => $blockchain->getIdElement(),
                 ':txid' => $blockchain->getTransaction()
             ];
 
-            if (!$this->db->action($sql, $data)) {
+            // If we are linking this transaction to a bulk for signing, we update the bulk
+            if ($bulkLinked) {
+                $sql .= '; UPDATE BULK_TRANSACTIONS SET LINKED_TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :bulk;';
+                $params[':bulk'] = $bulkLinked;
+            }
+
+            $this->db->action($sql, $params);
+            if ($this->db->getError()) {
                 $this->db->rollBack();
                 throw $this->dbException();
             }
@@ -182,7 +191,7 @@ class StoreData extends RepositoryLocatableAbstract
      */
     public function findFile(NotarizableInterface $file)
     {
-        if (!($file instanceof File) or !$file->getIdElement()) {
+        if (!($file instanceof FileAbstract) or !$file->getIdElement()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -219,9 +228,9 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Look for another file with the same hash and same user
-        $sql = "SELECT A.NUM FORBIDDEN, B.NUM WARNING FROM
-                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND CLIENT_TYPE = :client_type AND FK_ID_CLIENT = :id_client) A,
-                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND CLIENT_TYPE = :client_type AND FK_ID_CLIENT != :id_client) B";
+        $sql = "SELECT IFNULL(A.ID_FILE, 0) FORBIDDEN, B.NUM WARNING FROM
+                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND CLIENT_TYPE = :client_type AND FK_ID_CLIENT != :id_client) B
+                LEFT JOIN FILES A ON  A.STATUS = 'A' AND A.HASH = :hash AND A.CLIENT_TYPE = :client_type AND A.FK_ID_CLIENT = :id_client";
         $res = $this->db->query($sql, [
             ':client_type' => $file->getClientType(),
             ':id_client'   => $file->getIdClient(),
@@ -229,7 +238,15 @@ class StoreData extends RepositoryLocatableAbstract
         ]);
 
         if ($res->getRows()[0]['FORBIDDEN'] > 0) {
-            throw new \Exception(Exceptions::DUPLICATED_FILE, 409);
+            // Check if we are creating a signature, in that case we can reuse a file to create new signature processes
+            if ($file->getMode() == 'S') {
+                // Get the file
+                $file->setIdFile($res->getRows()[0]['FORBIDDEN'])->setExistent(true);
+
+                return;
+            } else {
+                throw new \Exception(Exceptions::DUPLICATED_FILE, 409);
+            }
         } elseif ($res->getRows()[0]['WARNING'] > 0) {
             // TODO Insert into the db logger
         }
@@ -448,46 +465,23 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
-     * Update some file data
+     * Associate signers to the bulk transaction
      *
-     * @param File $file
-     *
-     * @throws \Exception
-     */
-    public function updateFile(File $file)
-    {
-        if (!$file->getIdFile() or !$file->getIdBulk()) {
-            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
-        }
-
-        $sql = 'UPDATE FILES SET FK_ID_BULK = :id_bulk WHERE ID_FILE = :id';
-        $params = [':id' => $file->getIdFile(), ':id_bulk' => $file->getIdBulk()];
-
-        if (!$this->db->action($sql, $params)) {
-            throw $this->dbException();
-        }
-    }
-
-    /**
-     * Associate signers to the signable element
-     *
-     * @param SignableInterface $element
+     * @param BulkTransaction $bulk
      *
      * @return Signer[]
      * @throws \Exception
      */
-    public function associateSigners(SignableInterface $element)
+    public function associateSigners(BulkTransaction $bulk)
     {
         // Check data
-        if (!is_array($element->getSigners()) or count($element->getSigners()) == 0 or !$element->getElementId() or
-            !$element->getElementType()
-        ) {
+        if (!is_array($bulk->getSigners()) or count($bulk->getSigners()) == 0 or !$bulk->getIdBulkTransaction()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // Create new signers
         $signers = [];
-        foreach ($element->getSigners() as $signer) {
+        foreach ($bulk->getSigners() as $signer) {
             // Check signers
             $signer->clean();
             if (!$signer->getEmail() or !$signer->getName()) {
@@ -511,26 +505,24 @@ class StoreData extends RepositoryLocatableAbstract
             $identity = $res->getNumRows() == 1 ? $res->getRows()[0] : null;
 
             // Insert signatures
-            $sql = "INSERT INTO SIGNERS(ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, NAME, DOCUMENT, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
+            $sql = "INSERT INTO SIGNERS(FK_ID_BULK, CREATOR, EMAIL, NAME, DOCUMENT, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
                       FK_ID_USER, FK_ID_IDENTITY, PHONE)
-                    VALUES (:element_type, :element_id, :creator, :email, :name, :document, :account, :token, SYSDATE() + INTERVAL 15 DAY,
+                    VALUES (:id_bulk, :creator, :email, :name, :document, :account, :token, SYSDATE() + INTERVAL 15 DAY,
                       :id_user, :id_identity, :phone)";
 
             $params = [
-                ':element_type' => $element->getElementType(),
-                ':element_id'   => $element->getElementId(),
-                ':creator'      => $signer->getCreator() ? 1 : 0,
-                ':email'        => $signer->getEmail(),
-                ':name'         => $signer->getName(),
-                ':account'      => $signer->setAccount($identity ? $identity->getAccount()
+                ':id_bulk'     => $bulk->getIdBulkTransaction(),
+                ':creator'     => $signer->getCreator() ? 1 : 0,
+                ':email'       => $signer->getEmail(),
+                ':name'        => $signer->getName(),
+                ':account'     => $signer->setAccount($identity ? $identity->getAccount()
                     : hash('sha256', $signer->getEmail()))->getAccount(),
-                ':token'        => $signer->setToken(hash('sha256',
-                    $element->getElementType() . '_' . $element->getElementId() . '_' . $signer->getAccount() . '_' .
-                    time()))->getToken(),
-                ':document'     => ($identity and $identity->getDocument()) ? $identity->getDocument() : null,
-                ':id_user'      => $identity ? $identity->getIdUser() : null,
-                ':id_identity'  => $identity ? $identity->getIdIdentity() : null,
-                ':phone'        => $signer->getPhone() ? $signer->getPhone() : null
+                ':token'       => $signer->setToken(hash('sha256',
+                    $bulk->getIdBulkTransaction() . '_' . $signer->getAccount() . '_' . time()))->getToken(),
+                ':document'    => ($identity and $identity->getDocument()) ? $identity->getDocument() : null,
+                ':id_user'     => $identity ? $identity->getIdUser() : null,
+                ':id_identity' => $identity ? $identity->getIdIdentity() : null,
+                ':phone'       => $signer->getPhone() ? $signer->getPhone() : null
             ];
 
             if (!$this->db->action($sql, $params)) {
@@ -655,7 +647,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get element
-        $res = $this->db->query($sql, [':id' => $signer->getElementId()], $class);
+        $res = $this->db->query($sql, [':id' => $signer->getIdBulk()], $class);
 
         // If element exists, add current token signer
         if ($res->getNumRows() == 0) {
@@ -798,7 +790,7 @@ class StoreData extends RepositoryLocatableAbstract
         $signer->clean();
 
         // Check data
-        if (!$signer->getElementType() or !$signer->getElementId() or !$signer->getEmail() or !$signer->getIp() or
+        if (!$signer->getElementType() or !$signer->getIdBulk() or !$signer->getEmail() or !$signer->getIp() or
             !($signer->getDate() instanceof \DateTime)
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
@@ -813,7 +805,7 @@ class StoreData extends RepositoryLocatableAbstract
                 WHERE ELEMENT_TYPE = :element_type AND ELEMENT_ID = :element_id AND EMAIL = :email';
         $params = [
             ':element_type' => $signer->getElementType(),
-            ':element_id'   => $signer->getElementId(),
+            ':element_id'   => $signer->getIdBulk(),
             ':email'        => $signer->getEmail(),
             ':date'         => $signer->getFormattedDate(),
             ':ip'           => $signer->getIp(),

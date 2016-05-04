@@ -9,6 +9,35 @@ class BulkTransaction extends BulkTransactionAbstract
 {
     protected $typeObject;
 
+    // ADITIONAL METHODS
+    /**
+     * Transform original Json string of signers into an array of Signer objects
+     * @return $this
+     * @throws \Exception
+     */
+    public function transformSigners()
+    {
+        // Check signers
+        if (!$this->signers) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Try to decode signers
+        try {
+            $signers = json_decode($this->signers, true);
+        } catch (\Exception $e) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Populate objects
+        $this->signers = [];
+        foreach ($signers as $signer) {
+            $this->signers[] = (new Signer($signer))->setIdBulk($this->idBulkTransaction);
+        }
+
+        return $this;
+    }
+
     /**
      * Transform original Json string of files into an array of BulkFile objects
      * @return $this

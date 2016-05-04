@@ -132,18 +132,22 @@ class StoreData
      */
     private function fileToSign(File $file, $lang)
     {
+        $signers = $file->getSigners();
+
         // File is prepared to be signed
         if ($file->getMode() == 'S') {
-            // Launch doc conversion script
-            ScriptsLauncher::getInstance()->execBackground('convert-documents.sh ' . $this->storage->get($file));
-
-            $signers = $this->dataRepo->associateSigners($file);
-
+            // Launch doc conversion script if it did not exist
+            if ($file->getExistent()) {
+                $file = $this->dataRepo->findFile($file)->setIp($file->getIp());
+            } else {
+                ScriptsLauncher::getInstance()->execBackground('convert-documents.sh ' . $this->storage->get($file));
+            }
+            /** @var File $file */
             // Generate params array
             $params = (new BulkTransaction())->setType('Sign Document')
                                              ->setClientType($file->getClientType())
                                              ->setIdClient($file->getIdClient())
-                                             ->setExternalId(hash('sha256', 'Sign_Document' . '_' . $file->getIdFile()))
+                                             ->setExternalId(hash('sha256', 'Sign Document ' . time()))
                                              ->setIp($file->getIp())
                                              ->toArray();
 
@@ -157,23 +161,58 @@ class StoreData
             // Number of pages
             $params['pages'] = 0;
 
+            // Open bulk transaction
+            $bulk = $this->bulkModel->openBulk($params);
+
+            // Associate signers
+            $signers = $this->dataRepo->associateSigners($bulk->setSigners($signers)->transformSigners());
+
             // Calculate account name depending on signers
             if (count($signers) == 1) {
-                $params['account'] = $signers[0]->getAccount();
+                $bulk->setAccount($signers[0]->getAccount());
             } else {
                 // Concatenate signers accounts to generate multisig account name
                 $account = '';
                 foreach ($signers as $signer) {
                     $account .= $signer->getAccount();
                 }
-                $params['account'] = hash('sha256', $account);
+                $bulk->setAccount(hash('sha256', $account));
             }
 
-            // Open bulk transaction
-            $bulk = $this->bulkModel->openBulk($params);
+            // Update bulk transaction with blockchain account and associate files
+            $this->bulkModel->associateSignableElements($bulk->setFiles([$file]));
 
-            // Update file registry with bulk transaction
-            $this->dataRepo->updateFile($file->setIdBulk($bulk['idBulkTransaction']));
+            // Sign file against blockchain
+            $blockchain = \Api\Lib\BlockChain\BlockChain::getInstance();
+            if ($blockchain->getBalance() <= 0) {
+                $this->logger->addError(Exceptions::NO_COINS);
+                throw new \Exception(Exceptions::NO_COINS, 503);
+            }
+
+            // Get accounts list
+            $accounts = [];
+            foreach ($signers as $signer) {
+                $accounts[] = $signer->getAccount();
+            }
+
+            // Generate blockchainObj
+            $blockchainObj = $this->blockchainObjFactory($signature, $file, $blockchain->getNet());
+
+            // Notarize and create signable content in blockchain
+            $res = $blockchain->storeSignableData($blockchainObj->getHash(), $accounts, $bulk->getAccount());
+
+            // Check if the transaction was ok
+            if (!$res['txid']) {
+                $this->logger->addError('Error signing a file', $file->toArray());
+                throw new \Exception('', 500);
+            }
+
+            // Save the transaction information
+            $blockchainObj->setTransaction($res['txid']);
+            $file->setTransaction($res['txid']);
+
+            // Save blockchain obj
+            $this->dataRepo->signAsset($blockchainObj, $bulk->getIdBulkTransaction());
 
             // Send emails to signers
             $translate = TranslateFactory::factory($lang);
@@ -229,11 +268,6 @@ class StoreData
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // Convert signers into array if it needed
-        if ($file->getMode() == 'S') {
-            $file->transformSigners();
-        }
-
         // We need to check if the client exists and has enough free space
         if ($file->getClientType() == 'U') {
             $user = $this->usersRepo->find((new User())->setIdUser($file->getIdClient()));
@@ -278,6 +312,11 @@ class StoreData
             // Remove the uploaded file
             $this->storage->delete($file);
             throw $e;
+        }
+
+        // If we did not create the file because it already existed, we delete the new file
+        if ($file->getExistent()) {
+            $this->storage->delete($file);
         }
 
         // File has been created in mode to be signed
@@ -370,40 +409,10 @@ class StoreData
         }
 
         // Setup blockchain object
-        $blockchainObj = (new BlockChain())->setIp($file->getIp())
-                                           ->setNet($blockchain->getNet())
-                                           ->setClientType($file->getClientType())
-                                           ->setIdClient($file->getIdClient())
-                                           ->setIdIdentity($signature->getAuxIdentity())
-                                           ->setHash($signature->generateHash())
-                                           ->setJsonData($signature->generate(true))
-                                           ->setType($signature->getAssetType())
-                                           ->setIdElement($file->getIdFile());
+        $blockchainObj = $this->blockchainObjFactory($signature, $file, $blockchain->getNet());
 
-        // Signature
-        if ($file->getMode() == 'S') {
-            // If file needs to be signed, we need the list of signers
-            $signers = $this->dataRepo->signersList($file);
-            if ($signers->getNumRows() == 0) {
-                throw new \Exception(Exceptions::NON_EXISTENT, 409);
-            }
-
-            // Get accounts list
-            $accounts = [];
-            /** @var Signer $signer */
-            foreach ($signers->getRows() as $signer) {
-                $accounts[] = $signer->getAccount();
-            }
-
-            // Get bulk transaction associated
-            $bulk = $this->bulkModel->getBulk((new BulkTransaction())->setIdBulkTransaction($file->getIdBulk()));
-
-            // Notarize and create signable content in blockchain
-            $res = $blockchain->storeSignableData($blockchainObj->getHash(), $accounts, $bulk->getAccount());
-        } else {
-            // Notarize data
-            $res = $blockchain->storeData($blockchainObj->getHash());
-        }
+        // Notarize data
+        $res = $blockchain->storeData($blockchainObj->getHash());
 
         // Check if the transaction was ok
         if (!$res['txid']) {
@@ -458,6 +467,29 @@ class StoreData
         }
 
         return $signature;
+    }
+
+    /**
+     * Factory method to generate a BlockChain object full of information
+     *
+     * @param SignatureGenerator $signature
+     * @param SignableInterface  $element
+     * @param string             $net [optional]
+     *
+     * @return BlockChain
+     */
+    private function blockchainObjFactory(SignatureGenerator $signature, SignableInterface $element, $net = 'bitcoin')
+    {
+        // Generate blockchain object
+        return (new BlockChain())->setNet($net)
+                                 ->setIp($element->getIp())
+                                 ->setIdElement($element->getElementId())
+                                 ->setClientType($element->getClientType())
+                                 ->setIdClient($element->getIdClient())
+                                 ->setIdIdentity($signature->getAuxIdentity())
+                                 ->setHash($signature->generateHash())
+                                 ->setJsonData($signature->generate(true))
+                                 ->setType($signature->getAssetType());
     }
 
     /**

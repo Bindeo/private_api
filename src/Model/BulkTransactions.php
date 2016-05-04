@@ -141,7 +141,7 @@ class BulkTransactions
      *
      * @param array $params
      *
-     * @return array
+     * @return BulkTransaction
      * @throws \Exception
      */
     public function openBulk(array $params)
@@ -152,7 +152,7 @@ class BulkTransactions
         // Open the bulk transaction
         $this->bulkRepo->openBulk($bulk);
 
-        return $bulk->toArray();
+        return $bulk;
     }
 
     /**
@@ -213,6 +213,19 @@ class BulkTransactions
     {
         // Open the bulk transaction
         return $this->bulkRepo->documentSignatureBulk($bulk);
+    }
+
+    /**
+     * Update bulk transaction with generated account and associate it with elements to sign
+     *
+     * @param BulkTransaction $bulk
+     *
+     * @throws \Exception
+     */
+    public function associateSignableElements(BulkTransaction $bulk)
+    {
+        // Open the bulk transaction
+        $this->bulkRepo->associateSignableElements($bulk);
     }
 
     /**
