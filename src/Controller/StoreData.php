@@ -356,7 +356,8 @@ class StoreData
     {
         $res = $this->modelData->signatureCertificate((new BulkTransaction())->setExternalId($request->getParam('token'))
                                                                              ->setClientType($request->getParam('clientType'))
-                                                                             ->setIdClient($request->getParam('idClient')));
+                                                                             ->setIdClient($request->getParam('idClient')),
+            $request->getParam('mode'));
 
         $res = ['data' => ['type' => 'signatures', 'attributes' => $res->toArray()]];
 

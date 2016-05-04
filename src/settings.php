@@ -77,10 +77,11 @@ return [
 
         // Host and front urls for emails
         'front_urls'          => [
-            'host'             => 'https://',
-            'login'            => 'www.bindeo.com/login',
-            'validation_token' => 'www.bindeo.com/user/validate',
-            'review_contract'  => 'www.bindeo.com/data/signature'
+            'host'                 => 'https://',
+            'login'                => 'www.bindeo.com/login',
+            'validation_token'     => 'www.bindeo.com/user/validate',
+            'review_contract'      => 'www.bindeo.com/data/signature',
+            'generate_certificate' => 'www.bindeo.com/data/signature/generate-certificate'
         ],
 
         // Scripts path

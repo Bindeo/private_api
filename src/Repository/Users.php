@@ -252,8 +252,9 @@ class Users extends RepositoryLocatableAbstract
         // Generate validation code
         $token = md5($id . $user->getEmail() . time());
 
-        // Insert the validation token, the active user type and the first identity
-        $sql = "INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP)
+        // Insert the validation token, the active user type and the first identity, also we update old signers with same email to associate user
+        $sql = "UPDATE SIGNERS SET FK_ID_USER = :id WHERE EMAIL = :email;
+                INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP)
                 VALUES (:token, :type_val, :id, :email, SYSDATE(), :ip);
                 INSERT INTO USERS_TYPES(FK_ID_USER, FK_ID_TYPE, DATE_START, NEXT_PAYMENT, LAST_RESET)
                 VALUES (:id, :type, SYSDATE(), CASE WHEN :type > 2 THEN SYSDATE() + INTERVAL 1 MONTH ELSE NULL END, CASE WHEN :type > 2 THEN SYSDATE() ELSE NULL END);
@@ -270,7 +271,9 @@ class Users extends RepositoryLocatableAbstract
             ':name'     => $user->getName()
         ];
 
-        if (!$this->db->action($sql, $data)) {
+        $this->db->action($sql, $data);
+
+        if ($this->db->getError()) {
             $this->db->rollBack();
             throw $this->dbException();
         }

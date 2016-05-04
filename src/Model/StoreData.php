@@ -7,7 +7,6 @@ use Api\Entity\BulkEvent;
 use Api\Entity\BulkTransaction;
 use Api\Entity\DocsSignature;
 use Api\Entity\OAuthClient;
-use Api\Entity\ResultSet;
 use Api\Entity\SignatureGenerator;
 use Api\Entity\SignCode;
 use Api\Entity\Signer;
@@ -1037,11 +1036,12 @@ class StoreData
      * Get a pin code to sign a document by sending a signer token
      *
      * @param BulkTransaction $bulk
+     * @param string          $mode 'full' o 'simple' mode
      *
      * @return DocsSignature
      * @throws \Exception
      */
-    public function signatureCertificate(BulkTransaction $bulk)
+    public function signatureCertificate(BulkTransaction $bulk, $mode)
     {
         // Get bulk transaction if user is allowed
         $bulk = $this->bulkModel->documentSignatureBulk($bulk);
@@ -1052,6 +1052,21 @@ class StoreData
 
         // We will store all the information necessary to generate the certificate in a DocsSignature object
         $signature = (new DocsSignature())->setBulk($bulk);
+
+        // In simple mode, we only need information about bulk transaction
+        if ($mode == 'simple') {
+            return $signature;
+        }
+
+        // Blockchain instance
+        $net = \Api\Lib\BlockChain\BlockChain::getInstance();
+        if (!$net) {
+            $this->logger->addError(Exceptions::UNRECHEABLE_BLOCKCHAIN);
+            throw new \Exception(Exceptions::UNRECHEABLE_BLOCKCHAIN, 503);
+        }
+
+        // Get account address
+        $bulk->setAccount($net->getAccountAddress($bulk->getAccount()));
 
         // Get owner
         $owner = $this->getSignatureCreator((new File())->setClientType($bulk->getClientType())
@@ -1094,9 +1109,16 @@ class StoreData
         if ($signers->getNumRows() == 0) {
             throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
         }
+        $signers = $signers->getRows();
+        /** @var Signer[] $signers */
+
+        // Get blockchain addresses
+        foreach ($signers as $signer) {
+            $signer->setAccount($net->getAccountAddress($signer->getAccount()));
+        }
 
         // Set signers
-        $signature->setSigners($signers->getRows());
+        $signature->setSigners($signers);
 
         return $signature;
     }
