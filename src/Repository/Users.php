@@ -566,14 +566,12 @@ class Users extends RepositoryLocatableAbstract
                 throw new \Exception('', 500);
             }
 
-            // If the email changed, we need to resend the validation token
-            if ($emailChanged) {
-                $sql = "SELECT TOKEN FROM USERS_VALIDATIONS WHERE FK_ID_USER = :id_user AND TYPE = 'V'";
-                $res = $this->db->query($sql, [':id_user' => $user->getIdUser()]);
+            // Always resend validation token
+            $sql = "SELECT TOKEN FROM USERS_VALIDATIONS WHERE FK_ID_USER = :id_user AND TYPE = 'V'";
+            $res = $this->db->query($sql, [':id_user' => $user->getIdUser()]);
 
-                if ($res->getNumRows() == 1) {
-                    $response['token'] = $res->getRows()[0]['TOKEN'];
-                }
+            if ($res->getNumRows() == 1) {
+                $response['token'] = $res->getRows()[0]['TOKEN'];
             }
         } else {
             if (!$emailChanged) {
