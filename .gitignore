@@ -7,3 +7,4 @@
 !var/logs/.gitkeep
 !/logs/README.md
 /src/settings_dev.php
+/db/scripts/load.sh
