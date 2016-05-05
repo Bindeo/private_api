@@ -7,9 +7,9 @@ use Api\Lib\JsonRPC\jsonRPCClient;
 class BitcoinClient implements BlockChainClientInterface
 {
     const MAX_DATA_LENGTH = 128; // 80 bytes in hex characters
-    const STAMP_FEE       = (ENV == 'development') ? 0.000016 * 10 : 0.000016; // 1300 satoshis
-    const SIGNABLE_FEE    = (ENV == 'development') ? 0.000018 * 10 : 0.000018; // 1300 satoshis
-    const TRANSACTION_FEE = (ENV == 'development') ? 0.000025 * 10 : 0.000025; // 2300 satoshis
+    const STAMP_FEE       = (ENV == 'development') ? 0.000016 * 10 : 0.000016; // 1600 satoshis
+    const SIGNABLE_FEE    = (ENV == 'development') ? 0.000018 * 10 : 0.000018; // 1800 satoshis
+    const TRANSACTION_FEE = (ENV == 'development') ? 0.000025 * 10 : 0.000025; // 2500 satoshis
     const BULK_STAMP_FEE  = self::TRANSACTION_FEE;
     const SATOSHI         = 0.00000001; // 1 satoshi
 
