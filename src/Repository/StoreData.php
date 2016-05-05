@@ -91,11 +91,11 @@ class StoreData extends RepositoryLocatableAbstract
         if ($this->db->action($sql, $params)) {
             if ($blockchain->getType() == 'F') {
                 // Update the file
-                $sql = 'UPDATE FILES SET TRANSACTION = :txid WHERE ID_FILE = :id AND TRANSACTION IS NULL';
+                $sql = 'UPDATE FILES SET TRANSACTION = :txid WHERE ID_FILE = :id AND TRANSACTION IS NULL;';
             } elseif ($blockchain->getType() == 'F') {
-                $sql = 'UPDATE EMAILS SET TRANSACTION = :txid WHERE ID_EMAIL = :id AND TRANSACTION IS NULL';
+                $sql = 'UPDATE EMAILS SET TRANSACTION = :txid WHERE ID_EMAIL = :id AND TRANSACTION IS NULL;';
             } elseif ($blockchain->getType() == 'B') {
-                $sql = 'UPDATE BULK_TRANSACTIONS SET TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id';
+                $sql = 'UPDATE BULK_TRANSACTIONS SET TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id;';
             }
             $params = [
                 ':id'   => $blockchain->getIdElement(),
@@ -104,7 +104,8 @@ class StoreData extends RepositoryLocatableAbstract
 
             // If we are linking this transaction to a bulk for signing, we update the bulk
             if ($bulkLinked) {
-                $sql .= '; UPDATE BULK_TRANSACTIONS SET LINKED_TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :bulk;';
+                $sql .= "UPDATE BULK_TRANSACTIONS SET LINKED_TRANSACTION = :txid, STRUCTURE = REPLACE(STRUCTURE, 'PENDING', :txid)
+                         WHERE ID_BULK_TRANSACTION = :bulk;";
                 $params[':bulk'] = $bulkLinked;
             }
 
@@ -196,7 +197,7 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         $sql = 'SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME, HASH, SIZE,
-                  CTRL_DATE, TAG, DESCRIPTION, FK_ID_BULK, TRANSACTION, CONFIRMED, STATUS, ID_GEONAMES, LATITUDE, LONGITUDE
+                  PAGES, CTRL_DATE, TAG, DESCRIPTION, TRANSACTION, CONFIRMED, STATUS, ID_GEONAMES, LATITUDE, LONGITUDE
                 FROM FILES WHERE ID_FILE = :id';
         $params = [':id' => $file->getIdElement()];
 
@@ -348,6 +349,27 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
+     * Update some File fields
+     *
+     * @param File $file
+     *
+     * @throws \Exception
+     */
+    public function updateFile(File $file)
+    {
+        if (!$file->getIdFile()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $sql = 'UPDATE FILES SET PAGES = :pages WHERE ID_FILE = :id';
+        $params = [':id' => $file->getIdFile(), ':pages' => $file->getPages() ? $file->getPages() : 0];
+
+        if (!$this->db->action($sql, $params)) {
+            throw $this->dbException();
+        }
+    }
+
+    /**
      * Get a paginated list of files from one user
      *
      * @param FilesFilter $filter
@@ -424,10 +446,11 @@ class StoreData extends RepositoryLocatableAbstract
         // Get the paginated list
         $from = $filter->getStatus() != 'D' ? 'FILES' : 'FILES_DELETED';
 
-        $sql = "SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME,
-                  HASH, SIZE, CTRL_DATE, FK_ID_BULK, TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE
-                FROM " . $from . " WHERE CLIENT_TYPE = :client_type AND FK_ID_CLIENT = :id_client" . $where .
-               " AND STATUS = :status ORDER BY " . $order;
+        $sql = 'SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME,
+                  HASH, SIZE, PAGES, CTRL_DATE, TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE, MAX(S.FK_ID_BULK) FK_ID_BULK
+                FROM ' . $from . " LEFT JOIN FILES_SIGNATURE S ON MODE = 'S' AND S.FK_ID_FILE = ID_FILE" .
+               ' WHERE CLIENT_TYPE = :client_type AND FK_ID_CLIENT = :id_client' . $where .
+               ' AND STATUS = :status ORDER BY ' . $order;
 
         return $this->db->query($sql, $data, 'Api\Entity\File', $filter->getPage(), $filter->getNumRows());
     }
@@ -536,24 +559,24 @@ class StoreData extends RepositoryLocatableAbstract
     /**
      * Get the signers list of a signable element
      *
-     * @param SignableInterface $element
+     * @param BulkTransaction $bulk
      *
      * @return ResultSet
      * @throws \Exception
      */
-    public function signersList(SignableInterface $element)
+    public function signersList(BulkTransaction $bulk)
     {
         // Check data
-        if (!$element->getElementId() or !$element->getElementType()) {
+        if (!$bulk->getIdBulkTransaction()) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
         // Get signers list
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.NAME, S.DOCUMENT, S.ACCOUNT, U.LANG, S.TOKEN, S.SIGNED, S.CTRL_DATE DATE
+        $sql = 'SELECT S.FK_ID_BULK, S.CREATOR, S.EMAIL, S.NAME, S.DOCUMENT, S.ACCOUNT, U.LANG, S.TOKEN, S.SIGNED, S.CTRL_DATE DATE
                 FROM SIGNERS S LEFT JOIN USERS U ON U.ID_USER = S.FK_ID_USER
-                WHERE S.ELEMENT_TYPE = :type AND S.ELEMENT_ID = :id
+                WHERE S.FK_ID_BULK = :id
                 ORDER BY S.CREATOR DESC, S.EMAIL ASC';
-        $params = [':type' => $element->getElementType(), ':id' => $element->getElementId()];
+        $params = [':id' => $bulk->getIdBulkTransaction()];
 
         return $this->db->query($sql, $params, 'Api\Entity\Signer');
     }
@@ -569,7 +592,7 @@ class StoreData extends RepositoryLocatableAbstract
     public function getSigner($token)
     {
         // Get requested token
-        $sql = "SELECT ELEMENT_TYPE, ELEMENT_ID, CREATOR, EMAIL, PHONE, NAME, DOCUMENT, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED, TOKEN
+        $sql = "SELECT FK_ID_BULK, CREATOR, EMAIL, PHONE, NAME, DOCUMENT, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED, TOKEN
                 FROM SIGNERS WHERE TOKEN = :token AND (SIGNED = 1 OR TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0)";
         $res = $this->db->query($sql, [':token' => trim($token)], 'Api\Entity\Signer');
 
@@ -583,20 +606,20 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
-     * Get a signer through a file id
+     * Get a signer through a bulk transaction id
      *
      * @param int $id
      *
      * @return Signer
      * @throws \Exception
      */
-    public function getSignableFileCreator($id)
+    public function getSignatureCreator($id)
     {
         // Get requested token
-        $sql = "SELECT 'F' ELEMENT_TYPE, F.ID_FILE ELEMENT_ID, 1 CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT,
-                  F.FK_ID_CLIENT FK_ID_USER, S.FK_ID_IDENTITY, S.PHONE, S.VIEWED, IFNULL(S.SIGNED, 1) SIGNED, S.TOKEN
-                FROM FILES F LEFT JOIN SIGNERS S ON S.ELEMENT_TYPE = 'F' AND S.ELEMENT_ID = F.ID_FILE AND S.CREATOR = 1
-                WHERE F.ID_FILE = :id";
+        $sql = "SELECT B.ID_BULK_TRANSACTION FK_ID_BULK, 1 CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT,
+                  B.FK_ID_CLIENT FK_ID_USER, S.FK_ID_IDENTITY, S.PHONE, S.VIEWED, IFNULL(S.SIGNED, 1) SIGNED, S.TOKEN
+                FROM BULK_TRANSACTIONS B LEFT JOIN SIGNERS S ON S.FK_ID_BULK = B.ID_BULK_TRANSACTION AND S.CREATOR = 1
+                WHERE B.ID_BULK_TRANSACTION = :id";
         $res = $this->db->query($sql, [':id' => $id], 'Api\Entity\Signer');
 
         if ($res->getNumRows() == 0) {
@@ -609,18 +632,18 @@ class StoreData extends RepositoryLocatableAbstract
     }
 
     /**
-     * Get a signable element by a signer token
+     * Get a Bulk Transaction by a signer token
      *
      * @param string|int $token
      * @param int        $idUser
      *
-     * @return SignableInterface
+     * @return BulkTransaction
      * @throws \Exception
      */
-    public function getSignableElement($token, $idUser = null)
+    public function getSignature($token, $idUser = null)
     {
         // Get signer
-        $signer = is_numeric($token) ? $this->getSignableFileCreator($token) : $this->getSigner($token);
+        $signer = is_numeric($token) ? $this->getSignatureCreator($token) : $this->getSigner($token);
 
         // If signer has user, idUser must be the same
         if (($signer->getIdUser() or $idUser) and $signer->getIdUser() != $idUser) {
@@ -629,25 +652,21 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Mark as viewed
-        if (!$signer->getViewed() AND $signer->getToken()) {
+        if (!$signer->getViewed() and $signer->getToken()) {
             $sql = 'UPDATE SIGNERS SET VIEWED = 1 WHERE TOKEN = :token AND VIEWED = 0';
+
             // Execute query
             $this->db->action($sql, [':token' => $signer->getToken()]);
         }
 
-        if ($signer->getElementType() == 'F') {
-            $sql = "SELECT F.ID_FILE, F.CLIENT_TYPE, F.FK_ID_CLIENT, F.MODE, F.FK_ID_MEDIA, F.NAME, F.FILE_NAME,
-                      F.FILE_ORIG_NAME, F.HASH, F.SIZE, F.CTRL_DATE, F.TAG, F.DESCRIPTION, F.FK_ID_BULK, F.TRANSACTION,
-                      F.CONFIRMED, F.STATUS, COUNT(S.SIGNED) - SUM(S.SIGNED) - 1 PENDING_SIGNERS
-                    FROM FILES F, SIGNERS S
-                    WHERE F.ID_FILE = :id AND S.ELEMENT_TYPE = 'F' AND S.ELEMENT_ID = F.ID_FILE";
-            $class = 'Api\Entity\File';
-        } else {
-            return null;
-        }
+        $sql = "SELECT B.ID_BULK_TRANSACTION, B.EXTERNAL_ID, B.TYPE, B.ELEMENTS_TYPE, B.CLIENT_TYPE, B.FK_ID_CLIENT,
+                  B.NUM_ITEMS, B.CLOSED, B.STRUCTURE, B.HASH, B.STATUS, B.LINKED_TRANSACTION, B.TRANSACTION, B.ACCOUNT,
+                  B.CONFIRMED, COUNT(S.SIGNED) - SUM(S.SIGNED) - 1 PENDING_SIGNERS
+                FROM BULK_TRANSACTIONS B, SIGNERS S
+                WHERE B.STATUS = 'A' AND S.FK_ID_BULK = B.ID_BULK_TRANSACTION AND B.ID_BULK_TRANSACTION = :id";
 
         // Get element
-        $res = $this->db->query($sql, [':id' => $signer->getIdBulk()], $class);
+        $res = $this->db->query($sql, [':id' => $signer->getIdBulk()], 'Api\Entity\BulkTransaction');
 
         // If element exists, add current token signer
         if ($res->getNumRows() == 0) {
@@ -732,7 +751,7 @@ class StoreData extends RepositoryLocatableAbstract
         $this->geolocalize($code);
 
         // Get signature associated to code
-        $sql = 'SELECT S.ELEMENT_TYPE, S.ELEMENT_ID, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT, S.FK_ID_USER, S.FK_ID_IDENTITY, S.ACCOUNT
+        $sql = 'SELECT S.FK_ID_BULK, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT, S.FK_ID_USER, S.FK_ID_IDENTITY, S.ACCOUNT
                 FROM SIGNERS S, SIGN_CODES C
                 WHERE C.TOKEN = :token AND C.CODE = :code AND C.CODE_EXPIRATION > SYSDATE() AND
                   S.TOKEN = C.TOKEN AND S.TOKEN_EXPIRATION > SYSDATE() AND S.SIGNED = 0';
@@ -790,7 +809,7 @@ class StoreData extends RepositoryLocatableAbstract
         $signer->clean();
 
         // Check data
-        if (!$signer->getElementType() or !$signer->getIdBulk() or !$signer->getEmail() or !$signer->getIp() or
+        if (!$signer->getIdBulk() or !$signer->getEmail() or !$signer->getIp() or
             !($signer->getDate() instanceof \DateTime)
         ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
@@ -802,16 +821,15 @@ class StoreData extends RepositoryLocatableAbstract
         // Set as signed
         $sql = 'UPDATE SIGNERS SET SIGNED = 1, CTRL_DATE = :date, CTRL_IP = :ip, ID_GEONAMES = :id_geonames,
                   LATITUDE = :latitude, LONGITUDE = :longitude
-                WHERE ELEMENT_TYPE = :element_type AND ELEMENT_ID = :element_id AND EMAIL = :email';
+                WHERE FK_ID_BULK = :id_bulk AND EMAIL = :email';
         $params = [
-            ':element_type' => $signer->getElementType(),
-            ':element_id'   => $signer->getIdBulk(),
-            ':email'        => $signer->getEmail(),
-            ':date'         => $signer->getFormattedDate(),
-            ':ip'           => $signer->getIp(),
-            ':id_geonames'  => $signer->getIdGeonames() ? $signer->getIdGeonames() : null,
-            ':latitude'     => $signer->getLatitude() ? $signer->getLatitude() : null,
-            ':longitude'    => $signer->getLongitude() ? $signer->getLongitude() : null
+            ':id_bulk'     => $signer->getIdBulk(),
+            ':email'       => $signer->getEmail(),
+            ':date'        => $signer->getFormattedDate(),
+            ':ip'          => $signer->getIp(),
+            ':id_geonames' => $signer->getIdGeonames() ? $signer->getIdGeonames() : null,
+            ':latitude'    => $signer->getLatitude() ? $signer->getLatitude() : null,
+            ':longitude'   => $signer->getLongitude() ? $signer->getLongitude() : null
         ];
 
         // Execute query
@@ -839,10 +857,10 @@ class StoreData extends RepositoryLocatableAbstract
         // Get element
         if ($bulk->getType() == 'Sign Document') {
             $sql = "SELECT F.ID_FILE, F.CLIENT_TYPE, F.FK_ID_CLIENT, F.MODE, F.FK_ID_MEDIA, F.NAME, F.FILE_NAME,
-                  F.FILE_ORIG_NAME, F.HASH, F.SIZE, F.CTRL_DATE, F.TAG, F.DESCRIPTION, F.FK_ID_BULK, F.TRANSACTION,
-                  F.CONFIRMED, F.STATUS
-                FROM FILES F, FILES_SIGNATURE S
-                WHERE S.FK_ID_BULK = :id AND F.ID_FILE = S.FK_ID_FILE";
+                      F.FILE_ORIG_NAME, F.HASH, F.SIZE, F.PAGES, F.CTRL_DATE, F.TAG, F.DESCRIPTION, S.FK_ID_BULK,
+                      F.TRANSACTION, F.CONFIRMED, F.STATUS
+                    FROM FILES F, FILES_SIGNATURE S
+                    WHERE S.FK_ID_BULK = :id AND F.ID_FILE = S.FK_ID_FILE";
             $class = 'Api\Entity\File';
         } else {
             return null;

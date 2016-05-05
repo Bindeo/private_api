@@ -618,7 +618,7 @@ class BulkTransactions extends RepositoryLocatableAbstract
                 FROM BULK_TRANSACTIONS B WHERE STATUS = 'A' AND EXTERNAL_ID = :id AND
                   (CLIENT_TYPE = :type AND FK_ID_CLIENT = :id_client OR
                    EXISTS(SELECT 1 FROM SIGNERS S, FILES_SIGNATURE F
-                   WHERE F.FK_ID_BULK = B.ID_BULK_TRANSACTION AND S.ELEMENT_TYPE = 'F' AND S.ELEMENT_ID = F.FK_ID_FILE AND
+                   WHERE F.FK_ID_BULK = B.ID_BULK_TRANSACTION AND S.FK_ID_BULK = F.FK_ID_BULK AND
                     :type = 'U' AND S.FK_ID_USER = :id_client))";
 
         $params = [

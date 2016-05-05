@@ -38,7 +38,7 @@ class StoreData
     {
         // Get the file
         $res = $this->modelData->getFile(new File($request->getParams()));
-        $res = ['data' => ['type' => 'files', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'files', 'attributes' => $res ? $res->toArray() : []]];
 
         return $response->withJson($res, 200);
     }
@@ -56,7 +56,7 @@ class StoreData
     {
         // Save file
         $res = $this->modelData->saveFile(new File($request->getParams()), $request->getParam('lang'));
-        $res = ['data' => ['type' => 'files', 'attributes' => $res]];
+        $res = ['data' => ['type' => 'files', 'attributes' => $res ? $res->toArray() : []]];
 
         return $response->withJson($res, 201);
     }

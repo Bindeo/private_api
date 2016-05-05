@@ -81,16 +81,18 @@ class SignDocument
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
-        // Extract the file id
-        $id = explode('_', $bulk->getExternalId())[2];
+        // Get associated file
+        $elements = $this->dataRepo->getSignedElements($bulk);
 
-        // Find the file
-        if (!($file = $this->dataRepo->findFile((new File())->setIdFile($id)))) {
+        if (!$elements) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
+        /** @var File $file */
+        $file = $elements[0];
+
         // Get signers list
-        $signers = $this->dataRepo->signersList($file);
+        $signers = $this->dataRepo->signersList($bulk);
 
         if ($signers->getNumRows() == 0) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
@@ -101,12 +103,12 @@ class SignDocument
 
         // Prepare urls
         $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-               $this->frontUrls['review_contract'];
+               $this->frontUrls['generate_certificate'] . '?t=' .$bulk->getExternalId();
         $urlLogin = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
                     $this->frontUrls['login'];
 
         // Document creator
-        $creator = $this->dataModel->getSignatureCreator($file);
+        $creator = $this->dataModel->getSignatureCreator($bulk);
 
         // Instantiate creator language
         $translate = TranslateFactory::factory($creator->getLang());
@@ -116,7 +118,7 @@ class SignDocument
             'translate'    => $translate,
             'element_name' => $file->getElementName(),
             'user'         => $creator,
-            'url'          => $url . '/' . $file->getIdFile()
+            'url'          => $url
         ]);
 
         // Send and email
@@ -143,14 +145,14 @@ class SignDocument
                     'element_name' => $file->getElementName(),
                     'creator'      => $creator,
                     'user'         => $signer,
-                    'url'          => $url . '/' . $signer->getToken(),
+                    'url'          => $url,
                     'urlLogin'     => $urlLogin
                 ]);
 
                 // Send and email
                 try {
                     $res = $this->email->sendEmail($signer->getEmail(),
-                        $translate->translate('sign_signed_subject', $signer->getName()),
+                        $translate->translate('sign_completed_subject_copy', $creator->getName()),
                         $response->getBody()->__toString());
 
                     if (!$res or $res->http_response_code != 200) {

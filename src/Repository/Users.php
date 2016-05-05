@@ -540,20 +540,24 @@ class Users extends RepositoryLocatableAbstract
 
         // If the user is not confirmed we can update the identity and user profile
         if (!$user->getConfirmed()) {
-            $sql = "UPDATE USERS_IDENTITIES SET NAME = :name, VALUE = :value, DOCUMENT = :document, ACCOUNT = :account, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+            $sql = "UPDATE USERS_IDENTITIES SET NAME = :name, VALUE = :value, DOCUMENT = :document, ACCOUNT = :account,
+                      CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(), CONFIRMED = :confirmed
                     WHERE ID_IDENTITY = :id;
-                    UPDATE USERS SET NAME = :name, EMAIL = :value, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                    UPDATE USERS SET NAME = :name, EMAIL = :value, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(), CONFIRMED = :confirmed
                     WHERE ID_USER = :id_user;
-                    UPDATE USERS_VALIDATIONS SET EMAIL = :value WHERE FK_ID_USER = :id_user AND TYPE = 'V';";
+                    UPDATE USERS_VALIDATIONS SET EMAIL = :value, CONFIRMED = :confirmed
+                    WHERE FK_ID_USER = :id_user AND TYPE = 'V';";
 
             $params = [
-                ':id'       => $identity->getIdIdentity(),
-                ':name'     => $identity->getName(),
-                ':value'    => $identity->getValue(),
-                ':document' => $identity->getDocument(),
-                ':account'  => hash('sha256', $identity->getName() . $identity->getValue()),
-                ':ip'       => $identity->getIp(),
-                ':id_user'  => $user->getIdUser()
+                ':id'        => $identity->getIdIdentity(),
+                ':name'      => $identity->getName(),
+                ':value'     => $identity->getValue(),
+                ':document'  => $identity->getDocument(),
+                ':account'   => hash('sha256', $identity->getName() . $identity->getValue()),
+                ':ip'        => $identity->getIp(),
+                ':id_user'   => $user->getIdUser(),
+                // If user has updated his identity through email validation like signature, we can mark him as validated
+                ':confirmed' => $identity->getConfirmed() ? 1 : 0
             ];
 
             // Execute query
@@ -576,12 +580,13 @@ class Users extends RepositoryLocatableAbstract
                 // If the email didn't change we can create a new confirmed identity and deprecate the old one if it had document
                 if (!$oldDocument and !$nameChanged) {
                     // If only changed document but user didn't have document before, we can direct update it
-                    $sql = "UPDATE USERS_IDENTITIES SET DOCUMENT = :document, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()
+                    $sql = "UPDATE USERS_IDENTITIES SET DOCUMENT = :document, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(), CONFIRMED = :confirmed
                             WHERE ID_IDENTITY = :id";
                     $params = [
                         ':id'       => $identity->getIdIdentity(),
                         ':document' => $identity->getDocument(),
-                        ':ip'       => $identity->getIp()
+                        ':ip'       => $identity->getIp(),
+                        ':confirmed' => $identity->getConfirmed() ? 1 : 0
                     ];
                 } else {
                     $sql = "UPDATE USERS_IDENTITIES SET MAIN = 0, STATUS = 'D', CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE()

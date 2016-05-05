@@ -7,6 +7,7 @@ use Api\Entity\BulkEvent;
 use Api\Entity\BulkTransaction;
 use Api\Entity\DocsSignature;
 use Api\Entity\OAuthClient;
+use Api\Entity\ResultSet;
 use Api\Entity\SignatureGenerator;
 use Api\Entity\SignCode;
 use Api\Entity\Signer;
@@ -102,7 +103,7 @@ class StoreData
      *
      * @param File $file
      *
-     * @return array
+     * @return File
      */
     public function getFile(File $file)
     {
@@ -112,11 +113,8 @@ class StoreData
         if ($file) {
             // Get the public path
             $file->setPath($this->storage->get($file));
-
-            // Convert the object into an array
-            $file = $file->toArray();
         } else {
-            $file = [];
+            $file = null;
         }
 
         return $file;
@@ -128,6 +126,7 @@ class StoreData
      * @param File   $file
      * @param string $lang
      *
+     * @return File
      * @throws \Exception
      */
     private function fileToSign(File $file, $lang)
@@ -138,7 +137,7 @@ class StoreData
         if ($file->getMode() == 'S') {
             // Launch doc conversion script if it did not exist
             if ($file->getExistent()) {
-                $file = $this->dataRepo->findFile($file)->setIp($file->getIp());
+                $file = $this->dataRepo->findFile($file)->setUser($file->getUser())->setIp($file->getIp());
             } else {
                 ScriptsLauncher::getInstance()->execBackground('convert-documents.sh ' . $this->storage->get($file));
             }
@@ -159,7 +158,7 @@ class StoreData
             // Size in bytes
             $params['size'] = $file->getSize();
             // Number of pages
-            $params['pages'] = 0;
+            $params['pages'] = $file->getPages() ? $file->getPages() : 0;
 
             // Open bulk transaction
             $bulk = $this->bulkModel->openBulk($params);
@@ -246,7 +245,12 @@ class StoreData
                     }
                 }
             }
+
+            // Return id bulk transaction
+            $file->setIdBulk($bulk->getIdBulkTransaction());
         }
+
+        return $file;
     }
 
     /**
@@ -255,7 +259,7 @@ class StoreData
      * @param File   $file
      * @param string $lang [optional]
      *
-     * @return array
+     * @return File
      * @throws \Exception
      */
     public function saveFile(File $file, $lang = null)
@@ -321,10 +325,12 @@ class StoreData
 
         // File has been created in mode to be signed
         if ($file->getMode() == 'S') {
-            $this->fileToSign($file, $lang);
+            $file = $this->fileToSign($file, $lang);
+        } else {
+            $file = $this->getFile($file);
         }
 
-        return $this->getFile($file);
+        return $file;
     }
 
     /**
@@ -350,13 +356,20 @@ class StoreData
      *
      * @param FilesFilter $filter
      *
-     * @return \Api\Entity\ResultSet
+     * @return ResultSet
      * @throws \Exception
      */
     public function fileList(FilesFilter $filter)
     {
         // Get the list
-        return $this->dataRepo->fileList($filter);
+        $resultset = $this->dataRepo->fileList($filter);
+
+        // Clean no files
+        if (!$resultset->getRows()[0]->getIdFile()) {
+            $resultset = new ResultSet(0, 0, []);
+        }
+
+        return $resultset;
     }
 
     /**
@@ -771,17 +784,17 @@ class StoreData
     /**
      * Get the signature creator
      *
-     * @param SignableInterface $element
+     * @param BulkTransaction $bulk
      *
      * @return UserInterface
      * @throws \Exception
      */
-    public function getSignatureCreator(SignableInterface $element)
+    public function getSignatureCreator(BulkTransaction $bulk)
     {
-        if ($element->getClientType() == 'U') {
-            $user = $this->usersRepo->find((new User())->setIdUser($element->getIdClient()));
+        if ($bulk->getClientType() == 'U') {
+            $user = $this->usersRepo->find((new User())->setIdUser($bulk->getIdClient()));
         } else {
-            $user = $this->oauthRepo->oauthClient((new OAuthClient())->setIdClient($element->getIdClient()));
+            $user = $this->oauthRepo->oauthClient((new OAuthClient())->setIdClient($bulk->getIdClient()));
         }
 
         return $user;
@@ -802,29 +815,40 @@ class StoreData
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // Get the signable element
-        $element = $this->dataRepo->getSignableElement($token, $idUser);
+        // Get the bulk transaction
+        $bulk = $this->dataRepo->getSignature($token, $idUser);
 
-        if (!$element) {
+        if (!$bulk) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
+        // Get signable elements
+        $elements = $this->dataRepo->getSignedElements($bulk);
+
+        // Get first element of the list
+        if (!$elements) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        /** @var SignableInterface $element */
+        $element = $elements[0];
+
         // Save current signer in JSON field
-        $element->setSignerJson($element->getSigners()[0]->toArray());
+        $element->setSignerJson($bulk->getSigners()[0]->toArray());
 
         // If signer is the first time that he viewed document, we need to send a email to the creator
-        if ($element->getSigners()[0]->isSigner() and
-            $element->getSigners()[0]->getViewed() == 0 and !$element->getSigners()[0]->getCreator()
+        if ($bulk->getSigners()[0]->isSigner() and
+            $bulk->getSigners()[0]->getViewed() == 0 and !$bulk->getSigners()[0]->getCreator()
         ) {
             // Get the signature creator
-            $creator = $this->getSignatureCreator($element);
+            $creator = $this->getSignatureCreator($bulk);
 
             if ($creator and $creator->getEmail()) {
                 // Send email to the creator
                 $translate = TranslateFactory::factory($creator->getLang());
 
                 $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                       $this->frontUrls['review_contract'] . '/' . $element->getElementId();
+                       $this->frontUrls['review_contract'] . '/' . $bulk->getIdBulkTransaction();
 
                 // Send an email to the creator
                 $response = $this->view->render(new Response(), 'email/sign_viewed.html.twig', [
@@ -832,14 +856,14 @@ class StoreData
                     'element_name' => $element->getElementName(),
                     'datetime'     => (new \DateTime())->format('Y-m-d H:i:s T'),
                     'user'         => $creator,
-                    'viewer'       => $element->getSigners()[0],
+                    'viewer'       => $bulk->getSigners()[0],
                     'url'          => $url
                 ]);
 
                 // Send and email
                 try {
                     $res = $this->email->sendEmail($creator->getEmail(),
-                        $translate->translate('sign_viewed_subject', $element->getSigners()[0]->getName()),
+                        $translate->translate('sign_viewed_subject', $bulk->getSigners()[0]->getName()),
                         $response->getBody()->__toString());
 
                     if (!$res or $res->http_response_code != 200) {
@@ -877,12 +901,23 @@ class StoreData
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        // Get the signable element
-        $element = $this->dataRepo->getSignableElement($code->getToken(), $code->getIdUser());
+        // Get the bulk transaction
+        $bulk = $this->dataRepo->getSignature($code->getToken(), $code->getIdUser());
 
-        if (!$element) {
+        if (!$bulk) {
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
+
+        // Get the signable element
+        $elements = $this->dataRepo->getSignedElements($bulk);
+
+        if (!$elements) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        // Get first element
+        /** @var SignableInterface $element */
+        $element = $elements[0];
 
         // Get the sign code
         $code = $this->dataRepo->getFreshSignCode($code);
@@ -893,20 +928,20 @@ class StoreData
         $response = $this->view->render(new Response(), 'email/sign_code.html.twig', [
             'translate'    => $translate,
             'element_name' => $element->getElementName(),
-            'user'         => $element->getSigners()[0],
+            'user'         => $bulk->getSigners()[0],
             'code'         => $code->getCode()
         ]);
 
         // Send and email
         try {
-            $res = $this->email->sendEmail($element->getSigners()[0]->getEmail(),
+            $res = $this->email->sendEmail($bulk->getSigners()[0]->getEmail(),
                 $translate->translate('sign_code_subject'), $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $element->getSigners()[0]->toArray());
+                $this->logger->addError('Error sending and email', $bulk->getSigners()[0]->toArray());
             }
         } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $element->getSigners()[0]->toArray());
+            $this->logger->addError('Error sending and email', $bulk->getSigners()[0]->toArray());
         }
     }
 
@@ -930,17 +965,42 @@ class StoreData
         // Validate received code
         $signer = $this->dataRepo->validateSignCode($code);
 
+        // Get the bulk transaction
+        $bulk = $this->dataRepo->getSignature($code->getToken(), $code->getIdUser());
+
         // Get the signable element
-        $element = $this->dataRepo->getSignableElement($code->getToken(), $code->getIdUser());
+        $elements = $this->dataRepo->getSignedElements($bulk);
+
+        if (!$elements) {
+            throw new \Exception(Exceptions::NON_EXISTENT, 409);
+        }
+
+        // Get first element
+        /** @var SignableInterface $element */
+        $element = $elements[0];
+
+        // If element is File and it does not have page count yet, we need to count pages now
+        if ($element->getElementType() == 'F' and !$element->getPages()) {
+            /** @var File $element */
+            // Count pages
+            $element->setPages(count($this->storage->pagesPreview($element)));
+
+            // We need to update file and bulk structure
+            $this->dataRepo->updateFile($element);
+            $structure = $bulk->getStructure(true);
+            $structure['document']['pages'] = $element->getPages();
+            $bulk->setStructure(json_encode($structure));
+        }
 
         // Get creator
-        $creator = $this->getSignatureCreator($element);
+        $creator = $this->getSignatureCreator($bulk);
 
         // If signer has changed his name or document, we need to update them
         if ($signer->getName() != $code->getName() or $signer->getDocument() != $code->getDocument()) {
             // If signer is a registered user, we need to update his identity
             if ($signer->getIdIdentity()) {
                 $this->usersRepo->saveIdentity((new UserIdentity())->setIdIdentity($signer->getIdIdentity())
+                                                                   ->setConfirmed(1)
                                                                    ->setValue($signer->getEmail())
                                                                    ->setName($code->getName())
                                                                    ->setDocument($code->getDocument())
@@ -974,7 +1034,7 @@ class StoreData
         }
 
         // Add the event to the bulk transaction
-        $event = (new BulkEvent())->setIdBulk($element->getIdBulk())
+        $event = (new BulkEvent())->setIdBulk($signer->getIdBulk())
                                   ->setIp($code->getIp())
                                   ->setName('sign_' . $signer->getAccount())
                                   ->setTimestamp(new \DateTime())
@@ -985,52 +1045,34 @@ class StoreData
             $event->setClientType('U')->setIdClient($signer->getIdUser());
         }
 
-        // Obtain bulk transaction
-        $bulk = $this->bulkModel->getBulk((new BulkTransaction())->setIdBulkTransaction($event->getIdBulk()));
-
-        // Set linked transaction if bulk doesn't have it
-        if (!$bulk->getLinkedTransaction()) {
-            $structure = $bulk->setLinkedTransaction($element->getTransaction())->getStructure(true);
-
-            // Modify structure for Sign Document type of bulk transaction
-            $structure['document']['transaction'] = $element->getTransaction();
-
-            // If we have no count pages yet, we count them
-            if ($structure['document']['pages'] == 0) {
-                $structure['document']['pages'] = count($this->storage->pagesPreview($element));
-            }
-
-            $bulk->setStructure(json_encode($structure));
-        }
-
         // Add the event
         $bulk = $this->bulkModel->addEvent($event->setBulkObj($bulk));
 
         // Update signature
         $this->dataRepo->signSigner($signer->setDate($event->getDate())->setIp($code->getIp()));
 
-        if ($element->getSigners()[0]->getEmail() != $creator->getEmail()) {
+        if ($bulk->getSigners()[0]->getEmail() != $creator->getEmail()) {
             // Send email to creator
             $translate = TranslateFactory::factory($code->getLang());
 
             $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                   $this->frontUrls['review_contract'] . '/' . $element->getElementId();
+                   $this->frontUrls['review_contract'] . '/' . $bulk->getIdBulkTransaction();
 
             // Send an email to the creator
             $response = $this->view->render(new Response(), 'email/sign_signed.html.twig', [
                 'translate'    => $translate,
                 'element_name' => $element->getElementName(),
                 'datetime'     => $event->getDate()->format('Y-m-d H:i:s T'),
-                'signer'       => $element->getSigners()[0],
+                'signer'       => $bulk->getSigners()[0],
                 'user'         => $creator,
-                'pending'      => $element->getPendingSigners(),
+                'pending'      => $bulk->getPendingSigners(),
                 'url'          => $url
             ]);
 
             // Send and email
             try {
                 $res = $this->email->sendEmail($creator->getEmail(),
-                    $translate->translate('sign_signed_subject', $element->getSigners()[0]->getName()),
+                    $translate->translate('sign_signed_subject', $bulk->getSigners()[0]->getName()),
                     $response->getBody()->__toString());
 
                 if (!$res or $res->http_response_code != 200) {
@@ -1042,7 +1084,7 @@ class StoreData
         }
 
         // If everyone has signed the document, we close the bulk transaction
-        if ($element->getPendingSigners() == 0) {
+        if ($bulk->getPendingSigners() == 0) {
             $this->bulkModel->closeBulk($bulk->setIp($code->getIp()));
         }
 
@@ -1060,8 +1102,7 @@ class StoreData
     public function getSigner($token)
     {
         // If token is numeric, it means a file id and we need to get the file creator
-        return is_numeric($token) ? $this->dataRepo->getSignableFileCreator($token)
-            : $this->dataRepo->getSigner($token);
+        return is_numeric($token) ? $this->dataRepo->getSignatureCreator($token) : $this->dataRepo->getSigner($token);
     }
 
     /**
@@ -1101,8 +1142,7 @@ class StoreData
         $bulk->setAccount($net->getAccountAddress($bulk->getAccount()));
 
         // Get owner
-        $owner = $this->getSignatureCreator((new File())->setClientType($bulk->getClientType())
-                                                        ->setIdClient($bulk->getIdClient()));
+        $owner = $this->getSignatureCreator($bulk);
 
         if (!$owner) {
             throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
@@ -1123,20 +1163,11 @@ class StoreData
             throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
         }
 
-        if ($bulk->getElementsType() == 'E' and $bulk->getType() == 'Sign Document') {
-            $oldFiles = $files;
-            $files = [];
-            /** @var File $file */
-            foreach ($oldFiles as $file) {
-                $files[] = $file->setPages(count($this->storage->pagesPreview($file)));
-            }
-        }
-
         // Set files
         $signature->setFiles($files);
 
         // Get signers
-        $signers = $this->dataRepo->signersList($files[0]);
+        $signers = $this->dataRepo->signersList($bulk);
 
         if ($signers->getNumRows() == 0) {
             throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
