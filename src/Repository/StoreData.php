@@ -230,12 +230,13 @@ class StoreData extends RepositoryLocatableAbstract
 
         // Look for another file with the same hash and same user
         $sql = "SELECT IFNULL(A.ID_FILE, 0) FORBIDDEN, B.NUM WARNING FROM
-                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND CLIENT_TYPE = :client_type AND FK_ID_CLIENT != :id_client) B
-                LEFT JOIN FILES A ON  A.STATUS = 'A' AND A.HASH = :hash AND A.CLIENT_TYPE = :client_type AND A.FK_ID_CLIENT = :id_client";
+                (SELECT COUNT(*) NUM FROM FILES WHERE STATUS = 'A' AND HASH = :hash AND CLIENT_TYPE = :client_type AND FK_ID_CLIENT != :id_client AND MODE = :mode) B
+                LEFT JOIN FILES A ON  A.STATUS = 'A' AND A.HASH = :hash AND A.CLIENT_TYPE = :client_type AND A.FK_ID_CLIENT = :id_client AND MODE = :mode";
         $res = $this->db->query($sql, [
             ':client_type' => $file->getClientType(),
             ':id_client'   => $file->getIdClient(),
-            ':hash'        => $file->getHash()
+            ':hash'        => $file->getHash(),
+            ':mode'        => $file->getMode()
         ]);
 
         if ($res->getRows()[0]['FORBIDDEN'] > 0) {
