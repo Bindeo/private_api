@@ -897,7 +897,7 @@ class Users extends RepositoryLocatableAbstract
         if ($userAux->getRenew()) {
             $userAux = $this->renewAccount($userAux);
         }
-        $userAux->setPassword(null)->setRenew(null);
+        $userAux->setRenew(null);
 
         // Geolocalize the user
         $this->geolocalize($userAux);
