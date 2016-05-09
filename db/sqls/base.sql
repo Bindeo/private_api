@@ -33,6 +33,7 @@ DROP TABLE OAUTH_CLIENTS;
 # Tables
 
 source ../tables/TRANSLATIONS.sql;
+source ../tables/COUNTRIES.sql;
 source ../tables/OAUTH_CLIENTS.sql;
 source ../tables/OAUTH_TOKENS.sql;
 source ../tables/MEDIA_TYPES.sql;
@@ -69,6 +70,9 @@ source ../sqls/translations.sql;
 source ../sqls/account_types.sql;
 source ../sqls/media_types.sql;
 source ../sqls/media_extensions.sql;
+
+# Countries
+source ../sqls/countries.sql;
 
 # OAuth Clients
 source ../sqls/oauth_clients.sql;

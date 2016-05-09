@@ -17,7 +17,8 @@
         "slim/twig-view": "*",
         "monolog/monolog": "^1.0",
         "maxmind-db/reader": "^1.0",
-        "mailgun/mailgun-php": "^1.8"
+        "mailgun/mailgun-php": "^1.8",
+        "messagebird/php-rest-api": "^1.4"
     },
     "scripts": {
         "post-update-cmd": [

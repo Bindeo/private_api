@@ -696,15 +696,27 @@ class StoreData extends RepositoryLocatableAbstract
 
         // Get requested token
         $sql = 'SELECT COUNT(*) NUM FROM SIGNERS WHERE TOKEN = :token AND TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0';
-        $res = $this->db->query($sql, [':token' => $code->getToken()]);
+        $params = [':token' => $code->getToken()];
+        $res = $this->db->query($sql, $params);
 
         if ($res->getRows()[0]['NUM'] != 1) {
             // Token doesn't exists or it is expired
             throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
         }
 
+        // Check if we sent the same kind of code in less than 1 minute
+        $sql = 'SELECT CODE FROM SIGN_CODES WHERE TOKEN = :token AND METHOD = :method AND
+                  CODE_EXPIRATION > SYSDATE() AND CTRL_DATE > SYSDATE() - INTERVAL 1 MINUTE';
+        $params[':method'] = $code->getMethod();
+        $res = $this->db->query($sql, $params);
+
+        // If code exists, return it
+        if ($res->getNumRows()) {
+            return $code->setCode($res->getRows()[0]['CODE']);
+        }
+
         // Fill rest of data
-        $code->setMethod('E')->generateCode();
+        $code->generateCode();
         $this->geolocalize($code);
 
         // Generate new code and expire old one if exists

@@ -32,6 +32,11 @@ $settings['settings']['email']['mailgun'] = [
     'from'   => 'mail@bindeo.com'
 ];
 
+// MessageBird text messages sender
+$settings['settings']['phone']['messagebird'] = [
+    'key'    => 'test_T7cyZseVx71msE2gMcHbk00gs'
+];
+
 // Maxmind db route
 $settings['settings']['maxmind'] = '/usr/local/share/geoIP/GeoLite2-City.mmdb';
 

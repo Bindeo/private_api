@@ -86,6 +86,13 @@ $container['Api\Model\Email\Email'] = function ($c) {
     return \Api\Model\Email\EmailManager::factory($conf['current'], $conf[$conf['current']]);
 };
 
+// Text messages
+$container['Api\Model\Phone\Phone'] = function ($c) {
+    $conf = $c->get('settings')['phone'];
+
+    return \Api\Model\Phone\PhoneManager::factory($conf['current'], $conf[$conf['current']]);
+};
+
 // Repositories
 $container['Api\Repository\OAuth'] = function ($c) {
     return new Api\Repository\OAuth($c->get('Api\Model\General\Database'));
@@ -126,8 +133,8 @@ $container['Api\Model\StoreData'] = function ($c) {
 
     return new Api\Model\StoreData($c->get('Api\Repository\StoreData'), $c->get('Api\Repository\Users'),
         $c->get('Api\Repository\OAuth'), $c->get('Api\Model\BulkTransactions'),
-        $c->get('Api\Model\General\FilesStorage'), $c->get('logger'), $c->get('Api\Model\Email\Email'), $c->get('view'),
-        $c->get('settings')['front_urls']);
+        $c->get('Api\Model\General\FilesStorage'), $c->get('logger'), $c->get('Api\Model\Email\Email'),
+        $c->get('Api\Model\Phone\Phone'), $c->get('view'), $c->get('settings')['front_urls']);
 };
 
 $container['Api\Model\Callback\CallbackCaller'] = function ($c) {

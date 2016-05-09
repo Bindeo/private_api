@@ -17,6 +17,7 @@ use Api\Entity\UserIdentity;
 use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
 use Api\Model\General\ScriptsLauncher;
+use Api\Model\Phone\PhoneInterface;
 use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
@@ -70,6 +71,11 @@ class StoreData
     private $email;
 
     /**
+     * @var PhoneInterface
+     */
+    private $phone;
+
+    /**
      * @var Twig
      */
     private $view;
@@ -84,6 +90,7 @@ class StoreData
         FilesInterface $storage,
         LoggerInterface $logger,
         EmailInterface $email,
+        PhoneInterface $phone,
         Twig $view,
         array $frontUrls
     ) {
@@ -94,6 +101,7 @@ class StoreData
         $this->storage = $storage;
         $this->logger = $logger;
         $this->email = $email;
+        $this->phone = $phone;
         $this->view = $view;
         $this->frontUrls = $frontUrls;
     }
@@ -915,12 +923,15 @@ class StoreData
             throw new \Exception(Exceptions::NON_EXISTENT, 409);
         }
 
+        // Current signer
+        $signer = $bulk->getSigners()[0];
+
         // Get first element
         /** @var SignableInterface $element */
         $element = $elements[0];
 
         // Get the sign code
-        $code = $this->dataRepo->getFreshSignCode($code);
+        $code = $this->dataRepo->getFreshSignCode($code->setMethod($signer->getPhone() ? 'P' : 'E'));
 
         // Send an email with the code
         $translate = TranslateFactory::factory($code->getLang());
@@ -928,20 +939,26 @@ class StoreData
         $response = $this->view->render(new Response(), 'email/sign_code.html.twig', [
             'translate'    => $translate,
             'element_name' => $element->getElementName(),
-            'user'         => $bulk->getSigners()[0],
+            'user'         => $signer,
             'code'         => $code->getCode()
         ]);
 
-        // Send and email
-        try {
-            $res = $this->email->sendEmail($bulk->getSigners()[0]->getEmail(),
-                $translate->translate('sign_code_subject'), $response->getBody()->__toString());
+        // Send an email or a text message by mobile phone
+        if ($code->getMethod() == 'E' or !$signer->getPhone()) {
+            // Send an email
+            try {
+                $res = $this->email->sendEmail($signer->getEmail(), $translate->translate('sign_code_subject'),
+                    $response->getBody()->__toString());
 
-            if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $bulk->getSigners()[0]->toArray());
+                if (!$res or $res->http_response_code != 200) {
+                    $this->logger->addError('Error sending and email', $signer->toArray());
+                }
+            } catch (\Exception $e) {
+                $this->logger->addError('Error sending and email', $signer->toArray());
             }
-        } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $bulk->getSigners()[0]->toArray());
+        } else {
+            // Send a text message
+            $this->phone->sendMessage($signer->getPhone(), 'Bindeo PIN code: ' . $code->getCode());
         }
     }
 

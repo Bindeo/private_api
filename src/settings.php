@@ -62,6 +62,14 @@ return [
             ]
         ],
 
+        // Phone configurations
+        'phone'               => [
+            'current'     => 'messagebird',
+            'messagebird' => [
+                'key' => 'live_IjEu6di2DiZhVV1XbGq2pVS0a'
+            ]
+        ],
+
         // Maxmind - http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz
         'maxmind'             => '/usr/local/share/geoIP/GeoLite2-City.mmdb',
 
