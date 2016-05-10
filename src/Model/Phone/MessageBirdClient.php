@@ -26,12 +26,6 @@ class MessageBirdClient implements PhoneInterface
      */
     public function sendMessage($to, $content)
     {
-        $to = '+447761997798';
-
-        $messages = $this->client->lookup->read($to);
-
-        return true;
-
         // Send the message
         $message = new Message();
         $message->originator = 'Bindeo';

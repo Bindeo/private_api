@@ -944,7 +944,7 @@ class StoreData
         ]);
 
         // Send an email or a text message by mobile phone
-        if ($code->getMethod() == 'E' or !$signer->getPhone()) {
+        if ($code->getMethod() == 'E' or !$signer->getPhone() or ENV == 'development') {
             // Send an email
             try {
                 $res = $this->email->sendEmail($signer->getEmail(), $translate->translate('sign_code_subject'),
