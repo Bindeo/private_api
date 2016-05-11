@@ -97,10 +97,12 @@ class Accounts
                 $translate->translate('registry_subject', $user->getName()), $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $user->toArray());
+                $this->logger->addError('Error sending an email',
+                    ['user' => $user->toArray(), 'response' => $res ? $res->http_response_code : null]);
             }
         } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $user->toArray());
+            $this->logger->addError('Error sending an email',
+                ['user' => $user->toArray(), 'exception' => $e->getMessage()]);
         }
 
         return $user->setIdUser($data['idUser'])->toArray();
@@ -163,10 +165,12 @@ class Accounts
                 $translate->translate('password_subject', $user->getName()), $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $user->toArray());
+                $this->logger->addError('Error sending an email',
+                    ['user' => $user->toArray(), 'response' => $res ? $res->http_response_code : null]);
             }
         } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $user->toArray());
+            $this->logger->addError('Error sending an email',
+                ['user' => $user->toArray(), 'exception' => $e->getMessage()]);
         }
     }
 
@@ -212,10 +216,12 @@ class Accounts
                 $translate->translate('verification_subject', $user->getName()), $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
-                $this->logger->addError('Error sending and email', $user->toArray());
+                $this->logger->addError('Error sending an email',
+                    ['user' => $user->toArray(), 'response' => $res ? $res->http_response_code : null]);
             }
         } catch (\Exception $e) {
-            $this->logger->addError('Error sending and email', $user->toArray());
+            $this->logger->addError('Error sending an email',
+                ['user' => $user->toArray(), 'exception' => $e->getMessage()]);
         }
     }
 
@@ -293,10 +299,12 @@ class Accounts
                     $response->getBody()->__toString());
 
                 if (!$res or $res->http_response_code != 200) {
-                    $this->logger->addError('Error sending and email', $user->toArray());
+                    $this->logger->addError('Error sending an email',
+                        ['user' => $user->toArray(), 'response' => $res ? $res->http_response_code : null]);
                 }
             } catch (\Exception $e) {
-                $this->logger->addError('Error sending and email', $user->toArray());
+                $this->logger->addError('Error sending an email',
+                    ['user' => $user->toArray(), 'exception' => $e->getMessage()]);
             }
         }
 

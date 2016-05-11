@@ -246,10 +246,12 @@ class StoreData
                             $file->getUser()->getEmail() ? $file->getUser()->getEmail() : null);
 
                         if (!$res or $res->http_response_code != 200) {
-                            $this->logger->addError('Error sending and email', $signer->toArray());
+                            $this->logger->addError('Error sending an email',
+                                ['signer' => $signer->toArray(), 'response' => $res ? $res->http_response_code : null]);
                         }
                     } catch (\Exception $e) {
-                        $this->logger->addError('Error sending and email', $signer->toArray());
+                        $this->logger->addError('Error sending an email',
+                            ['signer' => $signer->toArray(), 'exception' => $e->getMessage()]);
                     }
                 }
             }
@@ -875,10 +877,12 @@ class StoreData
                         $response->getBody()->__toString());
 
                     if (!$res or $res->http_response_code != 200) {
-                        $this->logger->addError('Error sending and email', $creator->toArray());
+                        $this->logger->addError('Error sending an email',
+                            ['creator' => $creator->toArray(), 'response' => $res ? $res->http_response_code : null]);
                     }
                 } catch (\Exception $e) {
-                    $this->logger->addError('Error sending and email', $creator->toArray());
+                    $this->logger->addError('Error sending an email',
+                        ['creator' => $creator->toArray(), 'exception' => $e->getMessage()]);
                 }
             }
         }
@@ -951,10 +955,12 @@ class StoreData
                     $response->getBody()->__toString());
 
                 if (!$res or $res->http_response_code != 200) {
-                    $this->logger->addError('Error sending and email', $signer->toArray());
+                    $this->logger->addError('Error sending an email',
+                        ['signer' => $signer->toArray(), 'response' => $res ? $res->http_response_code : null]);
                 }
             } catch (\Exception $e) {
-                $this->logger->addError('Error sending and email', $signer->toArray());
+                $this->logger->addError('Error sending an email',
+                    ['signer' => $signer->toArray(), 'exception' => $e->getMessage()]);
             }
         } else {
             // Send a text message
@@ -1037,17 +1043,19 @@ class StoreData
             'name'        => $signer->getName(),
             'email'       => $signer->getEmail(),
             'id_document' => $signer->getDocument(),
-            'ip'          => $code->getIp()
+            'ip'          => $code->getIp(),
+            'method'      => $signer->getPhone() ? 'phone' : 'email'
         ];
+
+        // If sign code was sent by mobile phone, add the phone number
+        if ($signer->getPhone()) {
+            $data['phone'] = $signer->getPhone();
+        }
 
         // Additional data if available
         if ($code->getLatitude() and $code->getLongitude()) {
             $data['latitude'] = $code->getLatitude();
             $data['longitude'] = $code->getLongitude();
-        }
-
-        if ($signer->getPhone()) {
-            $data['phone'] = $signer->getPhone();
         }
 
         // Add the event to the bulk transaction
@@ -1093,10 +1101,12 @@ class StoreData
                     $response->getBody()->__toString());
 
                 if (!$res or $res->http_response_code != 200) {
-                    $this->logger->addError('Error sending and email', $creator->toArray());
+                    $this->logger->addError('Error sending an email',
+                        ['creator' => $creator->toArray(), 'response' => $res ? $res->http_response_code : null]);
                 }
             } catch (\Exception $e) {
-                $this->logger->addError('Error sending and email', $creator->toArray());
+                $this->logger->addError('Error sending an email',
+                    ['creator' => $creator->toArray(), 'exception' => $e->getMessage()]);
             }
         }
 

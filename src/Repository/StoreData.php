@@ -448,8 +448,9 @@ class StoreData extends RepositoryLocatableAbstract
         $from = $filter->getStatus() != 'D' ? 'FILES' : 'FILES_DELETED';
 
         $sql = 'SELECT ID_FILE, CLIENT_TYPE, FK_ID_CLIENT, MODE, FK_ID_MEDIA, NAME, FILE_NAME, FILE_ORIG_NAME,
-                  HASH, SIZE, PAGES, CTRL_DATE, TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE, MAX(S.FK_ID_BULK) FK_ID_BULK
-                FROM ' . $from . " LEFT JOIN FILES_SIGNATURE S ON MODE = 'S' AND S.FK_ID_FILE = ID_FILE" .
+                  HASH, SIZE, PAGES, CTRL_DATE, TRANSACTION, CONFIRMED, STATUS, TAG, DESCRIPTION, ID_GEONAMES, LATITUDE, LONGITUDE, S.FK_ID_BULK
+                FROM ' . $from .
+               " LEFT JOIN (SELECT FK_ID_FILE, MAX(FK_ID_BULK) FK_ID_BULK FROM FILES_SIGNATURE GROUP BY FK_ID_FILE) S ON MODE = 'S' AND S.FK_ID_FILE = ID_FILE" .
                ' WHERE CLIENT_TYPE = :client_type AND FK_ID_CLIENT = :id_client' . $where .
                ' AND STATUS = :status ORDER BY ' . $order;
 
@@ -522,7 +523,8 @@ class StoreData extends RepositoryLocatableAbstract
             }
 
             // Look for user identity
-            $sql = "SELECT FK_ID_USER, ID_IDENTITY, ACCOUNT, DOCUMENT FROM USERS_IDENTITIES WHERE TYPE = 'E' AND VALUE = :email";
+            $sql = "SELECT ID_IDENTITY, FK_ID_USER, ACCOUNT, DOCUMENT
+                    FROM USERS_IDENTITIES WHERE TYPE = 'E' AND STATUS = 'A' AND VALUE = :email";
             $params = [':email' => $signer->getEmail()];
             $res = $this->db->query($sql, $params, 'Api\Entity\UserIdentity');
             /** @var UserIdentity $identity */
@@ -573,8 +575,16 @@ class StoreData extends RepositoryLocatableAbstract
         }
 
         // Get signers list
-        $sql = 'SELECT S.FK_ID_BULK, S.CREATOR, S.EMAIL, S.NAME, S.DOCUMENT, S.ACCOUNT, U.LANG, S.TOKEN, S.SIGNED, S.CTRL_DATE DATE
-                FROM SIGNERS S LEFT JOIN USERS U ON U.ID_USER = S.FK_ID_USER
+        $sql = 'SELECT S.FK_ID_BULK, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT, S.ACCOUNT, U.LANG, S.TOKEN, S.SIGNED, S.CTRL_DATE DATE, C.METHOD
+                FROM SIGNERS S
+                  LEFT JOIN USERS U ON U.ID_USER = S.FK_ID_USER
+                  LEFT JOIN (SELECT TOKEN, METHOD FROM (
+                      SELECT A.TOKEN, A.METHOD, (
+                          SELECT 1 + COUNT(*) FROM SIGN_CODES B
+                          WHERE B.TOKEN = A.TOKEN AND (B.USED > A.USED OR B.USED = A.USED AND B.CODE_EXPIRATION > A.CODE_EXPIRATION)
+                        ) ROW FROM SIGN_CODES A
+                      ) X WHERE X.ROW = 1) C
+                    ON C.TOKEN = S.TOKEN
                 WHERE S.FK_ID_BULK = :id
                 ORDER BY S.CREATOR DESC, S.EMAIL ASC';
         $params = [':id' => $bulk->getIdBulkTransaction()];
@@ -764,15 +774,22 @@ class StoreData extends RepositoryLocatableAbstract
         $this->geolocalize($code);
 
         // Get signature associated to code
-        $sql = 'SELECT S.FK_ID_BULK, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT, S.FK_ID_USER, S.FK_ID_IDENTITY, S.ACCOUNT
+        $sql = "SELECT S.FK_ID_BULK, S.CREATOR, S.EMAIL, CASE C.METHOD WHEN 'P' THEN S.PHONE ELSE NULL END PHONE,
+                  S.NAME, S.DOCUMENT, S.FK_ID_USER, S.FK_ID_IDENTITY, S.ACCOUNT
                 FROM SIGNERS S, SIGN_CODES C
-                WHERE C.TOKEN = :token AND C.CODE = :code AND C.CODE_EXPIRATION > SYSDATE() AND
-                  S.TOKEN = C.TOKEN AND S.TOKEN_EXPIRATION > SYSDATE() AND S.SIGNED = 0';
+                WHERE C.TOKEN = :token AND C.CODE = :code AND C.CODE_EXPIRATION > SYSDATE() AND C.USED = 0 AND
+                  S.TOKEN = C.TOKEN AND S.TOKEN_EXPIRATION > SYSDATE() AND S.SIGNED = 0";
         $params = [':token' => $code->getToken(), ':code' => $code->getCode()];
         $res = $this->db->query($sql, $params, 'Api\Entity\Signer');
 
         if ($res->getNumRows() != 1) {
             // Code doesn't exists or it is expired
+            throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
+        }
+
+        // Mark as used
+        $sql = 'UPDATE SIGN_CODES SET USED = 1, CODE_EXPIRATION = SYSDATE() WHERE TOKEN = :token AND CODE = :code';
+        if (!$this->db->action($sql, $params)) {
             throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
         }
 
