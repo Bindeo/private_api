@@ -375,7 +375,7 @@ class StoreData
         $resultset = $this->dataRepo->fileList($filter);
 
         // Clean no files
-        if (!$resultset->getRows()[0]->getIdFile()) {
+        if ($resultset->getNumRows() > 0 and !$resultset->getRows()[0]->getIdFile()) {
             $resultset = new ResultSet(0, 0, []);
         }
 
