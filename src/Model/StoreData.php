@@ -1202,4 +1202,27 @@ class StoreData
 
         return $signature;
     }
+
+    /**
+     * Validate a mobile phone number
+     *
+     * @param Signer $signer
+     *
+     * @return Signer
+     * @throws \Exception
+     */
+    public function validateMobilePhone(Signer $signer)
+    {
+        // Check data
+        if (!$signer->getPhone()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Validate mobile phone
+        if (!$this->phone->validateNumber($signer->getPhone())) {
+            $signer->setPhone(null);
+        }
+
+        return $signer;
+    }
 }

@@ -7,6 +7,7 @@ use Api\Entity\BulkTransaction;
 use Api\Entity\Email;
 use Api\Entity\File;
 use Api\Entity\SignCode;
+use Api\Entity\Signer;
 use Bindeo\DataModel\Exceptions;
 use Bindeo\Filter\FilesFilter;
 use \Psr\Http\Message\ServerRequestInterface as Request;
@@ -360,6 +361,24 @@ class StoreData
             $request->getParam('mode'));
 
         $res = ['data' => ['type' => 'signatures', 'attributes' => $res->toArray()]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
+     * Validate a mobile phone number
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function validateMobilePhone(Request $request, Response $response, $args)
+    {
+        $res = $this->modelData->validateMobilePhone((new Signer($request->getParams())));
+
+        $res = ['data' => ['type' => 'signers', 'attributes' => $res->toArray()]];
 
         return $response->withJson($res, 200);
     }

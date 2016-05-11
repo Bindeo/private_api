@@ -46,4 +46,23 @@ class MessageBirdClient implements PhoneInterface
 
         return true;
     }
+
+    /**
+     * Validate a mobile phone number
+     *
+     * @param string $number
+     *
+     * @return bool
+     */
+    public function validateNumber($number)
+    {
+        try {
+            $this->client->lookup->read($number);
+            $res = true;
+        } catch (\Exception $e) {
+            $res = false;
+        }
+
+        return $res;
+    }
 }
