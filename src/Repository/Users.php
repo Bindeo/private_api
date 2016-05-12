@@ -253,7 +253,7 @@ class Users extends RepositoryLocatableAbstract
         $token = md5($id . $user->getEmail() . time());
 
         // Insert the validation token, the active user type and the first identity, also we update old signers with same email to associate user
-        $sql = "UPDATE SIGNERS SET FK_ID_USER = :id WHERE EMAIL = :email;
+        $sql = "UPDATE SIGNERS SET FK_ID_USER = :id WHERE EMAIL = :email AND FK_ID_USER IS NULL;;
                 INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP)
                 VALUES (:token, :type_val, :id, :email, SYSDATE(), :ip);
                 INSERT INTO USERS_TYPES(FK_ID_USER, FK_ID_TYPE, DATE_START, NEXT_PAYMENT, LAST_RESET)
@@ -783,7 +783,8 @@ class Users extends RepositoryLocatableAbstract
                     LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude
                     WHERE ID_USER = :id;
                     UPDATE USERS_IDENTITIES SET CONFIRMED = 1, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip
-                    WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :email;";
+                    WHERE FK_ID_USER = :id AND TYPE = 'E' AND VALUE = :email;
+                    UPDATE SIGNERS SET FK_ID_USER = :id WHERE EMAIL = :email AND FK_ID_USER IS NULL;";
             $params = [
                 ':id'          => $user->getIdUser(),
                 ':email'       => $user->getEmail(),
@@ -825,8 +826,8 @@ class Users extends RepositoryLocatableAbstract
                     WHERE FK_ID_USER = :id AND TYPE = 'E' AND ID_IDENTITY = :new_id;
                     UPDATE USERS SET CONFIRMED = 1, EMAIL = :email, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
                     LAST_ID_GEONAMES = :id_geonames, LAST_LATITUDE = :latitude, LAST_LONGITUDE = :longitude,
-                    NAME = (SELECT NAME FROM USERS_IDENTITIES WHERE ID_IDENTITY = :new_id)
-                    WHERE ID_USER = :id;";
+                    NAME = (SELECT NAME FROM USERS_IDENTITIES WHERE ID_IDENTITY = :new_id) WHERE ID_USER = :id;
+                    UPDATE SIGNERS SET FK_ID_USER = :id WHERE EMAIL = :email AND FK_ID_USER IS NULL;";
         } elseif ($res['TYPE'] == 'P' and $password) {
             // Password recovery
             $sql = 'UPDATE USERS SET CONFIRMED = 1, PASSWORD = :password, CTRL_DATE_MOD = SYSDATE(), CTRL_IP_MOD = :ip,
@@ -845,7 +846,8 @@ class Users extends RepositoryLocatableAbstract
         }
 
         // Execute query
-        if ($this->db->action($sql, $params)) {
+        $this->db->action($sql, $params);
+        if (!$this->db->getError()) {
             return $this->find($user);
         } else {
             throw $this->dbException();

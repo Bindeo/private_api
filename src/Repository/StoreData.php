@@ -523,8 +523,9 @@ class StoreData extends RepositoryLocatableAbstract
             }
 
             // Look for user identity
-            $sql = "SELECT ID_IDENTITY, FK_ID_USER, ACCOUNT, DOCUMENT
-                    FROM USERS_IDENTITIES WHERE TYPE = 'E' AND STATUS = 'A' AND VALUE = :email";
+            $sql = "SELECT I.ID_IDENTITY, I.FK_ID_USER, I.ACCOUNT, I.DOCUMENT
+                    FROM USERS_IDENTITIES I, USERS U
+                    WHERE U.EMAIL = :email AND I.FK_ID_USER = U.ID_USER AND I.STATUS = 'A' AND I.VALUE = U.EMAIL";
             $params = [':email' => $signer->getEmail()];
             $res = $this->db->query($sql, $params, 'Api\Entity\UserIdentity');
             /** @var UserIdentity $identity */
@@ -714,15 +715,15 @@ class StoreData extends RepositoryLocatableAbstract
             throw new \Exception(Exceptions::EXPIRED_TOKEN, 403);
         }
 
-        // Check if we sent the same kind of code in less than 1 minute
+        // Check if we sent the same kind of code in less than 2 minute
         $sql = 'SELECT CODE FROM SIGN_CODES WHERE TOKEN = :token AND METHOD = :method AND
-                  CODE_EXPIRATION > SYSDATE() AND CTRL_DATE > SYSDATE() - INTERVAL 1 MINUTE';
+                  CODE_EXPIRATION > SYSDATE() AND CTRL_DATE > SYSDATE() - INTERVAL 2 MINUTE';
         $params[':method'] = $code->getMethod();
         $res = $this->db->query($sql, $params);
 
         // If code exists, return it
         if ($res->getNumRows()) {
-            return $code->setCode($res->getRows()[0]['CODE']);
+            throw new \Exception(Exceptions::ALREADY_SENT, 409);
         }
 
         // Fill rest of data

@@ -937,18 +937,37 @@ class StoreData
         // Get the sign code
         $code = $this->dataRepo->getFreshSignCode($code->setMethod($signer->getPhone() ? 'P' : 'E'));
 
-        // Send an email with the code
-        $translate = TranslateFactory::factory($code->getLang());
+        // If method is mobile message, we will try to send it first
+        if ($code->getMethod() == 'P') {
+            // Send a text message
+            if (ENV != 'development') {
+                $res = $this->phone->sendMessage($signer->getPhone(), 'Bindeo PIN code: ' . $code->getCode());
+            } else {
+                $res = false;
+            }
 
-        $response = $this->view->render(new Response(), 'email/sign_code.html.twig', [
-            'translate'    => $translate,
-            'element_name' => $element->getElementName(),
-            'user'         => $signer,
-            'code'         => $code->getCode()
-        ]);
+            if (!$res) {
+                if (ENV != 'development') {
+                    // Generate a log
+                    $this->logger->addError('Error sending text message', ['number' => $signer->getPhone()]);
+                }
 
-        // Send an email or a text message by mobile phone
-        if ($code->getMethod() == 'E' or !$signer->getPhone() or ENV == 'development') {
+                // Failed in sending phone code so generate an email code
+                $code = $this->dataRepo->getFreshSignCode($code->setMethod('E'));
+            }
+        }
+
+        if ($code->getMethod() == 'E') {
+            // Send an email with the code
+            $translate = TranslateFactory::factory($code->getLang());
+
+            $response = $this->view->render(new Response(), 'email/sign_code.html.twig', [
+                'translate'    => $translate,
+                'element_name' => $element->getElementName(),
+                'user'         => $signer,
+                'code'         => $code->getCode()
+            ]);
+
             // Send an email
             try {
                 $res = $this->email->sendEmail($signer->getEmail(), $translate->translate('sign_code_subject'),
@@ -962,9 +981,6 @@ class StoreData
                 $this->logger->addError('Error sending an email',
                     ['signer' => $signer->toArray(), 'exception' => $e->getMessage()]);
             }
-        } else {
-            // Send a text message
-            $this->phone->sendMessage($signer->getPhone(), 'Bindeo PIN code: ' . $code->getCode());
         }
     }
 

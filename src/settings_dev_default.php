@@ -34,7 +34,7 @@ $settings['settings']['email']['mailgun'] = [
 
 // MessageBird text messages sender
 $settings['settings']['phone']['messagebird'] = [
-    'key'    => 'test_T7cyZseVx71msE2gMcHbk00gs'
+    'key'    => 'test_SFYjrGDKaCnzDTYauypS44M36'
 ];
 
 // Maxmind db route

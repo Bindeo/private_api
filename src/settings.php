@@ -66,7 +66,7 @@ return [
         'phone'               => [
             'current'     => 'messagebird',
             'messagebird' => [
-                'key' => 'live_IjEu6di2DiZhVV1XbGq2pVS0a'
+                'key' => 'live_IDvvayrDiA5sh3X1RORTGo1S8'
             ]
         ],
 
