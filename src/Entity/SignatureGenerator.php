@@ -2,6 +2,8 @@
 
 namespace Api\Entity;
 
+use Bindeo\Util\Tools;
+
 class SignatureGenerator
 {
     private $assetType;
@@ -221,7 +223,7 @@ class SignatureGenerator
                 ]
             ];
 
-            return $json ? json_encode($sign) : $sign;
+            return $json ? Tools::jsonEncode($sign) : $sign;
         } else {
             return null;
         }

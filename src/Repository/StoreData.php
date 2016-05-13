@@ -721,7 +721,7 @@ class StoreData extends RepositoryLocatableAbstract
         $params[':method'] = $code->getMethod();
         $res = $this->db->query($sql, $params);
 
-        // If code exists, return it
+        // If code exists, send nothing
         if ($res->getNumRows()) {
             throw new \Exception(Exceptions::ALREADY_SENT, 409);
         }

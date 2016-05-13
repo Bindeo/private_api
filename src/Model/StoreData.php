@@ -25,6 +25,7 @@ use Bindeo\DataModel\NotarizableInterface;
 use Bindeo\DataModel\SignableInterface;
 use Bindeo\DataModel\UserInterface;
 use Bindeo\Filter\FilesFilter;
+use Bindeo\Util\Tools;
 use \Psr\Log\LoggerInterface;
 use Slim\Views\Twig;
 use Slim\Http\Response;
@@ -935,22 +936,17 @@ class StoreData
         $element = $elements[0];
 
         // Get the sign code
-        $code = $this->dataRepo->getFreshSignCode($code->setMethod($signer->getPhone() ? 'P' : 'E'));
+        $code->setMethod(($signer->getPhone() and ENV != 'development') ? 'P' : 'E');
+        $code = $this->dataRepo->getFreshSignCode($code);
 
         // If method is mobile message, we will try to send it first
         if ($code->getMethod() == 'P') {
             // Send a text message
-            if (ENV != 'development') {
-                $res = $this->phone->sendMessage($signer->getPhone(), 'Bindeo PIN code: ' . $code->getCode());
-            } else {
-                $res = false;
-            }
+            $res = $this->phone->sendMessage($signer->getPhone(), 'Bindeo PIN code: ' . $code->getCode());
 
             if (!$res) {
-                if (ENV != 'development') {
-                    // Generate a log
-                    $this->logger->addError('Error sending text message', ['number' => $signer->getPhone()]);
-                }
+                // Generate a log
+                $this->logger->addError('Error sending text message', ['number' => $signer->getPhone()]);
 
                 // Failed in sending phone code so generate an email code
                 $code = $this->dataRepo->getFreshSignCode($code->setMethod('E'));
@@ -1028,7 +1024,7 @@ class StoreData
             $this->dataRepo->updateFile($element);
             $structure = $bulk->getStructure(true);
             $structure['document']['pages'] = $element->getPages();
-            $bulk->setStructure(json_encode($structure));
+            $bulk->setStructure(Tools::jsonEncode($structure));
         }
 
         // Get creator
@@ -1079,7 +1075,7 @@ class StoreData
                                   ->setIp($code->getIp())
                                   ->setName('sign_' . $signer->getAccount())
                                   ->setTimestamp(new \DateTime())
-                                  ->setData(json_encode($data));
+                                  ->setData(Tools::jsonEncode($data));
 
         // If user is registered and logged
         if ($signer->getIdUser()) {

@@ -11,6 +11,7 @@ use Api\Entity\BulkType;
 use Bindeo\DataModel\Exceptions;
 use Api\Model\General\FilesInterface;
 use Api\Repository\RepositoryAbstract;
+use Bindeo\Util\Tools;
 use \Psr\Log\LoggerInterface;
 
 /**
@@ -103,7 +104,7 @@ class BulkTransactions
             $structure['docs'] = [];
             $bulk->transformFiles();
         }
-        $bulk->setStructure(json_encode($structure))->setHash('PENDING');
+        $bulk->setStructure(Tools::jsonEncode($structure))->setHash('PENDING');
 
         return $bulk;
     }
@@ -260,7 +261,7 @@ class BulkTransactions
         $bulk->incNumItems();
         $structure = $bulk->getStructure(true);
         $structure['events'][] = $event->getStructure();
-        $bulk->setStructure(json_encode($structure));
+        $bulk->setStructure(Tools::jsonEncode($structure));
 
         // Update bulk transaction with new elements
         $this->bulkRepo->updateBulk($bulk);
@@ -452,7 +453,7 @@ class BulkTransactions
                 $structure['docs'][$file->getUniqueId()] = $file->getStructure();
             }
             // Set structure and hash
-            $bulk->setStructure(json_encode($structure))->hash();
+            $bulk->setStructure(Tools::jsonEncode($structure))->hash();
         }
 
         // Update bulk transaction with added elements
