@@ -17,19 +17,13 @@ class General
     private $generalRepo;
 
     /**
-     * @var \Api\Repository\Processes
-     */
-    private $procRepo;
-
-    /**
      * @var Reader
      */
     protected $maxmind;
 
-    public function __construct(RepositoryAbstract $generalRepo, RepositoryAbstract $procRepo, Reader $maxmind)
+    public function __construct(RepositoryAbstract $generalRepo, Reader $maxmind)
     {
         $this->generalRepo = $generalRepo;
-        $this->procRepo = $procRepo;
         $this->maxmind = $maxmind;
     }
 
@@ -67,25 +61,6 @@ class General
         $data = $this->generalRepo->mediaTypes($request->getParam('locale'));
 
         $res = ['data' => $data->toArray('media_type'), 'total_pages' => 1];
-
-        return $response->withJson($res, 200);
-    }
-
-    /**
-     * Get the processes status listed by language
-     *
-     * @param Request|\Slim\Http\Request   $request
-     * @param Response|\Slim\Http\Response $response
-     * @param array                        $args [optional]
-     *
-     * @return \Slim\Http\Response
-     * @throws \Exception
-     */
-    public function processesStatus(Request $request, Response $response, $args)
-    {
-        $data = $this->procRepo->getStatusList($request->getParam('locale'));
-
-        $res = ['data' => $data->toArray('processes_status'), 'total_pages' => 1];
 
         return $response->withJson($res, 200);
     }

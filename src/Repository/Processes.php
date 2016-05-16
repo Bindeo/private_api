@@ -3,9 +3,11 @@
 namespace Api\Repository;
 
 use Api\Entity\Process;
+use Api\Entity\ResultSet;
 use Bindeo\DataModel\ClientsInterface;
 use Bindeo\DataModel\ProcessInterface;
 use Bindeo\DataModel\Exceptions;
+use Bindeo\Filter\ProcessesFilter;
 use \MaxMind\Db\Reader;
 
 class Processes extends RepositoryAbstract
@@ -15,7 +17,7 @@ class Processes extends RepositoryAbstract
      *
      * @param string $lang
      *
-     * @return \Api\Entity\ResultSet
+     * @return ResultSet
      * @throws \Exception
      */
     public function getStatusList($lang)
@@ -35,6 +37,67 @@ class Processes extends RepositoryAbstract
         }
 
         return $data;
+    }
+
+    /**
+     * Get a filter list of processes
+     *
+     * @param ProcessesFilter $filter
+     *
+     * @return ResultSet
+     * @throws \Exception
+     */
+    public function processesList(ProcessesFilter $filter)
+    {
+        if (!$filter->getClientType() or !is_numeric($filter->getIdClient()) or !is_numeric($filter->getPage())) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        $filter->clean();
+
+        // Build the query
+        $params = [
+            ':client_type' => $filter->getClientType(),
+            ':id_client'   => $filter->getIdClient()
+        ];
+        $where = '';
+
+        // Status
+        if ($filter->getType() and $filter->getIdStatus()) {
+            $params[':type'] = $filter->getType();
+            $params[':id_status'] = $filter->getIdStatus();
+            $where .= ' AND P.TYPE = :type AND P.FK_ID_STATUS = :id_status';
+        }
+
+        // Name
+        if ($filter->getName()) {
+            $params[':name'] = $filter->getName();
+            $where .= ' AND MATCH(P.NAME) AGAINST(:name  IN NATURAL LANGUAGE MODE)';
+        }
+
+        // Orders
+        switch ($filter->getOrder()) {
+            case ProcessesFilter::ORDER_DATE_DESC:
+                $order = 'P.CTRL_DATE DESC';
+                break;
+            case ProcessesFilter::ORDER_DATE_ASC:
+                $order = 'P.CTRL_DATE ASC';
+                break;
+            case ProcessesFilter::ORDER_NAME_ASC:
+                $order = 'P.NAME ASC';
+                break;
+            case ProcessesFilter::ORDER_NAME_DESC:
+                $order = 'P.NAME DESC';
+                break;
+        }
+
+        // Get the paginated list
+        $sql = 'SELECT P.TYPE, P.ID_ELEMENT, P.CLIENT_TYPE, P.FK_ID_CLIENT, P.FK_ID_STATUS, P.NAME, P.CTRL_DATE, P.ADDITIONAL_DATA
+                FROM PROCESSES P, PROCESSES_CLIENTS C
+                WHERE C.CLIENT_TYPE = :client_type AND C.FK_ID_CLIENT = :id_client AND P.TYPE = C.TYPE AND P.ID_ELEMENT = C.ID_ELEMENT' .
+               $where . ' ORDER BY ' . $order;
+
+        return $this->db->query($sql, $params, 'Api\Entity\Process', $filter->getPage(), $filter->getNumRows());
     }
 
     /**

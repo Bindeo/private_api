@@ -161,8 +161,11 @@ $container['Api\Controller\OAuth'] = function ($c) {
 };
 
 $container['Api\Controller\General'] = function ($c) {
-    return new Api\Controller\General($c->get('Api\Repository\General'), $c->get('Api\Repository\Processes'),
-        $c->get('MaxMind\Db\Reader'));
+    return new Api\Controller\General($c->get('Api\Repository\General'), $c->get('MaxMind\Db\Reader'));
+};
+
+$container['Api\Controller\Processes'] = function ($c) {
+    return new Api\Controller\Processes($c->get('Api\Repository\Processes'));
 };
 
 $container['Api\Controller\Accounts'] = function ($c) {

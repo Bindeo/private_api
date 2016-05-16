@@ -5,7 +5,6 @@
 $app->group('/general', function () {
     $this->get('/account-types', 'Api\Controller\General:accountTypes');
     $this->get('/media-types', 'Api\Controller\General:mediaTypes');
-    $this->get('/processes-status', 'Api\Controller\General:processesStatus');
     $this->get('/geolocalize', 'Api\Controller\General:geolocalize');
     $this->get('/validate/phone', 'Api\Controller\StoreData:validateMobilePhone');
 });
@@ -49,6 +48,8 @@ $app->group('/data', function () {
     $this->get('/blockchain/coins', 'Api\Controller\StoreData:getBalance');
     $this->get('/blockchain/info', 'Api\Controller\StoreData:getOnlineTransaction');
     $this->get('/blockchain/test', 'Api\Controller\StoreData:testAsset');
+    $this->get('/processes-status', 'Api\Controller\Processes:processesStatus');
+    $this->get('/processes', 'Api\Controller\Processes:processesList');
 });
 
 // Bulk transaction routes
