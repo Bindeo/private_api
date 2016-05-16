@@ -5,6 +5,7 @@ namespace Api\Model;
 use Api\Entity\BlockChain;
 use Api\Entity\BulkTransaction;
 use Api\Entity\BulkType;
+use Api\Entity\Process;
 use Api\Model\Callback\CallbackCaller;
 use Api\Repository\RepositoryAbstract;
 use Bindeo\DataModel\Exceptions;
@@ -29,6 +30,11 @@ class System
     private $dataRepo;
 
     /**
+     * @var \Api\Repository\Processes
+     */
+    private $procRepo;
+
+    /**
      * @var EmailInterface
      */
     private $email;
@@ -51,6 +57,7 @@ class System
     public function __construct(
         RepositoryAbstract $bulkRepo,
         RepositoryAbstract $dataRepo,
+        RepositoryAbstract $procRepo,
         EmailInterface $email,
         Twig $view,
         LoggerInterface $logger,
@@ -58,6 +65,7 @@ class System
     ) {
         $this->bulkRepo = $bulkRepo;
         $this->dataRepo = $dataRepo;
+        $this->procRepo = $procRepo;
         $this->email = $email;
         $this->view = $view;
         $this->logger = $logger;
@@ -79,6 +87,13 @@ class System
                                                                       ->setClientType($bulk->getClientType())
                                                                       ->setIdClient($bulk->getIdClient())))
             ) {
+                if ($bulk->getType() == 'Sign Document') {
+                    // Set process as completed
+                    $this->procRepo->updateProcess((new Process())->setType('S')
+                                                                  ->setIdElement($bulk->getIdBulkTransaction())
+                                                                  ->setIdStatus(Process::STATUS_S_COMPLETED));
+                }
+
                 // Execute callback for client
                 if ($bulkType->getCallbackType() == 'E') {
                     // Send email
@@ -97,11 +112,16 @@ class System
                     } catch (\Exception $e) {
                         $this->logger->addError('Error sending and email', $to);
                     }
-                } elseif($bulkType->getCallbackType() == 'C') {
+                } elseif ($bulkType->getCallbackType() == 'C') {
                     // Class type callback
                     $this->callbackCaller->call($bulkType->getCallbackValue(), $bulk);
                 }
             }
+        } elseif ($blockchain->getType() == 'F') {
+            // Set process as completed
+            $this->procRepo->updateProcess((new Process())->setType('F')
+                                                          ->setIdElement($blockchain->getIdElement())
+                                                          ->setIdStatus(Process::STATUS_N_COMPLETED));
         }
     }
 

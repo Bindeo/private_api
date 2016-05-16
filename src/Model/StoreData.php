@@ -7,6 +7,7 @@ use Api\Entity\BulkEvent;
 use Api\Entity\BulkTransaction;
 use Api\Entity\DocsSignature;
 use Api\Entity\OAuthClient;
+use Api\Entity\Process;
 use Api\Entity\ResultSet;
 use Api\Entity\SignatureGenerator;
 use Api\Entity\SignCode;
@@ -52,6 +53,11 @@ class StoreData
     private $oauthRepo;
 
     /**
+     * @var \Api\Repository\Processes
+     */
+    private $procRepo;
+
+    /**
      * @var BulkTransactions
      */
     private $bulkModel;
@@ -87,6 +93,7 @@ class StoreData
         RepositoryAbstract $dataRepo,
         RepositoryAbstract $usersRepo,
         RepositoryAbstract $oauthRepo,
+        RepositoryAbstract $procRepo,
         BulkTransactions $bulkModel,
         FilesInterface $storage,
         LoggerInterface $logger,
@@ -98,6 +105,7 @@ class StoreData
         $this->dataRepo = $dataRepo;
         $this->usersRepo = $usersRepo;
         $this->oauthRepo = $oauthRepo;
+        $this->procRepo = $procRepo;
         $this->bulkModel = $bulkModel;
         $this->storage = $storage;
         $this->logger = $logger;
@@ -189,6 +197,11 @@ class StoreData
 
             // Update bulk transaction with blockchain account and associate files
             $this->bulkModel->associateSignableElements($bulk->setFiles([$file]));
+
+            // Create process representing bulk transaction to sign and add signers as clients
+            $process = $this->procRepo->createProcess($bulk);
+            $this->procRepo->addProcessClients($process, $signers);
+            $this->procRepo->updateProcess($process->generateAdditionalData($signers));
 
             // Sign file against blockchain
             $blockchain = \Api\Lib\BlockChain\BlockChain::getInstance();
@@ -338,6 +351,8 @@ class StoreData
         if ($file->getMode() == 'S') {
             $file = $this->fileToSign($file, $lang);
         } else {
+            // Create process representing file to notarize
+            $this->procRepo->createProcess($file);
             $file = $this->getFile($file);
         }
 
@@ -1125,6 +1140,13 @@ class StoreData
         // If everyone has signed the document, we close the bulk transaction
         if ($bulk->getPendingSigners() == 0) {
             $this->bulkModel->closeBulk($bulk->setIp($code->getIp()));
+
+            // Update process
+            $signers = $this->dataRepo->signersList($bulk);
+            $this->procRepo->updateProcess((new Process())->setType('S')
+                                                          ->setIdElement($bulk->getIdBulkTransaction())
+                                                          ->generateAdditionalData($signers->getRows())
+                                                          ->setIdStatus(Process::STATUS_S_SIGNED));
         }
 
         return $bulk->setIp(null);

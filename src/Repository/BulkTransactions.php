@@ -7,7 +7,6 @@ use Api\Entity\BulkEvent;
 use Api\Entity\BulkFile;
 use Api\Entity\BulkTransaction;
 use Api\Entity\BulkType;
-use Api\Entity\OAuthClient;
 use Api\Entity\ResultSet;
 use Bindeo\DataModel\Exceptions;
 use \MaxMind\Db\Reader;
@@ -153,6 +152,9 @@ class BulkTransactions extends RepositoryLocatableAbstract
         } else {
             throw $this->dbException();
         }
+
+        // Create process representing bulk transaction
+        $this->processesRepo->createProcess($bulk);
     }
 
     /**

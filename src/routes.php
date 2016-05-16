@@ -5,6 +5,7 @@
 $app->group('/general', function () {
     $this->get('/account-types', 'Api\Controller\General:accountTypes');
     $this->get('/media-types', 'Api\Controller\General:mediaTypes');
+    $this->get('/processes-status', 'Api\Controller\General:processesStatus');
     $this->get('/geolocalize', 'Api\Controller\General:geolocalize');
     $this->get('/validate/phone', 'Api\Controller\StoreData:validateMobilePhone');
 });

@@ -4,17 +4,21 @@ namespace Api\Repository;
 
 use Api\Entity\BulkTransaction;
 use Api\Entity\File;
+use Api\Entity\Process;
 use Api\Entity\ResultSet;
 use Api\Entity\SignCode;
 use Api\Entity\Signer;
 use Api\Entity\UserIdentity;
+use Bindeo\DataModel\ClientsInterface;
 use Bindeo\DataModel\FileAbstract;
 use Bindeo\DataModel\NotarizableInterface;
+use Bindeo\DataModel\ProcessInterface;
 use Bindeo\DataModel\SignableInterface;
 use Bindeo\Filter\FilesFilter;
 use Bindeo\DataModel\Exceptions;
 use \MaxMind\Db\Reader;
 use Api\Entity\BlockChain;
+use Symfony\Component\BrowserKit\Client;
 
 class StoreData extends RepositoryLocatableAbstract
 {
@@ -92,8 +96,6 @@ class StoreData extends RepositoryLocatableAbstract
             if ($blockchain->getType() == 'F') {
                 // Update the file
                 $sql = 'UPDATE FILES SET TRANSACTION = :txid WHERE ID_FILE = :id AND TRANSACTION IS NULL;';
-            } elseif ($blockchain->getType() == 'F') {
-                $sql = 'UPDATE EMAILS SET TRANSACTION = :txid WHERE ID_EMAIL = :id AND TRANSACTION IS NULL;';
             } elseif ($blockchain->getType() == 'B') {
                 $sql = 'UPDATE BULK_TRANSACTIONS SET TRANSACTION = :txid WHERE ID_BULK_TRANSACTION = :id;';
             }
@@ -169,8 +171,6 @@ class StoreData extends RepositoryLocatableAbstract
             $sql .= 'UPDATE BULK_TRANSACTIONS SET CONFIRMED = 1 WHERE ID_BULK_TRANSACTION = :id AND TRANSACTION = :txid;';
         } elseif ($blockchain->getType() == 'F') {
             $sql .= 'UPDATE FILES SET CONFIRMED = 1 WHERE ID_FILE = :id AND TRANSACTION = :txid;';
-        } elseif ($blockchain->getType() == 'E') {
-            $sql .= 'UPDATE EMAILS SET CONFIRMED = 1 WHERE ID_EMAIL = :id AND TRANSACTION = :txid;';
         }
 
         if (!$this->db->action($sql, $params)) {

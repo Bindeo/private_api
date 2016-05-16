@@ -106,6 +106,10 @@ $container['Api\Repository\Users'] = function ($c) {
     return new Api\Repository\Users($c->get('Api\Model\General\Database'), $c->get('MaxMind\Db\Reader'));
 };
 
+$container['Api\Repository\Processes'] = function ($c) {
+    return new Api\Repository\Processes($c->get('Api\Model\General\Database'));
+};
+
 $container['Api\Repository\StoreData'] = function ($c) {
     return new Api\Repository\StoreData($c->get('Api\Model\General\Database'), $c->get('MaxMind\Db\Reader'));
 };
@@ -132,7 +136,7 @@ $container['Api\Model\StoreData'] = function ($c) {
     $c->get('Api\Model\General\ScriptsLauncher');
 
     return new Api\Model\StoreData($c->get('Api\Repository\StoreData'), $c->get('Api\Repository\Users'),
-        $c->get('Api\Repository\OAuth'), $c->get('Api\Model\BulkTransactions'),
+        $c->get('Api\Repository\OAuth'), $c->get('Api\Repository\Processes'), $c->get('Api\Model\BulkTransactions'),
         $c->get('Api\Model\General\FilesStorage'), $c->get('logger'), $c->get('Api\Model\Email\Email'),
         $c->get('Api\Model\Phone\Phone'), $c->get('view'), $c->get('settings')['front_urls']);
 };
@@ -147,7 +151,7 @@ $container['Api\Model\System'] = function ($c) {
     $c->get('Api\Lib\BlockChain\BlockChain');
 
     return new Api\Model\System($c->get('Api\Repository\BulkTransactions'), $c->get('Api\Repository\StoreData'),
-        $c->get('Api\Model\Email\Email'), $c->get('view'), $c->get('logger'),
+        $c->get('Api\Repository\Processes'), $c->get('Api\Model\Email\Email'), $c->get('view'), $c->get('logger'),
         $c->get('Api\Model\Callback\CallbackCaller'));
 };
 
@@ -157,7 +161,8 @@ $container['Api\Controller\OAuth'] = function ($c) {
 };
 
 $container['Api\Controller\General'] = function ($c) {
-    return new Api\Controller\General($c->get('Api\Repository\General'), $c->get('MaxMind\Db\Reader'));
+    return new Api\Controller\General($c->get('Api\Repository\General'), $c->get('Api\Repository\Processes'),
+        $c->get('MaxMind\Db\Reader'));
 };
 
 $container['Api\Controller\Accounts'] = function ($c) {
