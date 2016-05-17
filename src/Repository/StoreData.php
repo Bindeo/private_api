@@ -620,18 +620,20 @@ class StoreData extends RepositoryLocatableAbstract
     /**
      * Get a signer through a bulk transaction id
      *
-     * @param int $id
+     * @param int|string $id
      *
      * @return Signer
      * @throws \Exception
      */
     public function getSignatureCreator($id)
     {
+        $where = is_numeric($id) ? 'B.ID_BULK_TRANSACTION = :id' : 'B.EXTERNAL_ID = :id';
+
         // Get requested token
         $sql = "SELECT B.ID_BULK_TRANSACTION FK_ID_BULK, 1 CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT,
                   B.FK_ID_CLIENT FK_ID_USER, S.FK_ID_IDENTITY, S.PHONE, S.VIEWED, IFNULL(S.SIGNED, 1) SIGNED, S.TOKEN
                 FROM BULK_TRANSACTIONS B LEFT JOIN SIGNERS S ON S.FK_ID_BULK = B.ID_BULK_TRANSACTION AND S.CREATOR = 1
-                WHERE B.ID_BULK_TRANSACTION = :id";
+                WHERE " . $where;
         $res = $this->db->query($sql, [':id' => $id], 'Api\Entity\Signer');
 
         if ($res->getNumRows() == 0) {
@@ -655,7 +657,7 @@ class StoreData extends RepositoryLocatableAbstract
     public function getSignature($token, $idUser = null)
     {
         // Get signer
-        $signer = is_numeric($token) ? $this->getSignatureCreator($token) : $this->getSigner($token);
+        $signer = substr($token, 0, 1) == 's' ? $this->getSignatureCreator(substr($token, 1)) : $this->getSigner($token);
 
         // If signer has user, idUser must be the same
         if (($signer->getIdUser() or $idUser) and $signer->getIdUser() != $idUser) {

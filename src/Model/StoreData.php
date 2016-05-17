@@ -837,7 +837,7 @@ class StoreData
      */
     public function getSignableElement($token, $idUser = null)
     {
-        if (!$token or is_numeric($token) and !$idUser) {
+        if (!$token and !$idUser) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -1162,8 +1162,9 @@ class StoreData
      */
     public function getSigner($token)
     {
-        // If token is numeric, it means a file id and we need to get the file creator
-        return is_numeric($token) ? $this->dataRepo->getSignatureCreator($token) : $this->dataRepo->getSigner($token);
+        // If token starts with 's', it means an external id and we need to get the file creator
+        return substr($token, 0, 1) == 's' ? $this->dataRepo->getSignatureCreator(substr($token, 1))
+            : $this->dataRepo->getSigner($token);
     }
 
     /**

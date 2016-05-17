@@ -64,6 +64,9 @@ source ../tables/PROCESSES_CLIENTS.sql;
 source ../triggers/TGR_BD_USERS.sql;
 source ../triggers/TGR_BD_FILES.sql;
 
+# Functions
+source ../functions/REGEX_REPLACE.sql;
+
 # Translates
 source ../sqls/translations.sql;
 source ../sqls/account_types.sql;

@@ -27,7 +27,8 @@ class Processes extends RepositoryAbstract
         }
 
         $sql = "SELECT P.TYPE, P.ID_STATUS, T.VALUE NAME
-                FROM PROCESSES_STATUS P, TRANSLATIONS T WHERE T.ID_TRANSLATION = P.FK_ID_TRANSLATION AND T.LANG = :lang";
+                FROM PROCESSES_STATUS P, TRANSLATIONS T WHERE T.ID_TRANSLATION = P.FK_ID_TRANSLATION AND T.LANG = :lang
+                ORDER BY P.TYPE ASC, P.ID_STATUS ASC";
         $params = [':lang' => $lang];
 
         $data = $this->db->query($sql, $params, 'Api\Entity\ProcessStatus');
@@ -49,7 +50,9 @@ class Processes extends RepositoryAbstract
      */
     public function processesList(ProcessesFilter $filter)
     {
-        if (!$filter->getClientType() or !is_numeric($filter->getIdClient()) or !is_numeric($filter->getPage())) {
+        if (!in_array($filter->getLang(), ['es_ES', 'en_US']) or !$filter->getClientType() or
+            !is_numeric($filter->getIdClient()) or !is_numeric($filter->getPage())
+        ) {
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
@@ -57,6 +60,7 @@ class Processes extends RepositoryAbstract
 
         // Build the query
         $params = [
+            ':lang'        => $filter->getLang(),
             ':client_type' => $filter->getClientType(),
             ':id_client'   => $filter->getIdClient()
         ];
@@ -72,7 +76,7 @@ class Processes extends RepositoryAbstract
         // Name
         if ($filter->getName()) {
             $params[':name'] = $filter->getName();
-            $where .= ' AND MATCH(P.NAME) AGAINST(:name  IN NATURAL LANGUAGE MODE)';
+            $where .= ' AND MATCH(P.SEARCH) AGAINST(:name  IN NATURAL LANGUAGE MODE)';
         }
 
         // Orders
@@ -92,9 +96,11 @@ class Processes extends RepositoryAbstract
         }
 
         // Get the paginated list
-        $sql = 'SELECT P.TYPE, P.ID_ELEMENT, P.CLIENT_TYPE, P.FK_ID_CLIENT, P.FK_ID_STATUS, P.NAME, P.CTRL_DATE, P.ADDITIONAL_DATA
-                FROM PROCESSES P, PROCESSES_CLIENTS C
-                WHERE C.CLIENT_TYPE = :client_type AND C.FK_ID_CLIENT = :id_client AND P.TYPE = C.TYPE AND P.ID_ELEMENT = C.ID_ELEMENT' .
+        $sql = "SELECT P.TYPE, P.ID_ELEMENT, P.CLIENT_TYPE, P.FK_ID_CLIENT, P.FK_ID_STATUS, P.NAME, P.CTRL_DATE, P.ADDITIONAL_DATA, T.VALUE STATUS, B.EXTERNAL_ID ID_ALT_ELEMENT
+                FROM PROCESSES P LEFT JOIN BULK_TRANSACTIONS B ON P.TYPE = 'S' AND B.ID_BULK_TRANSACTION = P.ID_ELEMENT,
+                  PROCESSES_CLIENTS C, PROCESSES_STATUS S, TRANSLATIONS T
+                WHERE C.CLIENT_TYPE = :client_type AND C.FK_ID_CLIENT = :id_client AND P.TYPE = C.TYPE AND P.ID_ELEMENT = C.ID_ELEMENT AND
+                  S.TYPE = P.TYPE AND S.ID_STATUS = P.FK_ID_STATUS AND T.ID_TRANSLATION = S.FK_ID_TRANSLATION AND T.LANG = :lang" .
                $where . ' ORDER BY ' . $order;
 
         return $this->db->query($sql, $params, 'Api\Entity\Process', $filter->getPage(), $filter->getNumRows());
@@ -146,8 +152,8 @@ class Processes extends RepositoryAbstract
             throw new \Exception(Exceptions::MISSING_FIELDS, 400);
         }
 
-        $sql = 'INSERT INTO PROCESSES(CLIENT_TYPE, FK_ID_CLIENT, TYPE, ID_ELEMENT, FK_ID_STATUS, NAME, CTRL_DATE)
-                VALUES (:client_type, :id_client, :type, :id_element, 1, :name, SYSDATE());
+        $sql = 'INSERT INTO PROCESSES(CLIENT_TYPE, FK_ID_CLIENT, TYPE, ID_ELEMENT, FK_ID_STATUS, NAME, SEARCH, CTRL_DATE)
+                VALUES (:client_type, :id_client, :type, :id_element, 1, :name, REGEX_REPLACE(\'[^A-Za-z0-9]\', \' \', :name), SYSDATE());
                 INSERT INTO PROCESSES_CLIENTS(TYPE, ID_ELEMENT, CLIENT_TYPE, FK_ID_CLIENT)
                 VALUES (:type, :id_element, :client_type, :id_client);';
         $params = [
