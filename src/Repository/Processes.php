@@ -198,17 +198,22 @@ class Processes extends RepositoryAbstract
         // Loop clients
         foreach ($clients as $client) {
             if ($client instanceof ClientsInterface) {
-                // Insert clients
-                $params = [
-                    ':type'        => $process->getType(),
-                    ':id_element'  => $process->getIdElement(),
-                    ':client_type' => $client->getClientType(),
-                    ':id_client'   => $client->getIdClient()
-                ];
+                if ($client->getIdClient()) {
+                    // Insert clients
+                    $params = [
+                        ':type'        => $process->getType(),
+                        ':id_element'  => $process->getIdElement(),
+                        ':client_type' => $client->getClientType(),
+                        ':id_client'   => $client->getIdClient()
+                    ];
 
-                if (!$this->db->action($sql, $params)) {
-                    $this->db->rollBack();
-                    throw $this->dbException();
+                    if (!$this->db->action($sql, $params)) {
+                        // If client is repeated because is also the creator, avoid exception
+                        if ($this->db->getError()[0] != "23000") {
+                            $this->db->rollBack();
+                            throw $this->dbException();
+                        }
+                    }
                 }
             } else {
                 $this->db->rollBack();
@@ -245,7 +250,8 @@ class Processes extends RepositoryAbstract
             ':additional_data' => $process->getAdditionalData() ? $process->getAdditionalData() : null
         ];
 
-        if (!$this->db->action($sql, $params)) {
+        $this->db->action($sql, $params);
+        if ($this->db->getError()) {
             throw $this->dbException();
         }
     }

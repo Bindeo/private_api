@@ -874,7 +874,7 @@ class StoreData
                 $translate = TranslateFactory::factory($creator->getLang());
 
                 $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                       $this->frontUrls['review_contract'] . '/' . $bulk->getIdBulkTransaction();
+                       $this->frontUrls['review_contract'] . '/s' . $bulk->getExternalId();
 
                 // Send an email to the creator
                 $response = $this->view->render(new Response(), 'email/sign_viewed.html.twig', [
@@ -1108,7 +1108,7 @@ class StoreData
             $translate = TranslateFactory::factory($code->getLang());
 
             $url = $this->frontUrls['host'] . (ENV == 'development' ? DEVELOPER . '.' : '') .
-                   $this->frontUrls['review_contract'] . '/' . $bulk->getIdBulkTransaction();
+                   $this->frontUrls['review_contract'] . '/s' . $bulk->getExternalId();
 
             // Send an email to the creator
             $response = $this->view->render(new Response(), 'email/sign_signed.html.twig', [
@@ -1137,17 +1137,21 @@ class StoreData
             }
         }
 
+        // Update process
+        $signers = $this->dataRepo->signersList($bulk);
+        $process = (new Process())->setType('S')
+                                  ->setIdElement($bulk->getIdBulkTransaction())
+                                  ->generateAdditionalData($signers->getRows());
+
         // If everyone has signed the document, we close the bulk transaction
         if ($bulk->getPendingSigners() == 0) {
             $this->bulkModel->closeBulk($bulk->setIp($code->getIp()));
-
-            // Update process
-            $signers = $this->dataRepo->signersList($bulk);
-            $this->procRepo->updateProcess((new Process())->setType('S')
-                                                          ->setIdElement($bulk->getIdBulkTransaction())
-                                                          ->generateAdditionalData($signers->getRows())
-                                                          ->setIdStatus(Process::STATUS_S_SIGNED));
+            $process->setIdStatus(Process::STATUS_S_SIGNED);
+        } else {
+            $process->setIdStatus(Process::STATUS_S_NEW);
         }
+
+        $this->procRepo->updateProcess($process);
 
         return $bulk->setIp(null);
     }
@@ -1156,15 +1160,14 @@ class StoreData
      * Get a signer through a token
      *
      * @param string $token
+     * @param int    $idUser
      *
      * @return Signer
      * @throws \Exception
      */
-    public function getSigner($token)
+    public function getSigner($token, $idUser = null)
     {
-        // If token starts with 's', it means an external id and we need to get the file creator
-        return substr($token, 0, 1) == 's' ? $this->dataRepo->getSignatureCreator(substr($token, 1))
-            : $this->dataRepo->getSigner($token);
+        return $this->dataRepo->getSigner($token, $idUser);
     }
 
     /**

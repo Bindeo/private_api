@@ -285,7 +285,7 @@ class StoreData
      */
     public function getSigner(Request $request, Response $response, $args)
     {
-        $res = $this->modelData->getSigner($request->getParam('token'));
+        $res = $this->modelData->getSigner($request->getParam('token'), $request->getParam('idUser'));
 
         $res = ['data' => ['type' => 'signers', 'attributes' => $res->toArray()]];
 

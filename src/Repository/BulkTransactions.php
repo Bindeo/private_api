@@ -152,9 +152,6 @@ class BulkTransactions extends RepositoryLocatableAbstract
         } else {
             throw $this->dbException();
         }
-
-        // Create process representing bulk transaction
-        $this->processesRepo->createProcess($bulk);
     }
 
     /**

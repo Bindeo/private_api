@@ -531,6 +531,13 @@ class StoreData extends RepositoryLocatableAbstract
             /** @var UserIdentity $identity */
             $identity = $res->getNumRows() == 1 ? $res->getRows()[0] : null;
 
+            // Fill identity in signer
+            if ($identity) {
+                $signer->setIdUser($identity->getIdUser())
+                       ->setIdIdentity($identity->getIdIdentity())
+                       ->setDocument($identity->getDocument());
+            }
+
             // Insert signatures
             $sql = "INSERT INTO SIGNERS(FK_ID_BULK, CREATOR, EMAIL, NAME, DOCUMENT, ACCOUNT, TOKEN, TOKEN_EXPIRATION,
                       FK_ID_USER, FK_ID_IDENTITY, PHONE)
@@ -546,9 +553,9 @@ class StoreData extends RepositoryLocatableAbstract
                     : hash('sha256', $signer->getEmail()))->getAccount(),
                 ':token'       => $signer->setToken(hash('sha256',
                     $bulk->getIdBulkTransaction() . '_' . $signer->getAccount() . '_' . time()))->getToken(),
-                ':document'    => ($identity and $identity->getDocument()) ? $identity->getDocument() : null,
-                ':id_user'     => $identity ? $identity->getIdUser() : null,
-                ':id_identity' => $identity ? $identity->getIdIdentity() : null,
+                ':document'    => $signer->getDocument() ? $signer->getDocument() : null,
+                ':id_user'     => $signer->getIdUser() ? $signer->getIdUser() : null,
+                ':id_identity' => $signer->getIdIdentity() ? $signer->getIdIdentity() : null,
                 ':phone'       => $signer->getPhone() ? $signer->getPhone() : null
             ];
 
@@ -597,16 +604,37 @@ class StoreData extends RepositoryLocatableAbstract
      * Get a signer through a token
      *
      * @param string $token
+     * @param int    $idUser
      *
      * @return Signer
      * @throws \Exception
      */
-    public function getSigner($token)
+    public function getSigner($token, $idUser = null)
     {
-        // Get requested token
-        $sql = "SELECT FK_ID_BULK, CREATOR, EMAIL, PHONE, NAME, DOCUMENT, FK_ID_USER, FK_ID_IDENTITY, PHONE, VIEWED, SIGNED, TOKEN
-                FROM SIGNERS WHERE TOKEN = :token AND (SIGNED = 1 OR TOKEN_EXPIRATION > SYSDATE() AND SIGNED = 0)";
-        $res = $this->db->query($sql, [':token' => trim($token)], 'Api\Entity\Signer');
+        $token = trim($token);
+        // Could be signer token or bulk transaction external id
+        // If token starts with 's', it means an external id
+        if (substr($token, 0, 1) == 's') {
+            if (!$idUser) {
+                throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+            }
+            // Bulk transaction external id
+            $sql = 'SELECT S.FK_ID_BULK, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT, S.FK_ID_USER, S.FK_ID_IDENTITY,
+                      S.PHONE, S.VIEWED, S.SIGNED, S.TOKEN
+                    FROM SIGNERS S, BULK_TRANSACTIONS B
+                    WHERE B.EXTERNAL_ID = :id AND S.FK_ID_BULK = B.ID_BULK_TRANSACTION AND S.FK_ID_USER = :id_user AND
+                      (S.SIGNED = 1 OR S.TOKEN_EXPIRATION > SYSDATE() AND S.SIGNED = 0)';
+            $params = [':id' => substr($token, 1), ':id_user' => $idUser];
+        } else {
+            // Signer token
+            $sql = 'SELECT S.FK_ID_BULK, S.CREATOR, S.EMAIL, S.PHONE, S.NAME, S.DOCUMENT, S.FK_ID_USER, S.FK_ID_IDENTITY,
+                      S.PHONE, S.VIEWED, S.SIGNED, S.TOKEN
+                    FROM SIGNERS S WHERE S.TOKEN = :token AND (S.SIGNED = 1 OR S.TOKEN_EXPIRATION > SYSDATE() AND S.SIGNED = 0)';
+            $params = [':token' => $token];
+        }
+
+        // Get requested signer
+        $res = $this->db->query($sql, $params, 'Api\Entity\Signer');
 
         if ($res->getNumRows() == 0) {
             // Token doesn't exists or it is expired
@@ -657,7 +685,7 @@ class StoreData extends RepositoryLocatableAbstract
     public function getSignature($token, $idUser = null)
     {
         // Get signer
-        $signer = substr($token, 0, 1) == 's' ? $this->getSignatureCreator(substr($token, 1)) : $this->getSigner($token);
+        $signer = $this->getSigner($token, $idUser);
 
         // If signer has user, idUser must be the same
         if (($signer->getIdUser() or $idUser) and $signer->getIdUser() != $idUser) {

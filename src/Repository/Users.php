@@ -252,8 +252,10 @@ class Users extends RepositoryLocatableAbstract
         // Generate validation code
         $token = md5($id . $user->getEmail() . time());
 
-        // Insert the validation token, the active user type and the first identity, also we update old signers with same email to associate user
-        $sql = "UPDATE SIGNERS SET FK_ID_USER = :id WHERE EMAIL = :email AND FK_ID_USER IS NULL;;
+        // Insert the validation token, the active user type and the first identity, update old signers with same email to associate user and insert processes clients
+        $sql = "UPDATE SIGNERS SET FK_ID_USER = :id WHERE EMAIL = :email AND FK_ID_USER IS NULL;
+                INSERT INTO PROCESSES_CLIENTS(TYPE, ID_ELEMENT, CLIENT_TYPE, FK_ID_CLIENT)
+                SELECT 'S', FK_ID_BULK, 'U', FK_ID_USER FROM SIGNERS WHERE FK_ID_USER = :id;
                 INSERT INTO USERS_VALIDATIONS(TOKEN, TYPE, FK_ID_USER, EMAIL, CTRL_DATE, CTRL_IP)
                 VALUES (:token, :type_val, :id, :email, SYSDATE(), :ip);
                 INSERT INTO USERS_TYPES(FK_ID_USER, FK_ID_TYPE, DATE_START, NEXT_PAYMENT, LAST_RESET)
@@ -581,9 +583,9 @@ class Users extends RepositoryLocatableAbstract
                     $sql = "UPDATE USERS_IDENTITIES SET DOCUMENT = :document, CTRL_IP_MOD = :ip, CTRL_DATE_MOD = SYSDATE(), CONFIRMED = :confirmed
                             WHERE ID_IDENTITY = :id";
                     $params = [
-                        ':id'       => $identity->getIdIdentity(),
-                        ':document' => $identity->getDocument(),
-                        ':ip'       => $identity->getIp(),
+                        ':id'        => $identity->getIdIdentity(),
+                        ':document'  => $identity->getDocument(),
+                        ':ip'        => $identity->getIp(),
                         ':confirmed' => $identity->getConfirmed() ? 1 : 0
                     ];
                 } else {

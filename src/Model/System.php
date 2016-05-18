@@ -79,7 +79,7 @@ class System
      *
      * @throws \Exception
      */
-    private function executeCallbak(BlockChain $blockchain)
+    private function executeCallback(BlockChain $blockchain)
     {
         if ($blockchain->getType() == 'B') {
             if (($bulk = $this->bulkRepo->getBulk((new BulkTransaction())->setIdBulkTransaction($blockchain->getIdElement()))) and
@@ -119,7 +119,7 @@ class System
             }
         } elseif ($blockchain->getType() == 'F') {
             // Set process as completed
-            $this->procRepo->updateProcess((new Process())->setType('F')
+            $this->procRepo->updateProcess((new Process())->setType('N')
                                                           ->setIdElement($blockchain->getIdElement())
                                                           ->setIdStatus(Process::STATUS_N_COMPLETED));
         }
@@ -152,7 +152,7 @@ class System
                     $this->dataRepo->confirmTransaction($row);
 
                     // Execute callback process depending on the client
-                    $this->executeCallbak($row);
+                    $this->executeCallback($row);
                 }
             }
         }
