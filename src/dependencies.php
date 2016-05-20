@@ -40,7 +40,11 @@ $container['Api\Middleware\OAuth'] = function ($c) {
 
 // Maxmind to geolocalize
 $container['MaxMind\Db\Reader'] = function ($c) {
-    return new \MaxMind\Db\Reader($c->get('settings')['maxmind']);
+    try {
+        return new \MaxMind\Db\Reader($c->get('settings')['maxmind']);
+    } catch (\Exception $e) {
+        throw new \Exception('MaxMindDb not redeable', 503);
+    }
 };
 
 // BlockChain
