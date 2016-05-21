@@ -366,6 +366,27 @@ class StoreData
     }
 
     /**
+     * Get a notarization certificate
+     *
+     * @param Request|\Slim\Http\Request   $request
+     * @param Response|\Slim\Http\Response $response
+     * @param array                        $args [optional]
+     *
+     * @return \Slim\Http\Response
+     */
+    public function notarizationCertificate(Request $request, Response $response, $args)
+    {
+        $res = $this->modelData->notarizationCertificate((new File())->setHash($request->getParam('token'))
+                                                                     ->setClientType($request->getParam('clientType'))
+                                                                     ->setIdClient($request->getParam('idClient')),
+            $request->getParam('mode'));
+
+        $res = ['data' => ['type' => 'signatures', 'attributes' => $res->toArray()]];
+
+        return $response->withJson($res, 200);
+    }
+
+    /**
      * Validate a mobile phone number
      *
      * @param Request|\Slim\Http\Request   $request

@@ -1172,7 +1172,7 @@ class StoreData
     }
 
     /**
-     * Get a pin code to sign a document by sending a signer token
+     * Get a signature certificate
      *
      * @param BulkTransaction $bulk
      * @param string          $mode 'full' o 'simple' mode
@@ -1250,6 +1250,55 @@ class StoreData
         $signature->setSigners($signers);
 
         return $signature;
+    }
+
+    /**
+     * Get a notarization certificate
+     *
+     * @param File   $file
+     * @param string $mode 'full' o 'simple' mode
+     *
+     * @return DocsSignature
+     * @throws \Exception
+     */
+    public function notarizationCertificate(File $file, $mode)
+    {
+        // Get file if user is allowed
+        $file = $this->dataRepo->documentNotarization($file);
+
+        if (!$file) {
+            throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
+        }
+
+        // We will store all the information necessary to generate the certificate in a DocsSignature object
+        $notarization = (new DocsSignature())->setFiles([$file]);
+
+        // Get blockchain transaction
+        $blockchain = $this->dataRepo->findTransaction((new BlockChain())->setTransaction($file->getTransaction()));
+
+        if (!$blockchain) {
+            throw new \Exception(Exceptions::FEW_PRIVILEGES, 403);
+        }
+
+        // Store blockchain transaction
+        $notarization->setBlockchain($blockchain);
+
+        // In simple mode, we only need information about file
+        if ($mode == 'simple') {
+            return $notarization;
+        }
+
+        // If owner is user, it is better to get current identity
+        if ($file->getClientType() == 'U') {
+            $owner = $this->usersRepo->getIdentities((new User())->setIdUser($file->getIdClient()), true)->getRows()[0];
+        } else {
+            $owner = $this->oauthRepo->oauthClient((new OAuthClient())->setIdClient($file->getIdClient()));
+        }
+
+        // Set owner
+        $notarization->setIssuer($owner)->setIssuerType($file->getClientType());
+
+        return $notarization;
     }
 
     /**

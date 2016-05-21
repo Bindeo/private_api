@@ -50,6 +50,7 @@ $app->group('/data', function () {
     $this->get('/blockchain/test', 'Api\Controller\StoreData:testAsset');
     $this->get('/processes-status', 'Api\Controller\Processes:processesStatus');
     $this->get('/processes', 'Api\Controller\Processes:processesList');
+    $this->get('/certificate', 'Api\Controller\StoreData:notarizationCertificate');
 });
 
 // Bulk transaction routes

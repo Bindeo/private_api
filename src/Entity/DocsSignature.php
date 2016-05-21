@@ -21,6 +21,11 @@ class DocsSignature extends DocsSignatureAbstract
             $props['bulk'] = $this->bulk->toArray();
         }
 
+        // Blockchain
+        if ($this->blockchain instanceof BlockChain) {
+            $props['blockchain'] = $this->blockchain->toArray();
+        }
+
         // Files
         if ($this->files and is_array($this->files)) {
 

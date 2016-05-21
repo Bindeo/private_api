@@ -937,4 +937,38 @@ class StoreData extends RepositoryLocatableAbstract
             return $res->getRows();
         }
     }
+
+    /**
+     * Get a notarization certificate
+     *
+     * @param File $file
+     *
+     * @return File
+     * @throws \Exception
+     */
+    public function documentNotarization(File $file)
+    {
+        if (!$file->getHash() or !$file->getClientType() or !$file->getIdClient()) {
+            throw new \Exception(Exceptions::MISSING_FIELDS, 400);
+        }
+
+        // Get notarized file
+        $sql = 'SELECT F.ID_FILE, F.CLIENT_TYPE, F.FK_ID_CLIENT, F.MODE, F.FK_ID_MEDIA, F.NAME, F.FILE_ORIG_NAME, F.HASH,
+                  F.SIZE, F.PAGES, F.CTRL_DATE, F.TAG, F.DESCRIPTION, F.TRANSACTION, F.CONFIRMED
+                FROM FILES F, BLOCKCHAIN B
+                WHERE B.HASH = :hash AND F.TRANSACTION = B.TRANSACTION AND F.CLIENT_TYPE = :client_type AND F.FK_ID_CLIENT = :id_client';
+        $params = [
+            ':hash'        => $file->getHash(),
+            ':client_type' => $file->getClientType(),
+            ':id_client'   => $file->getIdClient()
+        ];
+
+        $data = $this->db->query($sql, $params, 'Api\Entity\File');
+
+        if (!$data or $this->db->getError()) {
+            throw new \Exception($this->db->getError(), 400);
+        }
+
+        return $data->getNumRows() ? $data->getRows()[0] : null;
+    }
 }
