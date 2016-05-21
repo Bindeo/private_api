@@ -110,6 +110,19 @@ class SignDocument
         // Document creator
         $creator = $this->dataModel->getSignatureCreator($bulk);
 
+        // Generate and store certificate in tmp dir
+        $certificate = '/var/www/files/tmp/' . $bulk->getExternalId() . '.pdf';
+        $context = stream_context_create([
+            'ssl' => [
+                'verify_peer'      => false,
+                'verify_peer_name' => false
+            ]
+        ]);
+
+        file_put_contents($certificate,
+            fopen($url . '&s=' . $this->frontUrls['secret'] . '&u=' . $creator->getIdUser() . '&ut=' .
+                  $creator->getUserType(), 'rb', false, $context));
+
         // Instantiate creator language
         $translate = TranslateFactory::factory($creator->getLang());
 
@@ -125,7 +138,7 @@ class SignDocument
 
             $res = $this->email->sendEmail($creator->getEmail(),
                 $translate->translate('sign_completed_subject', $file->getElementName(32)),
-                $response->getBody()->__toString());
+                $response->getBody()->__toString(), ['attachment' => $certificate]);
 
             if (!$res or $res->http_response_code != 200) {
                 $this->logger->addError('Error sending an email',
@@ -156,7 +169,7 @@ class SignDocument
 
                     $res = $this->email->sendEmail($signer->getEmail(),
                         $translate->translate('sign_completed_subject_copy', $file->getElementName(32)),
-                        $response->getBody()->__toString());
+                        $response->getBody()->__toString(), ['attachment' => $certificate]);
 
                     if (!$res or $res->http_response_code != 200) {
                         $this->logger->addError('Error sending an email',

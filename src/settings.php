@@ -85,6 +85,7 @@ return [
 
         // Host and front urls for emails
         'front_urls'          => [
+            'secret'               => '174a2b95bb27a46f8bc1e09179b2734c54c2837e',
             'host'                 => 'https://',
             'login'                => 'www.bindeo.com/login',
             'validation_token'     => 'www.bindeo.com/user/validate',
