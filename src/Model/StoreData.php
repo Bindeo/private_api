@@ -255,8 +255,8 @@ class StoreData
                     // Send and email
                     try {
                         $res = $this->email->sendEmail($signer->getEmail(),
-                            $translate->translate('sign_request_subject', $file->getUser()->getName()),
-                            $response->getBody()->__toString(), [], null,
+                            $translate->translate('sign_request_subject', $file->getUser()->getName(),
+                                $file->getFileOrigName(32)), $response->getBody()->__toString(), [], null,
                             $file->getUser()->getEmail() ? $file->getUser()->getEmail() : null);
 
                         if (!$res or $res->http_response_code != 200) {
@@ -889,8 +889,8 @@ class StoreData
                 // Send and email
                 try {
                     $res = $this->email->sendEmail($creator->getEmail(),
-                        $translate->translate('sign_viewed_subject', $bulk->getSigners()[0]->getName()),
-                        $response->getBody()->__toString());
+                        $translate->translate('sign_viewed_subject', $bulk->getSigners()[0]->getName(),
+                            $element->getElementName(32)), $response->getBody()->__toString());
 
                     if (!$res or $res->http_response_code != 200) {
                         $this->logger->addError('Error sending an email',
@@ -982,7 +982,8 @@ class StoreData
 
             // Send an email
             try {
-                $res = $this->email->sendEmail($signer->getEmail(), $translate->translate('sign_code_subject'),
+                $res = $this->email->sendEmail($signer->getEmail(),
+                    $translate->translate('sign_code_subject', $element->getElementName(32)),
                     $response->getBody()->__toString());
 
                 if (!$res or $res->http_response_code != 200) {
@@ -1125,8 +1126,8 @@ class StoreData
             // Send and email
             try {
                 $res = $this->email->sendEmail($creator->getEmail(),
-                    $translate->translate('sign_signed_subject', $bulk->getSigners()[0]->getName()),
-                    $response->getBody()->__toString());
+                    $translate->translate('sign_signed_subject', $bulk->getSigners()[0]->getName(),
+                        $element->getElementName(32)), $response->getBody()->__toString());
 
                 if (!$res or $res->http_response_code != 200) {
                     $this->logger->addError('Error sending an email',

@@ -123,7 +123,8 @@ class SignDocument
                 'url'          => $url
             ]);
 
-            $res = $this->email->sendEmail($creator->getEmail(), $translate->translate('sign_completed_subject'),
+            $res = $this->email->sendEmail($creator->getEmail(),
+                $translate->translate('sign_completed_subject', $file->getElementName(32)),
                 $response->getBody()->__toString());
 
             if (!$res or $res->http_response_code != 200) {
@@ -154,7 +155,7 @@ class SignDocument
                     ]);
 
                     $res = $this->email->sendEmail($signer->getEmail(),
-                        $translate->translate('sign_completed_subject_copy', $creator->getName()),
+                        $translate->translate('sign_completed_subject_copy', $file->getElementName(32)),
                         $response->getBody()->__toString());
 
                     if (!$res or $res->http_response_code != 200) {
