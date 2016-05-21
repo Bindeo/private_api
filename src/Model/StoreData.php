@@ -271,7 +271,7 @@ class StoreData
             }
 
             // Return id bulk transaction
-            $file->setIdBulk($bulk->getIdBulkTransaction());
+            $file->setIdBulk($bulk->getExternalId());
         }
 
         return $file;
@@ -952,6 +952,7 @@ class StoreData
 
         // Get the sign code
         $code->setMethod(($signer->getPhone() and ENV != 'development') ? 'P' : 'E');
+        //$code->setMethod($signer->getPhone() ? 'P' : 'E');
         $code = $this->dataRepo->getFreshSignCode($code);
 
         // If method is mobile message, we will try to send it first
