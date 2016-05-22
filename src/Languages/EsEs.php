@@ -40,10 +40,9 @@ class EsEs extends TranslateAbstract
             'sign_completed_subject'       => '"%s" ha sido firmado',
             'sign_completed_subtitle'      => 'Tu documento ha sido firmado',
             'sign_completed_explain'       => 'Todos los involucrados firmaron tu documento',
-            'sign_completed_button'        => 'Descarga prueba',
+            'sign_completed_button'        => 'Verlo en Bindeo',
             'sign_completed_subject_copy'  => 'Todos los involucrados firmaron "%s", mantén tu copia firmada',
             'sign_completed_subtitle_copy' => 'Todos los involucrados firmaron el documento de %s, mantén tu copia firmada',
-            'sign_completed_button_copy'   => 'Descarga el documento firmado',
             'sign_completed_explain_copy'  => 'Todos tus documentos firmados están disponibles %siniciando sesión en Bindeo%s'
         ];
     }

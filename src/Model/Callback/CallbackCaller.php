@@ -3,6 +3,7 @@
 namespace Api\Model\Callback;
 
 use Api\Model\Email\EmailInterface;
+use Api\Model\General\FilesInterface;
 use Api\Model\StoreData;
 use Api\Repository\RepositoryAbstract;
 use Bindeo\DataModel\Exceptions;
@@ -32,6 +33,11 @@ class CallbackCaller
     private $email;
 
     /**
+     * @var \Api\Model\General\FilesStorage
+     */
+    private $storage;
+
+    /**
      * @var Twig
      */
     private $view;
@@ -50,6 +56,7 @@ class CallbackCaller
         RepositoryAbstract $dataRepo,
         StoreData $dataModel,
         EmailInterface $email,
+        FilesInterface $storage,
         Twig $view,
         LoggerInterface $logger,
         array $frontUrls
@@ -58,6 +65,7 @@ class CallbackCaller
         $this->dataRepo = $dataRepo;
         $this->dataModel = $dataModel;
         $this->email = $email;
+        $this->storage = $storage;
         $this->view = $view;
         $this->logger = $logger;
         $this->frontUrls = $frontUrls;
@@ -65,12 +73,13 @@ class CallbackCaller
         // Generate callbacks list
         $this->callbacks = [
             'SignDocument' => [
-                'class' => 'Api\Model\Callback\SignDocument',
+                'class'  => 'Api\Model\Callback\SignDocument',
                 'params' => [
                     $this->bulkRepo,
                     $this->dataRepo,
                     $this->dataModel,
                     $this->email,
+                    $this->storage,
                     $this->view,
                     $this->logger,
                     $this->frontUrls

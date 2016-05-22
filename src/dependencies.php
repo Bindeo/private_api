@@ -148,7 +148,8 @@ $container['Api\Model\StoreData'] = function ($c) {
 $container['Api\Model\Callback\CallbackCaller'] = function ($c) {
     return new Api\Model\Callback\CallbackCaller($c->get('Api\Repository\BulkTransactions'),
         $c->get('Api\Repository\StoreData'), $c->get('Api\Model\StoreData'), $c->get('Api\Model\Email\Email'),
-        $c->get('view'), $c->get('logger'), $c->get('settings')['front_urls']);
+        $c->get('Api\Model\General\FilesStorage'), $c->get('view'), $c->get('logger'),
+        $c->get('settings')['front_urls']);
 };
 
 $container['Api\Model\System'] = function ($c) {

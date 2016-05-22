@@ -7,6 +7,7 @@ use Api\Entity\File;
 use Api\Entity\Signer;
 use Api\Languages\TranslateFactory;
 use Api\Model\Email\EmailInterface;
+use Api\Model\General\FilesInterface;
 use Api\Model\StoreData;
 use Api\Repository\RepositoryAbstract;
 use Bindeo\DataModel\Exceptions;
@@ -37,6 +38,11 @@ class SignDocument
     private $email;
 
     /**
+     * @var \Api\Model\General\FilesStorage
+     */
+    private $storage;
+
+    /**
      * @var Twig
      */
     private $view;
@@ -53,6 +59,7 @@ class SignDocument
         RepositoryAbstract $dataRepo,
         StoreData $dataModel,
         EmailInterface $email,
+        FilesInterface $storage,
         Twig $view,
         LoggerInterface $logger,
         array $frontUrls
@@ -61,6 +68,7 @@ class SignDocument
         $this->dataRepo = $dataRepo;
         $this->dataModel = $dataModel;
         $this->email = $email;
+        $this->storage = $storage;
         $this->view = $view;
         $this->logger = $logger;
         $this->frontUrls = $frontUrls;
@@ -111,7 +119,8 @@ class SignDocument
         $creator = $this->dataModel->getSignatureCreator($bulk);
 
         // Generate and store certificate in tmp dir
-        $certificate = '/var/www/files/tmp/' . $bulk->getExternalId() . '.pdf';
+        $original = $this->storage->get($file);
+        $certificate = '/var/www/files/tmp/Bindeo_signature_' . $bulk->getExternalId() . '.pdf';
         $context = stream_context_create([
             'ssl' => [
                 'verify_peer'      => false,
@@ -133,12 +142,13 @@ class SignDocument
                 'translate'    => $translate,
                 'element_name' => $file->getElementName(),
                 'user'         => $creator,
-                'url'          => $url
+                'url'          => $urlLogin
             ]);
 
             $res = $this->email->sendEmail($creator->getEmail(),
                 $translate->translate('sign_completed_subject', $file->getElementName(32)),
-                $response->getBody()->__toString(), ['attachment' => $certificate]);
+                $response->getBody()->__toString(),
+                ['attachment' => [$certificate, ['remoteName' => $file->getFileOrigName(), 'filePath' => $original]]]);
 
             if (!$res or $res->http_response_code != 200) {
                 $this->logger->addError('Error sending an email',
@@ -163,13 +173,17 @@ class SignDocument
                         'element_name' => $file->getElementName(),
                         'creator'      => $creator,
                         'user'         => $signer,
-                        'url'          => $url,
-                        'urlLogin'     => $urlLogin
+                        'url'          => $urlLogin
                     ]);
 
                     $res = $this->email->sendEmail($signer->getEmail(),
                         $translate->translate('sign_completed_subject_copy', $file->getElementName(32)),
-                        $response->getBody()->__toString(), ['attachment' => $certificate]);
+                        $response->getBody()->__toString(), [
+                            'attachment' => [
+                                $certificate,
+                                ['remoteName' => $file->getFileOrigName(), 'filePath' => $original]
+                            ]
+                        ]);
 
                     if (!$res or $res->http_response_code != 200) {
                         $this->logger->addError('Error sending an email',
@@ -182,5 +196,4 @@ class SignDocument
             }
         }
     }
-
 }

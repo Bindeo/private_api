@@ -40,10 +40,9 @@ class EnUs extends TranslateAbstract
             'sign_completed_subject'       => '"%s" has been completed',
             'sign_completed_subtitle'      => 'Your document has been completed',
             'sign_completed_explain'       => 'All signers completed your document',
-            'sign_completed_button'        => 'Download proof',
+            'sign_completed_button'        => 'View it in Bindeo',
             'sign_completed_subject_copy'  => 'All signers completed "%s", keep your signed copy',
             'sign_completed_subtitle_copy' => 'All signers completed %s document, keep your signed copy',
-            'sign_completed_button_copy'   => 'Download signed document',
             'sign_completed_explain_copy'  => 'All your signed documents are available by %ssigning up on Bindeo%s'
         ];
     }
