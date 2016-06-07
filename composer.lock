@@ -5,6 +5,7 @@
         "This file is @generated automatically"
     ],
     "hash": "4b71870f3b597dbacde4d3db4e07342c",
+    "content-hash": "504f7c87abd64c75397533210b0212e5",
     "packages": [
         {
             "name": "container-interop/container-interop",
@@ -623,16 +624,16 @@
         },
         {
             "name": "slim/slim",
-            "version": "3.4.1",
+            "version": "3.4.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/slimphp/Slim.git",
-                "reference": "794073a27b2dd9ef492124263038291b7f8daeb3"
+                "reference": "a132385f736063d00632b52b3f8a389fe66fe4fa"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/slimphp/Slim/zipball/794073a27b2dd9ef492124263038291b7f8daeb3",
-                "reference": "794073a27b2dd9ef492124263038291b7f8daeb3",
+                "url": "https://api.github.com/repos/slimphp/Slim/zipball/a132385f736063d00632b52b3f8a389fe66fe4fa",
+                "reference": "a132385f736063d00632b52b3f8a389fe66fe4fa",
                 "shasum": ""
             },
             "require": {
@@ -689,7 +690,7 @@
                 "micro",
                 "router"
             ],
-            "time": "2016-05-16 18:49:10"
+            "time": "2016-05-25 11:23:38"
         },
         {
             "name": "slim/twig-view",
@@ -743,16 +744,16 @@
         },
         {
             "name": "twig/twig",
-            "version": "v1.24.0",
+            "version": "v1.24.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/twigphp/Twig.git",
-                "reference": "3e5aa30ebfbafd5951fb1b01e338e1800ce7e0e8"
+                "reference": "3566d311a92aae4deec6e48682dc5a4528c4a512"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/twigphp/Twig/zipball/3e5aa30ebfbafd5951fb1b01e338e1800ce7e0e8",
-                "reference": "3e5aa30ebfbafd5951fb1b01e338e1800ce7e0e8",
+                "url": "https://api.github.com/repos/twigphp/Twig/zipball/3566d311a92aae4deec6e48682dc5a4528c4a512",
+                "reference": "3566d311a92aae4deec6e48682dc5a4528c4a512",
                 "shasum": ""
             },
             "require": {
@@ -800,7 +801,7 @@
             "keywords": [
                 "templating"
             ],
-            "time": "2016-01-25 21:22:18"
+            "time": "2016-05-30 09:11:59"
         }
     ],
     "packages-dev": [],
